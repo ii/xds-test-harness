@@ -83,8 +83,8 @@ discoveryRequest := &envoy_service_discovery_v3.DiscoveryRequest{
   ResourceNames: []string{*resourceFlag},
 }
 #+end_src
-/the resourceflag defaults to foo/
-
+/the resource flag defaults to foo/
+* Results
 I expect the discoveryResponse to have a versionInfo, type_url, nonce, and resources, again following the ACK diagram.
 
 #+begin_example yaml
