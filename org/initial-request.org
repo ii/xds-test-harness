@@ -41,7 +41,7 @@ echo "curl localhost:1000": $(curl localhost:10000)
 I won't be able to successfully curl ~:18000~ as it is a gRPC server, and needs
 http/2. I can reach it, through, with a simple client I will build next.
 * Client
-The client is located at [[file:~/Projects/envoy/tester-prototype/main.go][../main.go]]
+The client is located at [[../main.go][../main.go]]
 It is based off an [[https://github.com/envoyproxy/go-control-plane/blob/main/pkg/integration/ttl_integration_test.go][integration test in the go-control-plane repo]]
 
 In it, I setup I dial into :18000, then set up an EDS client and an endpoint
