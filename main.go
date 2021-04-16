@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
+	//"flag"
 	"fmt"
 	"log"
 	"google.golang.org/grpc"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
-	endpointservice "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
+	cluster_service "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 )
@@ -16,8 +16,8 @@ import (
 func main() {
 	// Take a resource flag to practice sending different resources.
 	// For simplicity, we will only request a single resource
-	resourceFlag := flag.String("resource", "foo", "a string")
-	flag.Parse()
+	//resourceFlag := flag.String("resource", "foo", "a string")
+	//flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -29,7 +29,7 @@ func main() {
 	}
 	log.Printf("Connected to xDS Server. State: %v", conn.GetState())
 
-	client := endpointservice.NewEndpointDiscoveryServiceClient(conn)
+	client := cluster_service.NewClusterDiscoveryServiceClient(conn)
 
 	// Discovery Request following format of go-control-plane integration test.
 	// we do not provide version_info to match the initial ACK diagram in
@@ -38,12 +38,14 @@ func main() {
 		Node: &envoy_config_core_v3.Node{
 			Id: "test-id",
 		},
-		TypeUrl:       resource.EndpointType,
-		ResourceNames: []string{*resourceFlag},
+		TypeUrl:       resource.ClusterType,
+		// Note that for CDS it is also possible to send a request w/o ResourceNames,
+		// and it will return all clusters (wildcard request)
+		ResourceNames: []string{"example_proxy_cluster"},
 	}
 
 	// Stream, send, and receive following integration test.
-	sclient, err := client.StreamEndpoints(ctx)
+	sclient, err := client.StreamClusters(ctx)
 	if err != nil {
 		log.Fatalf("err setting up stream: %v", err.Error())
 	}
