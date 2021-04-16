@@ -144,7 +144,6 @@ and check the output again
 cat flight-log | grep "respond"
 #+end_src
 
-#+RESULTS:
 : 2021/04/16 17:56:56 respond type.googleapis.com/envoy.service.runtime.v3.Runtime[runtime-0] version "" with version "1"
 : 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.cluster.v3.Cluster[] version "" with version "1"
 : 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.listener.v3.Listener[] version "" with version "1"
@@ -157,7 +156,12 @@ We are communicating, but it's a vague communication!
 * Current Understanding
 I am happy that I am successfully communicating to the xDS server, but do not feel confident in the discovery requests and Responses.
 Questions I have that I plan to answer in the future:
-- Should the discoveryResponse include a resource property, even if the resources I requested don't exist?
-- What would a proper discoveryRequest look like, where I am asking for a correct resource using the context of this example server?
+- Should the discoveryResponse include a resource property, even if the
+  resources I requested don't exist?
+- What would a proper discoveryRequest look like, where I am asking for a
+  correct resource using the context of this example server?
 - What would be the best way to program the full ACK flow and the NACK flow?
-  - In the docs it says "Every xDS resource type has a version string that indicates the version for that resource type. Whenever one resource of that type changes, the version is changed."  for the EDS resource i'm requesting, what are examples of a "resource change"?
+  - In the docs it says "Every xDS resource type has a version string that
+    indicates the version for that resource type. Whenever one resource of that
+    type changes, the version is changed." for the EDS resource i'm requesting,
+    what are examples of a "resource change"?
