@@ -91,7 +91,6 @@ I expect the discoveryResponse to have a versionInfo, type_url, nonce, and resou
 version_info: X
 resources:
 - foo ClusterLoadAssignment proto encoding
-- bar ClusterLoadAssignment proto encoding
 type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
 nonce: A
 #+end_example
