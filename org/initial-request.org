@@ -1,0 +1,163 @@
+#+TITLE: Initial Request
+
+* Goal
+In this document, I give my progress in making an xDS client that sends a
+discoveryRequest to an xDS server and gets back an appropriate
+discoveryResponse.
+
+From here, I can iterate to a more elegant implementation, and to begin writing
+basic test cases for xDS that I can then try with this client.
+
+* Setup xDS Server
+
+For the xDS server, I am using the [[https://github.com/envoyproxy/go-control-plane/][go-control-plane]], which acts as an xDS
+management server for an envoy proxy. Specifically, I will use the [[https://github.com/envoyproxy/go-control-plane/blob/main/internal/example/README.md][example
+server]] given in this repo.
+
+After cloning, i can run it using `make example` then pipe its output a log to
+be able to grep for my requests later on.
+
+#+NAME: clone and run go-control-plane
+#+begin_src tmate :dir ~/tmp
+git clone https://github.com/envoyproxy/go-control-plane
+cd go-control-plane
+make example 2>&1 | tee -a flight-log
+#+end_src
+
+Once it's running, it should setup the server to listen at ~:18000~, with an
+admin interface at ~:19000~ The makefile also sets up an envoy instance,
+listening at ~10000~ that redirects all requests to ~envoyproxy.io~
+
+To confirm:
+#+NAME: Confirm envoy proxy deployed correctly
+#+begin_src shell :results output
+echo "Proxy is $(curl localhost:19000/ready) and listening at $(curl localhost:19000/listeners)"
+echo "curl localhost:1000": $(curl localhost:10000)
+#+end_src
+
+: Proxy is LIVE and listening at listener_0::0.0.0.0:10000
+: curl localhost:1000: Redirecting to https://www.envoyproxy.io/
+
+I won't be able to successfully curl ~:18000~ as it is a gRPC server, and needs
+http/2. I can reach it, through, with a simple client I will build next.
+* Client
+The client is located at [[file:~/Projects/envoy/tester-prototype/main.go][../main.go]]
+It is based off an [[https://github.com/envoyproxy/go-control-plane/blob/main/pkg/integration/ttl_integration_test.go][integration test in the go-control-plane repo]]
+
+In it, I setup I dial into :18000, then set up an EDS client and an endpoint
+stream. I send a discoveryRequest, await a discoveryResponse, then pretty-print
+the response to stdout.
+
+It is intended to model the [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack][ACK diagram]] in the [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol][xDS protocol docs]], so the request
+should be:
+
+#+begin_example yaml
+version_info:
+node: { id: envoy }
+resource_names:
+- foo
+type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+response_nonce:
+#+end_example
+
+No version_info or response_nonce is given, as it is the initial request and
+the version_info and nonce will be given in the response.
+
+I wrote this DiscoveryRequest in go, with the node hardcoded to the one
+created in the example makefile.
+
+#+begin_src shell
+curl http://localhost:19000/server_info | jq .node.id
+#+end_src
+
+: test-id
+
+And so:
+
+#+begin_src go
+discoveryRequest := &envoy_service_discovery_v3.DiscoveryRequest{
+  Node: &envoy_config_core_v3.Node{
+      Id: "test-id",
+  },
+  TypeUrl: resource.EndpointType,
+  ResourceNames: []string{*resourceFlag},
+}
+#+end_src
+/the resourceflag defaults to foo/
+
+I expect the discoveryResponse to have a versionInfo, type_url, nonce, and resources, again following the ACK diagram.
+
+#+begin_example yaml
+version_info: X
+resources:
+- foo ClusterLoadAssignment proto encoding
+- bar ClusterLoadAssignment proto encoding
+type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+nonce: A
+#+end_example
+
+Running the program, I get this response:
+#+begin_src shell :dir ../ :results output
+go run main.go
+#+end_src
+
+: 2021/04/16 17:47:47 Connected to xDS Server. State: IDLE
+: 2021/04/16 17:47:47 response: {
+:    "version_info": "1",
+:    "type_url": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+:    "nonce": "1"
+: }
+
+I get everything but resources. I am uncertain why this is. I'd expect that, even
+if there are no resources for ~foo~, the resources property would still be there.
+
+Grepping the control-plane logs, we can confirm that our request prompted a
+response, meaning (I assume) that we are correctly communicating with the xDS
+server. The last line in the result shows it responding for
+~ClusterLoadAssignment[foo]~
+
+#+begin_src shell :dir ~/tmp/go-control-plane :results output
+cat flight-log | grep "respond"
+#+end_src
+
+: 2021/04/16 17:56:56 respond type.googleapis.com/envoy.service.runtime.v3.Runtime[runtime-0] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.cluster.v3.Cluster[] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.listener.v3.Listener[] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.route.v3.RouteConfiguration[local_route] version "" with version "1"
+: 2021/04/16 17:58:00 respond type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment[foo] version "" with version "1"
+
+I can try again with a resource like xds_cluster (the name of the management cluster)
+
+#+begin_src shell :dir ../ :results output
+go run main.go -resource xds_cluster
+#+end_src
+
+: 2021/04/17 18:03:08 Connected to xDS Server. State: IDLE
+: 2021/04/17 18:03:08 response: {
+:    "version_info": "1",
+:    "type_url": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+:    "nonce": "1"
+: }
+
+and check the output again
+#+begin_src shell :dir ~/tmp/go-control-plane :results output
+cat flight-log | grep "respond"
+#+end_src
+
+#+RESULTS:
+: 2021/04/16 17:56:56 respond type.googleapis.com/envoy.service.runtime.v3.Runtime[runtime-0] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.cluster.v3.Cluster[] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.listener.v3.Listener[] version "" with version "1"
+: 2021/04/16 17:57:11 respond type.googleapis.com/envoy.config.route.v3.RouteConfiguration[local_route] version "" with version "1"
+: 2021/04/16 17:58:00 respond type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment[foo] version "" with version "1"
+: 2021/04/17 18:03:08 respond type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment[xds_cluster] version "" with version "1"
+
+We are communicating, but it's a vague communication!
+
+* Current Understanding
+I am happy that I am successfully communicating to the xDS server, but do not feel confident in the discovery requests and Responses.
+Questions I have that I plan to answer in the future:
+- Should the discoveryResponse include a resource property, even if the resources I requested don't exist?
+- What would a proper discoveryRequest look like, where I am asking for a correct resource using the context of this example server?
+- What would be the best way to program the full ACK flow and the NACK flow?
+  - In the docs it says "Every xDS resource type has a version string that indicates the version for that resource type. Whenever one resource of that type changes, the version is changed."  for the EDS resource i'm requesting, what are examples of a "resource change"?
