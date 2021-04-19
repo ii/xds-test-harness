@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	//"flag"
 	"fmt"
 	"log"
+	"io"
 	"google.golang.org/grpc"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	cluster_service "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
@@ -13,12 +13,21 @@ import (
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 )
 
-func main() {
-	// Take a resource flag to practice sending different resources.
-	// For simplicity, we will only request a single resource
-	//resourceFlag := flag.String("resource", "foo", "a string")
-	//flag.Parse()
+func createRequest (version string, nonce string) *envoy_service_discovery_v3.DiscoveryRequest {
+	return &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: version,
+		Node: &envoy_config_core_v3.Node{
+			Id: "test-id",
+		},
+		TypeUrl: resource.ClusterType,
+		// Note that for CDS it is also possible to send a request w/o ResourceNames,
+		// and it will return all clusters (wildcard request)
+		// ResourceNames: []string{},
+		ResponseNonce: nonce,
+	}
+}
 
+func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -27,51 +36,79 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error connecting to management server: %v\n", err)
 	}
-	log.Printf("Connected to xDS Server. State: %v", conn.GetState())
 
 	client := cluster_service.NewClusterDiscoveryServiceClient(conn)
 
-	// Discovery Request following format of go-control-plane integration test.
-	// we do not provide version_info to match the initial ACK diagram in
-	// xDS protocol docs
-	discoveryRequest := &envoy_service_discovery_v3.DiscoveryRequest{
-		Node: &envoy_config_core_v3.Node{
-			Id: "test-id",
-		},
-		TypeUrl:       resource.ClusterType,
-		// Note that for CDS it is also possible to send a request w/o ResourceNames,
-		// and it will return all clusters (wildcard request)
-		ResourceNames: []string{"example_proxy_cluster"},
-	}
-
 	// Stream, send, and receive following integration test.
-	sclient, err := client.StreamClusters(ctx)
+	stream, err := client.StreamClusters(ctx)
 	if err != nil {
 		log.Fatalf("err setting up stream: %v", err.Error())
 	}
 
-	err = sclient.Send(discoveryRequest)
+	waitc := make(chan *envoy_service_discovery_v3.DiscoveryResponse)
+
+	// Start the receiving stream, coming from the xDS server. All responses sent
+	// to the waitc channel
+	go func () {
+		for {
+			in, err := stream.Recv()
+			if err == io.EOF {
+				// read done.
+				close(waitc)
+				return
+			}
+			if err != nil {
+				log.Fatalf("Failed to receive Discovery Response: %v", err.Error())
+			}
+
+			// pretty-print to stdout
+			responseJSON, err := json.MarshalIndent(in, "", " ")
+			if err != nil {
+				log.Fatalf("Error marshalling response: %v", err)
+			}
+			log.Printf("Got Response: %v", string(responseJSON))
+
+			waitc <- in
+		}
+	}()
+
+	dreq := createRequest("","")
+
+	// Pretty print this too.
+	requestJSON, err:= json.MarshalIndent(dreq, "", "  ")
 	if err != nil {
+		log.Fatalf("error marshalling discovery request: %v", err.Error())
+	}
+
+	fmt.Printf("sending DiscoveryRequest:\n%v\n ", string(requestJSON))
+	if err = stream.Send(dreq); err != nil {
 		log.Fatalf("err sending discoveryRequest: %v", err.Error())
 	}
 
-	awaitResponse := func() *envoy_service_discovery_v3.DiscoveryResponse {
-		doneCh := make(chan *envoy_service_discovery_v3.DiscoveryResponse)
-		go func() {
+	// set up our last known version, which will be the empty string we sent in our initial discovery request.
+	last_version := ""
 
-			r, err := sclient.Recv()
+	// endless loop until signal interrupt.
+	// We take the latest discovery response and, if there's new version_info, send a new
+	// discovery request confirming we've received response successfully.
+	for {
+      dres := <-waitc
+		if dres.VersionInfo != last_version {
+			dreq = createRequest(dres.VersionInfo, dres.Nonce)
+			requestJSON, err:= json.MarshalIndent(dreq, "", "  ")
 			if err != nil {
-				fmt.Printf("errrrr: %v", err.Error())
+				log.Fatalf("error marshalling discovery request: %v", err.Error())
 			}
-			doneCh <- r
-		}()
-		return <-doneCh
-	}
 
-	discoveryResponse := awaitResponse()
-	respJSON, err := json.MarshalIndent(discoveryResponse, "", "   ")
-	if err != nil {
-		log.Fatalf("Error marshalling discoveryResponse: %v", err.Error())
+			fmt.Printf("sending DiscoveryRequest:\n%v\n ", string(requestJSON))
+			if err = stream.Send(dreq); err != nil {
+				log.Fatalf("err sending discoveryRequest: %v", err.Error())
+			}
+			// this is a sanity check. Since we are communicating with CDS, we could expect that if new clusters are added,
+			// then we should see a new version and a new number of resources from previous.
+	        log.Printf("\nLast Version: %v, \nNew Version: %v,\nResources: %v\n", last_version, dres.VersionInfo, len(dres.GetResources()))
+			last_version = dres.VersionInfo
+		}
 	}
-	log.Printf("response: %v\n", string(respJSON))
+	//TODO end this gracefully
 }
