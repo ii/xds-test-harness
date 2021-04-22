@@ -127,7 +127,6 @@ digraph SoW {
             }
 #+end_src
 
-#+RESULTS:
 [[file:sow-diagram.png]]
 
 In our rough iteration, our flow is so:
@@ -140,7 +139,6 @@ digraph SoW {
             }
 #+end_src
 
-#+RESULTS:
 [[file:streaming-diagram.png]]
 
 This won't be how the actual framework is structure, more a mental map for where this iteration fits.
@@ -423,7 +421,6 @@ curl http://localhost:19000/config_dump |
     jq '.configs[1].dynamic_active_clusters[].cluster.name'
 #+end_src
 
-#+RESULTS:
 : "ecco"
 : "echo"
 : "echo-park"
