@@ -86,14 +86,14 @@ func main() {
 	}
 
 	// set up our last known version, which will be the empty string we sent in our initial discovery request.
-	last_version := ""
+	lastVersion := ""
 
 	// endless loop until signal interrupt.
 	// We take the latest discovery response and, if there's new version_info, send a new
 	// discovery request confirming we've received response successfully.
 	for {
       dres := <-waitc
-		if dres.VersionInfo != last_version {
+		if dres.VersionInfo != lastVersion {
 			dreq = createRequest(dres.VersionInfo, dres.Nonce)
 			requestJSON, err:= json.MarshalIndent(dreq, "", "  ")
 			if err != nil {
@@ -106,8 +106,8 @@ func main() {
 			}
 			// this is a sanity check. Since we are communicating with CDS, we could expect that if new clusters are added,
 			// then we should see a new version and a new number of resources from previous.
-	        log.Printf("\nLast Version: %v, \nNew Version: %v,\nResources: %v\n", last_version, dres.VersionInfo, len(dres.GetResources()))
-			last_version = dres.VersionInfo
+	        log.Printf("\nLast Version: %v, \nNew Version: %v,\nResources: %v\n", lastVersion, dres.VersionInfo, len(dres.GetResources()))
+			lastVersion = dres.VersionInfo
 		}
 	}
 	//TODO end this gracefully
