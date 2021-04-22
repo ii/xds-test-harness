@@ -1,0 +1,91 @@
+#+TITLE: Test Cases For Xds Transport
+
+* Goal
+This is an exercise to move through the xDS transport docs and set up test cases
+for each header. These cases dont' need to be perfect, just a way to build
+understanding of the protocol, and to get the base materials for writing actual
+test cases.
+
+What follows is the same outline as on the protocol page, with each heading,
+when applicable, having at least 1 test case written for it.
+
+The syntax for the test cases is not defined yet, for now rough, clear
+descriptions will do. I can revisit this file using a more consistent syntax
+later on.
+
+The second iteration of this would be to write up implementation details for
+each test case, and how it would be handled by the test runner.
+
+* xDS Transport Protocol
+** Transport API Version [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#transport-api-version][link]]
+Not applicable for test case
+** Basic Protocol Overview [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#basic-protocol-overview][link]]
+- Given a valid discovery request to a server requesting relevant resources, the
+  server should respond with a valid discovery response.
+- When a valid discovery response is received by a client, it should send a
+  discovery Request to the server containing the response's given version info
+  and nonce.
+- When the client makes its *first* request to a server, the request should contain a node identifier.
+- Given an established stream between a client and a server where the client's
+  first request included a node identifier, if the client sends a request with
+  an empty node identifier, the server should accept it as valid.
+- Given an established stream between a client and a server where the client's
+  first request included a node identifier, if the client sends a request with a
+  non-empty node identifier, that identifier should be identical to the one
+  given in the first request. the server should accept it as valid.
+** ACK/NACK and resource type instance version [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack-nack-and-resource-type-instance-version][link]]
+- Given a valid xDS resource type with a version string, if that resource type
+  changes, the version string should change
+- Given an initial discovery request for a resource to a server that has this
+  resource available, the server should send a discovery response whose
+  version_info contaions the latest version of that resource type.
+** ACK  [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack][link]]
+- If a discoveryResponse is sent by the server, and this version is successfully
+  applied by the client, the client should respond with a discoveryRequest with
+  the version_info and nonce given by the discoveryResponse.
+** NACK [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#nack][link]]
+- if a client rejects a discoveryResponse, it should show this by sending a
+  discoveryRequest that includes an error detail and the last accepted version.
+- *Question:* What should happen if a request is sent with the previous version
+  and no error detail? How should the server respond?
+** ACK and NACK Semantic Summary [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack-and-nack-semantics-summary][link]]
+- When a discovery response is sent by the server, the client should reply with
+  a discoveryRequest, whether that is an ACK or NACK.
+- if the client sends an ACK, it should _not_ contain an error_detail
+** When to send an update [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#when-to-send-an-update][link]]
+- No matter how many discoveryRequests are sent by the client, the server should
+  only send a discoveryResponse if the resource has changed from the version
+  given in the request.
+** How the client specifies what to return [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#how-the-client-specifies-what-resources-to-return][link]]
+- If a client sends a request for resources that are not Listener or Cluster,
+  that request should include resource names being requested.
+- If a client sends a request that includes resource names, and these resources
+  exist, the server response should include these resources.
+- If a client recieves a response that includes resources _in addition_ to the
+  resources it requested, it should accept it as a valid response (silently
+  ignoring hte resources).
+** Client Behaviour
+** Grouping Resources into Responses
+** Duplicate Resource Names
+** Deleting Resources
+** Knowing when a requested resource does not exist
+** Unsubscribing from Resources
+** Requesting Multiple Resources from a single stream
+** Resource updates
+* Resource warming
+** Eventual consistency considerations
+* TTL
+** SotW TTL
+* Aggregated Discovery Service
+* Incremental xDS
+** Resource Names
+** Subscribing to Resources
+** Unsubscribing from Resources
+** Knowing when a requested resource does not exist
+* Questions
+- Error handling. What currently happens when an invalid request is sent (e.g. a
+  NACK that doesn't have an error detail, or a request for non-listener/cluster
+  resource that doesnt' contain resource names in the request)?
+- Can a test target be both a server and a client (e.g. an xDS management server
+  that needs to communicate to another xDS management server because of some
+  business logic)?
