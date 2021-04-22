@@ -152,15 +152,12 @@ cat flight-log | grep "respond"
 
 We are communicating, but it's a vague communication!
 
-* Current Understanding
-I am happy that I am successfully communicating to the xDS server, but do not feel confident in the discovery requests and Responses.
-Questions I have that I plan to answer in the future:
-- Should the discoveryResponse include a resource property, even if the
-  resources I requested don't exist?
-- What would a proper discoveryRequest look like, where I am asking for a
-  correct resource using the context of this example server?
-- What would be the best way to program the full ACK flow and the NACK flow?
-  - In the docs it says "Every xDS resource type has a version string that
-    indicates the version for that resource type. Whenever one resource of that
-    type changes, the version is changed." for the EDS resource i'm requesting,
-    what are examples of a "resource change"?
+* Switching to ClusterDiscoveryService
+
+One issue explaning the lack of resources is that in the particular envoy
+instance I was running this against, there were no endpoints--the endpoint
+discovery service, then, had nothing to return (thanks to [[https://github.com/zachmandeville/tester-prototype/pull/1][Adi]] for pointing this out).
+
+I updated this code to start up a ClusterDiscoveryService client instead,
+requested all clusters, and got the expected results back. I did enough changes
+to this, though, to document it in another write-up.
