@@ -118,7 +118,7 @@ This iteration is not meant as an actual tester, more to solidly see an initial
 exchange.
 
 In the conformance SoW, the diagram of our testing framework looks rougly like so:
-#+begin_src dot :file sow-diagram.png :cmdline -Kdot -Tpng
+#+begin_src dot :file assets/sow-diagram.png :cmdline -Kdot -Tpng
 digraph SoW {
             "Test cases" -> "Test runner" [label=" test case description"]
             "Test runner" -> "Test target" [label=" xDS"]
@@ -130,7 +130,7 @@ digraph SoW {
 [[file:sow-diagram.png]]
 
 In our rough iteration, our flow is so:
-#+begin_src dot :file streaming-diagram.png :cmdline -Kdot -Tpng
+#+begin_src dot :file assets/streaming-diagram.png :cmdline -Kdot -Tpng
 digraph SoW {
             "This org file" -> "/main.go" [label=" roughly described case"]
             "/main.go" -> "xDS management server" [label=" xDS"]
