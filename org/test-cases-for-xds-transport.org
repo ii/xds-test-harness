@@ -103,7 +103,8 @@ Not applicable for test case
 * Questions
 - Error handling. What currently happens when an invalid request is sent (e.g. a
   NACK that doesn't have an error detail, or a request for non-listener/cluster
-  resource that doesnt' contain resource names in the request)?
+  resource that doesn't contain resource names in the request)?
 - Can a test target be both a server and a client (e.g. an xDS management server
   that needs to communicate to another xDS management server because of some
   business logic)?
+    - Are these separate test suites to be run, depending on the target?
