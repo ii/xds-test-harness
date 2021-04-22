@@ -63,10 +63,28 @@ Not applicable for test case
   exist, the server response should include these resources.
 - If a client recieves a response that includes resources _in addition_ to the
   resources it requested, it should accept it as a valid response (silently
-  ignoring hte resources).
+  ignoring the resources).
 ** Client Behaviour
+- if a client makes a request for CDS or LDS, and that request has a wildcard
+  for resources, it is accepted as a valid request.
+- if a client makes a request for CDS or LDS, and that request has specified
+  resource names, it is accepted as a valid request.
 ** Grouping Resources into Responses
+- Given an API set up with an incremental update variant and a resource type
+  with 100 resources, and given a sucessful ACK of these initial resources, when
+  1 resource changes, and the server sends a discoveryResponse with only that
+  resource, the client should update this resource /and/ retain all 99 other
+  resources.
+- Given an API set up with an SotW variant and a resource type with 100
+  resources, and given a sucessful ACK of these initial resources, when the
+  server sends a discoveryResponse with only a single resource, the client 1
+  resource changes, and the server sends a discoveryResponse with only that
+  resource, the client should update this resource /and/ retain all 99 other
+  resources.
 ** Duplicate Resource Names
+- If a server sends a discoveryResponse for a resource type, and it's resource
+  names contain duplicates, the client should send a NACK as this response is
+  invalid.
 ** Deleting Resources
 ** Knowing when a requested resource does not exist
 ** Unsubscribing from Resources
