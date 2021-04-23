@@ -96,12 +96,12 @@ Not applicable for test case
 - If a client recieves a response that includes resources _in addition_ to the
   resources it requested, it should accept it as a valid response (silently
   ignoring the resources).
-** Client Behaviour
+** Client Behaviour [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#client-behavior][link]]
 - if a client makes a request for CDS or LDS, and that request has a wildcard
   for resources, the server should accept it as a valid request.
 - if a client makes a request for CDS or LDS, and that request has specified
   resource names, the server should accept it as a valid request.
-** Grouping Resources into Responses
+** Grouping Resources into Responses [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#grouping-resources-into-responses][link]]
 - Given a server configured with Incremental ADS, a resource type with 100
   resources available, and a successful ACK from a client for this resource
   type...when 1 of the resources changes, the server should send a
@@ -109,12 +109,12 @@ Not applicable for test case
 - Given a server configured with ADS, a resource type with 100 resources, and a
   sucessful ACK from a of these initial resources...when 1 of these resources
   changes, the server should send a discoveryRsponse with all 100 resources.
-** Duplicate Resource Names
+** Duplicate Resource Names [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#duplicate-resource-names][link]]
 *** Outside 0.5
 - If a server sends a discoveryResponse for a resource type, and it's resource
   names contain duplicates, the client should send a NACK as this response is
   invalid.
-** Deleting Resources
+** Deleting Resources [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#deleting-resources][link]]
 - Given a server configured with Incremental ADS, a resource type with X
   resources available, and a successful ACK from a client for this resource
   type...when 1 of the resources is deleted, the server should send a
@@ -123,13 +123,13 @@ Not applicable for test case
   available, and a successful ACK from a client for this resource type...when 1
   of the resources is deleted, the server should send a discoveryResponse with a
   removed_resource field that lists this resource.
-** Knowing when a requested resource does not exist
+** Knowing when a requested resource does not exist [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist][link]]
 - Given a server and a resource type that has resource name FOO available, and a
   client that sends a request for this resource type, with resource names FOO
   and BAR; the server should send a response for FOO. Then, when the resource
   BAR is made available, the server should send a response that includes BAR to this
   client.
-** Unsubscribing from Resources
+** Unsubscribing from Resources [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#unsubscribing-from-resources][link]]
 - Given an api configured for Incremental ADS, and a client that requested a
   resource type with the resources FOO and BAR... if the client sends a request
   with BAR listed in a resource_unsubscribe field, and BAR changes in some way,
@@ -140,7 +140,7 @@ Not applicable for test case
   the server /should not/ send a response including the resource BAR to the
   client. The server should only send a discovery response to the client when
   FOO changes.
-** Requesting Multiple Resources from a single stream
+** Requesting Multiple Resources from a single stream [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#requesting-multiple-resources-on-a-single-stream][link]]
 To be honest, I am a bit confused on this section. The header relates to ADS,
 which is in scope for 0.5. A key part of this section is 'The management server
 should be capable of handling one or more resource_names for a given resource
@@ -154,7 +154,7 @@ a single stream? Or is the first diagram showing ADS and diagram 2 shows
 multiple streams? The specific of the nonces and versions in the second diagram
 seems like it's showing multiple streams, but I want to make sure I understand
 it correctly.
-** Resource updates
+** Resource updates [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#resource-updates][link]]
 - Given the client sent a request for a resource with nonce A, and the server
   sent a discoveryResponse with nonce B...if the server receives a request with
   nonce A, it /should not/ send a discovery response (as this nonce is stale).
@@ -163,7 +163,7 @@ it correctly.
   /happen in the same way when using ADS. Since we are scoped to ADS for 0.5, the/
   /nuances of race conditions likely don't need to be tested out yet./
 
-** Resource Warming
+** Resource Warming [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#resource-warming][link]]
 - If a client sends a request for a cluster, the server should send
   ClusterLoadAssignement responses to give updates on cluster warming.
 
@@ -177,7 +177,6 @@ it correctly.
   the diagrams of this section, the top diagram shows ADS and the bottom does
   not?
 
-  ---
-
+** Answsered
 - Can a test target be both a server and a client?
-  /ANSWER: absolutely, xds-relay is an example of this.  For 0.5, we are just testing server behaviour though./
+  /absolutely, xds-relay is an example of this.  For 0.5, we are just testing server behaviour though./
