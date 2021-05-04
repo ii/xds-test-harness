@@ -1,0 +1,182 @@
+#+TITLE: XDs Transport Test Cases
+
+* Goal
+This is an exercise to move through the xDS transport docs and set up test cases
+for each header. These cases dont' need to be perfect, just a way to build
+understanding of the protocol, and to get the base materials for writing actual
+test cases.
+
+What follows is the same outline as on the protocol page, with each heading
+having at least 1 test case written for it.
+** v0.5
+The 0.5 mvp of the xDS test suite is scoped to a specific segment of xDS. The
+first set of test cases should have the same scope.
+
+As a reminder, in 0.5:
+#+begin_quote
+- Test targets are limited to xDS server implementations (i.e. control planes).
+- Test cases will only cover xDS transport protocol interactions. After a series
+  of xDS interactions, correctness will be validated by comparing the delivered
+  xDS resources, versions, etc. with those permitted by the test case. Test
+  target state will be validated via adapter accessor methods and/or CSDS.
+- The xDS transport is limited to ADS and gRPC.
+- v3 xDS API only.
+- Test cases need only cover CDS and EDS protocols (representative of the
+  variety of protocols from a transport perspective).
+- Test cases do not need to cover every aspect of xDS behavior but should be at
+  least as complete as Envoy’s integration tests and the behaviors explicitly
+  described in the specification.
+
+The following are explicitly in-scope in the SoW:
+- State-of-the-world and delta xDS transport protocols.
+- Test cases covering CDS/EDS warming behavior.
+- Corner cases that have come up on #control-plane-dev and #xds, GitHub issues,
+  around transport protocol.
+- Test adapters for the go-control-plane based xds-relay. xDS server test cases should pass.
+#+end_quote
+[[https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit#][- xDS conformance test suite SotW]]
+
+** Iterations of this document
+1. [X] rough descriptions of tests, scoped to 0.5, for each heading.
+2. [ ] rough description of way to implement each test against a test target
+   (e.g. plain description of interaction of target, runner, and adapter)
+3. [ ] test cases written in formal syntax
+4. [ ] links to code implementation for each test case.
+5. [ ] Expand beyond 0.5
+* xDS Transport Protocol
+** Transport API Version [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#transport-api-version][link]]
+Not applicable for test case
+** Basic Protocol Overview [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#basic-protocol-overview][link]]
+- Given a valid discovery request to a server requesting relevant resources, the
+  server should respond with a valid discovery response.
+- Given an established stream between a client and a server where the client's
+  first request included a node identifier, if the client sends a request with
+  an empty node identifier, the server should accept it as valid.
+- Given an established stream between a client and a server where the client's
+  first request included a node identifier, if the client sends a request with a
+  non-empty node identifier, that identifier should be identical to the one
+  given in the first request. If not, the server should designate it invalid.
+*** Outside 0.5
+- When a valid discovery response is received by a client, it should send a
+  discovery Request to the server containing the response's given version info
+  and nonce.
+- When the client makes its *first* request to a server, the request should contain a node identifier.
+** ACK/NACK and resource type instance version [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack-nack-and-resource-type-instance-version][link]]
+- Given a valid xDS resource type with a version string, if that resource type
+  changes, the version string should change
+- Given an initial discovery request for a resource resource to a server, the
+  server should send a response whose version_info contains the latest version
+  of that resource type.
+** ACK  [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack][link]]
+*** Outside 0.5
+- If a discoveryResponse is sent by the server, and this version is successfully
+  applied by the client, the client should respond with a discoveryRequest with
+  the version_info and nonce given by the discoveryResponse.
+** NACK [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#nack][link]]
+*** Outside 0.5
+- if a client rejects a discoveryResponse, it should show this by sending a
+  discoveryRequest that includes an error detail and the last accepted version.
+- *Question:* What should happen if a request is sent with the previous version
+  and no error detail? How should the server respond?
+** ACK and NACK Semantic Summary [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#ack-and-nack-semantics-summary][link]]
+*** Outside 0.5
+- When a discovery response is sent by the server, the client should reply with
+  a discoveryRequest, whether that is an ACK or NACK.
+- if the client sends an ACK, it should _not_ contain an error_detail
+** When to send an update [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#when-to-send-an-update][link]]
+- No matter how many discoveryRequests are sent by the client, the server should
+  only send a discoveryResponse if the resource has changed from the version
+  given in the request.
+** How the client specifies what to return [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#how-the-client-specifies-what-resources-to-return][link]]
+*** Outside 0.5
+- If a client sends a request for resources that are not Listener or Cluster,
+  that request should include resource names being requested.
+- If a client sends a request that includes resource names, and these resources
+  exist, the server response should include these resources.
+- If a client recieves a response that includes resources _in addition_ to the
+  resources it requested, it should accept it as a valid response (silently
+  ignoring the resources).
+** Client Behaviour [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#client-behavior][link]]
+- if a client makes a request for CDS or LDS, and that request has a wildcard
+  for resources, the server should accept it as a valid request.
+- if a client makes a request for CDS or LDS, and that request has specified
+  resource names, the server should accept it as a valid request.
+** Grouping Resources into Responses [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#grouping-resources-into-responses][link]]
+- Given a server configured with Incremental ADS, a resource type with 100
+  resources available, and a successful ACK from a client for this resource
+  type...when 1 of the resources changes, the server should send a
+  discoveryResponse with only that changed resource.
+- Given a server configured with ADS, a resource type with 100 resources, and a
+  sucessful ACK from a of these initial resources...when 1 of these resources
+  changes, the server should send a discoveryRsponse with all 100 resources.
+** Duplicate Resource Names [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#duplicate-resource-names][link]]
+*** Outside 0.5
+- If a server sends a discoveryResponse for a resource type, and it's resource
+  names contain duplicates, the client should send a NACK as this response is
+  invalid.
+** Deleting Resources [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#deleting-resources][link]]
+- Given a server configured with Incremental ADS, a resource type with X
+  resources available, and a successful ACK from a client for this resource
+  type...when 1 of the resources is deleted, the server should send a
+  discoveryResponse with a removed_resource field that lists this resource.
+- Given a server configured with ADS, a resource type with X resources
+  available, and a successful ACK from a client for this resource type...when 1
+  of the resources is deleted, the server should send a discoveryResponse with a
+  removed_resource field that lists this resource.
+** Knowing when a requested resource does not exist [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist][link]]
+- Given a server and a resource type that has resource name FOO available, and a
+  client that sends a request for this resource type, with resource names FOO
+  and BAR; the server should send a response for FOO. Then, when the resource
+  BAR is made available, the server should send a response that includes BAR to this
+  client.
+** Unsubscribing from Resources [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#unsubscribing-from-resources][link]]
+- Given an api configured for Incremental ADS, and a client that requested a
+  resource type with the resources FOO and BAR... if the client sends a request
+  with BAR listed in a resource_unsubscribe field, and BAR changes in some way,
+  the server /should not/ send a discovery response including resource BAR to
+  the client.
+- Given an api configured for SotW ADS, and a client that sends a request for
+  esources FOO and BAR, and then sends a request for only FOO...if BAR changes,
+  the server /should not/ send a response including the resource BAR to the
+  client. The server should only send a discovery response to the client when
+  FOO changes.
+** Requesting Multiple Resources from a single stream [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#requesting-multiple-resources-on-a-single-stream][link]]
+To be honest, I am a bit confused on this section. The header relates to ADS,
+which is in scope for 0.5. A key part of this section is 'The management server
+should be capable of handling one or more resource_names for a given resource
+type in each request'. I am not sure how to map the diagram of two valid EDS
+requests to this description though. Plainly, I am not sure what this diagram is
+intended to show.
+
+In the second diagram, is it showing that a request for /bar/ that is bound for
+~management server 1~ still passes through ~management server 0~ as it's part of
+a single stream? Or is the first diagram showing ADS and diagram 2 shows
+multiple streams? The specific of the nonces and versions in the second diagram
+seems like it's showing multiple streams, but I want to make sure I understand
+it correctly.
+** Resource updates [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#resource-updates][link]]
+- Given the client sent a request for a resource with nonce A, and the server
+  sent a discoveryResponse with nonce B...if the server receives a request with
+  nonce A, it /should not/ send a discovery response (as this nonce is stale).
+
+  /this section relates to race conditions which, to my understanding, do not/
+  /happen in the same way when using ADS. Since we are scoped to ADS for 0.5, the/
+  /nuances of race conditions likely don't need to be tested out yet./
+
+** Resource Warming [[https://www.envoyproxy.io/docs/envoy/v1.17.2/api-docs/xds_protocol#resource-warming][link]]
+- If a client sends a request for a cluster, the server should send
+  ClusterLoadAssignement responses to give updates on cluster warming.
+
+* Questions
+- Should error handling be specified as part of conformance? If the server
+  receives an invalid request (e.g. a NACK that doesnt' have an erorr detail, or
+  a request for a non-listener/cluster resource that doesn't contain
+  resource names), should the server be expected to handle the error in a certain wa?
+- What is a plain description of the header [[*Requesting Multiple Resources from
+  a single stream]]?, as it relates to ADS? Is my understanding correct that in
+  the diagrams of this section, the top diagram shows ADS and the bottom does
+  not?
+
+** Answsered
+- Can a test target be both a server and a client?
+  /absolutely, xds-relay is an example of this.  For 0.5, we are just testing server behaviour though./
