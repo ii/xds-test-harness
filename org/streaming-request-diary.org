@@ -1,0 +1,545 @@
+#+TITLE: Streaming Request Diary
+
+* Goal
+Improve upon the [[file:initial-request.org][initial request]] to make it request the correct type of service,
+and to build my understanding of gRPC clients and the xDS protocol.
+
+The initial request was communicating with an endpoint discovery service, but
+the config for that particular instance didn't have any endpoints to return, and
+so it was hard to check if I was getting accurate resources.
+
+The new request will setup a stream with the cluster discovery service, using an
+instance that I know has clusters and where I can control the number of
+clusters.
+
+I want to better understand the flow of discovery requests and discovery
+responses, a proper ACK, and building out a gRPC client.
+* Context
+** Discovery Requests and Responses
+For the conformance suite we are interested in the pub-sub (publish-subscribe)
+protocol, or for a client to subscribe to a server that will publish when its
+reosurces have changed. If the client is subscribed to one of these resource
+services, it should get the notice of the change.
+
+There are different ways to manage this that I wont' get into yet, but the
+discovery requests and responses set up the basic method for this subscription
+to happen.
+
+From the [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#basic-protocol-overview][xDS protocol overview]]:
+#+begin_quote
+Each xDS stream begins with a DiscoveryRequest from the client, which specifies
+the list of resources to subscribe to, the type URL corresponding to the
+subscribed resources, the node identifier, and an optional resource type
+instance version indicating the most recent version of the resource type that
+the client has already seen (see ACK/NACK and resource type instance version for
+details).
+
+The server will then send a DiscoveryResponse containing any resources that the
+client has subscribed to that have changed since the last resource type instance
+version that the client indicated it has seen. The server may send additional
+responses at any time when the subscribed resources change.
+
+Whenever the client receives a new response, it will send another request
+indicating whether or not the resources in the response were valid (see ACK/NACK
+and resource type instance version for details).
+#+end_quote
+
+In other words, to initiate the subscription the client sends a request. The
+server sends a response with the resources the client is subscribing to. The
+client then sends an updated request letting it know it got these resources. The
+server does not send a response until something has changed. A client can send
+multiple requests if it likes, but it shouldn't expect a response for every
+request if there's been no change in the subscribed resources.
+** an xDS ACK
+The exchange mentioned above is an ACK in the xDS protocol. The successful
+implementation of an ACK should have the client send a disdovery request,
+structured like so:
+
+#+begin_example yaml
+version_info:
+node: { id: envoy }
+resource_names:
+- foo
+type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+response_nonce:
+#+end_example
+
+it receives a response structured like so:
+#+begin_src yaml
+version_info: X
+resources:
+- foo ClusterLoadAssignment proto encoding
+- bar ClusterLoadAssignment proto encoding
+type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+nonce: A
+#+end_src
+
+and then sends ACKnowledgement of successfully receiving the response, by
+submitting another request, this time with the version_info and nonce updated.
+
+#+begin_src yaml
+version_info: X
+resources:
+- foo ClusterLoadAssignment proto encoding
+- bar ClusterLoadAssignment proto encoding
+type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
+nonce: A
+#+end_src
+
+It then waits until a change in resources prompts another discovery response. It
+can do this through the bidirectional stream of a gRPC api.
+** Bidirectional stream
+with gRPC you do not need to do continual polling for resources. Instead, the a
+bidirectional stream is established between server and client. When a change
+comes, it will arrive in teh stream and the client acknowledges it through a
+mesage on its own stream.
+
+In the initial request, I wasn't using this idea to the fullest. There was a
+single change and then the program quit. In the new iteration, I want to see the
+stream in action, having the client waiting, making a change to the subscribed
+resource, and seeing that change communicated down the wire through a new
+discovery response.
+* our Environment
+For this iteration, I will be using a fork of [[https://github.com/stevesloka/envoy-xds-server][Steve Sloka's implemention of the
+go-control-plane]] as my xDS management server. This implementation allows you to
+dynamically update the config using a yaml file. I want this so that I can
+intentionally change resources, which should trigger a discovery response.
+
+I will also be running a single envoy instance, that is listening for new
+snapshot updates from this xDS management server. This implementation comes with
+a bootstrap script to create this instance.
+
+Our tester-prototype will subscribe to the same xDS management server,
+specifically subscribed to the CDS(cluster discovery service). We will use the
+code implemented in [[https://github.com/zachmandeville/tester-prototype/blob/c5de36028c81ef3ab39fa21cbdb0800dccff9330/main.go][commit c5de36]].
+
+* Expectations
+This iteration is not meant as an actual tester, more to solidly see an initial
+exchange.
+
+In the conformance SoW, the diagram of our testing framework looks rougly like so:
+#+begin_src dot :file assets/sow-diagram.png :cmdline -Kdot -Tpng
+digraph SoW {
+            "Test cases" -> "Test runner" [label=" test case description"]
+            "Test runner" -> "Test target" [label=" xDS"]
+            "Test runner" -> "Test adapter" [label=" Adapter gRPC"]
+            "Test adapter" -> "Test target" [label=" Target specific setup"]
+            }
+#+end_src
+
+[[file:sow-diagram.png]]
+
+In our rough iteration, our flow is so:
+#+begin_src dot :file assets/streaming-diagram.png :cmdline -Kdot -Tpng
+digraph SoW {
+            "This org file" -> "/main.go" [label=" roughly described case"]
+            "/main.go" -> "xDS management server" [label=" xDS"]
+            "/main.go" -> "config.yaml in xDS server repo" [label=" Adapter gRPC"]
+            "config.yaml in xDS server repo" -> "xDS management server" [label=" Target specific setup"]
+            }
+#+end_src
+
+[[file:streaming-diagram.png]]
+
+This won't be how the actual framework is structure, more a mental map for where this iteration fits.
+
+In the [[https://www.envoyproxy.io/docs/envoy/v1.17.1/api-docs/xds_protocol#when-to-send-an-update][protocol docs]] for when to send an update, it says:
+#+begin_quote
+The management server should only send updates to the Envoy client when the
+resources in the DiscoveryResponse have changed. Envoy replies to any
+DiscoveryResponse with a DiscoveryRequest containing the ACK/NACK immediately
+after it has been either accepted or rejected. If the management server provides
+the same set of resources rather than waiting for a change to occur, it will
+cause needless work on both the client and the management server, which could
+have a severe performance impact.
+#+end_quote
+
+So, our rough test cases would be:
+
+- *Given an unchanged config and a client subscribed to CDS, then after the initial ACK, the server should not send any additional discovery requests.*
+- *If a cluster is added to the config, the server should send out a new discovery response.*
+- *If the client sends a discovery request with the nonce and version info from the last discovery response, it should receive a new disdovery response when the cluster resources change.*
+
+I will test this just with messages to stdout.
+* Run Code
+For the instance, I will use this config:
+#+begin_src yaml :notangle ~/Learning/envoy/envoy-xds-server/config/config.yaml
+name: test_config
+spec:
+  listeners:
+  - name: listener_0
+    address: 0.0.0.0
+    port: 9000
+    routes:
+    - name: allroute
+      prefix: /
+      clusters:
+      - echo
+  clusters:
+  - name: echo
+    endpoints:
+    - address: 159.89.221.245
+      port: 80
+#+end_src
+
+And so start up the xDS management server:
+#+begin_src tmate :window xDS-server :dir ~/Learning/envoy/envoy-xds-server
+go run cmd/server/main.go
+#+end_src
+
+And the envoy instance.
+#+begin_src tmate :window envoy :dir ~/Learning/envoy/envoy-xds-server
+./hack/start-envoy.sh
+#+end_src
+
+With these running, I should have an admin interface up at :19000
+
+#+begin_src shell :results output
+curl http://localhost:19000/ready
+#+end_src
+
+: LIVE
+
+And can see only a single cluster whose name matches the one in our config.
+
+#+begin_src shell :results output
+curl http://localhost:19000/config_dump | jq ".configs[1].dynamic_active_clusters"
+#+end_src
+
+#+begin_example
+[
+  {
+    "version_info": "411",
+    "cluster": {
+      "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+      "name": "echo",
+      "type": "EDS",
+      "eds_cluster_config": {
+        "eds_config": {
+          "api_config_source": {
+            "api_type": "GRPC",
+            "grpc_services": [
+              {
+                "envoy_grpc": {
+                  "cluster_name": "xds_cluster"
+                }
+              }
+            ],
+            "set_node_on_first_message_only": true,
+            "transport_api_version": "V3"
+          },
+          "resource_api_version": "V3"
+        }
+      },
+      "connect_timeout": "5s",
+      "dns_lookup_family": "V4_ONLY"
+    },
+    "last_updated": "2021-04-22T02:20:01.617Z"
+  }
+]
+#+end_example
+
+Then, we start up this tester-prototype
+#+begin_src tmate :window tester :dir ~/Projects/xDS-conformance/tester-prototype
+go run main.go
+#+end_src
+
+I get this output
+
+#+begin_example shell
+sending DiscoveryRequest:
+{
+  "node": {
+    "id": "test-id",
+    "UserAgentVersionType": null
+  },
+  "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+}
+ 2021/04/22 14:25:23 Got Response: {
+ "version_info": "411",
+ "resources": [
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgRlY2hvGh0KGzACEhcIAiIPCg0KC3hkc19jbHVzdGVyOAFAAiICCAWIAQEQAw=="
+  }
+ ],
+ "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+ "nonce": "1"
+}
+sending DiscoveryRequest:
+{
+  "version_info": "411",
+  "node": {
+    "id": "test-id",
+    "UserAgentVersionType": null
+  },
+  "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+  "response_nonce": "1"
+}
+ 2021/04/22 14:25:23
+Last Version: ,
+New Version: 411,
+Resources: 1
+#+end_example
+
+The last bit is a summary which says: given version "" I got back "411" which
+showed 1 cluster resource.
+
+The code stays running, waiting for anything on the stream, and so if i let it
+run a few moments, i should get no new discovery responses.
+
+Confirming this, I then add a new cluster.
+
+#+begin_src yaml :tangle ~/Learning/envoy/envoy-xds-server/config/config.yaml
+name: test_config
+spec:
+  listeners:
+  - name: listener_0
+    address: 0.0.0.0
+    port: 9000
+    routes:
+    - name: allroute
+      prefix: /
+      clusters:
+      - echo
+  clusters:
+  - name: echo
+    endpoints:
+    - address: 155.89.225.245
+      port: 80
+  - name: echo-park
+    endpoints:
+    - address: 155.85.225.246
+      port: 80
+#+end_src
+
+Which prints this out in our tester
+#+begin_example
+2021/04/22 14:30:39 Got Response: {
+ "version_info": "412",
+ "resources": [
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgRlY2hvGh0KGzACEhcIAiIPCg0KC3hkc19jbHVzdGVyOAFAAiICCAWIAQEQAw=="
+  },
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgllY2hvLXBhcmsaHQobMAISFwgCIg8KDQoLeGRzX2NsdXN0ZXI4AUACIgIIBYgBARAD"
+  }
+ ],
+ "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+ "nonce": "2"
+}
+sending DiscoveryRequest:
+{
+  "version_info": "412",
+  "node": {
+    "id": "test-id",
+    "UserAgentVersionType": null
+  },
+  "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+  "response_nonce": "2"
+}
+ 2021/04/22 14:30:39
+Last Version: 411,
+New Version: 412,
+Resources: 2
+#+end_example
+
+So the response comes first, meaning the streaming to the client is working.  The client then sends a request back with the correct version and nonce.  The summary shows the updated version string and that it's two clusters.
+
+Another update could be if a cluster changed names.  I would expect a new version, but the same amount of resources
+
+I'll update the config.yaml to be:
+
+#+begin_src yaml
+name: test_config
+spec:
+  listeners:
+  - name: listener_0
+    address: 0.0.0.0
+    port: 9000
+    routes:
+    - name: allroute
+      prefix: /
+      clusters:
+      - echo
+  clusters:
+  - name: ecco
+    endpoints:
+    - address: 155.89.225.245
+      port: 80
+  - name: echo-park
+    endpoints:
+    - address: 155.85.225.246
+      port: 80
+#+end_src
+
+Oddly, the output is not what I expect:
+
+#+begin_example
+2021/04/22 14:33:18 Got Response: {
+ "version_info": "413",
+ "resources": [
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgRlY2hvGh0KGzACEhcIAiIPCg0KC3hkc19jbHVzdGVyOAFAAiICCAWIAQEQAw=="
+  },
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgllY2hvLXBhcmsaHQobMAISFwgCIg8KDQoLeGRzX2NsdXN0ZXI4AUACIgIIBYgBARAD"
+  },
+  {
+   "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+   "value": "CgRlY2NvGh0KGzACEhcIAiIPCg0KC3hkc19jbHVzdGVyOAFAAiICCAWIAQEQAw=="
+  }
+ ],
+ "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+ "nonce": "3"
+}
+sending DiscoveryRequest:
+{
+  "version_info": "413",
+  "node": {
+    "id": "test-id",
+    "UserAgentVersionType": null
+  },
+  "type_url": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+  "response_nonce": "3"
+}
+ 2021/04/22 14:33:18
+Last Version: 412,
+New Version: 413,
+Resources: 3
+#+end_example
+
+The version updated as it should, but it's showing 3 resources now.
+What does the config dump say?
+
+#+begin_src shell :results output
+curl http://localhost:19000/config_dump |
+    jq '.configs[1].dynamic_active_clusters[].cluster.name'
+#+end_src
+
+: "ecco"
+: "echo"
+: "echo-park"
+
+There are three cluster resources here too, so this is more likely to do with me
+not fully understanding the xDS management server implementation, and how it's
+meant to handle changes of names in the config. This server was created for a
+demo for a talk, not intended for production, and there may be some issue with
+how it's watching the ~config.yaml~ that I didn't think of. I don't think it's
+worth debugging right now, as the basic interactions I wanted to see _are_
+happening.
+
+- After the first ack, no new messages are sent from the server.
+- Every time there was a change in resources, the server sent a new discovery
+  response.
+- The client did not need to do anything to receive this response, it worked as
+  part of the streaming API. It only needed to acknowledge that it received it.
+
+* Code Deep Dive
+This code has a few improvements from the first iteration
+** Create Requests
+[[file:~/Projects/xDS-conformance/tester-prototype/main.go::func createRequest (version string, nonce string) *envoy_service_discovery_v3.DiscoveryRequest {][createRequests]] is a helper function to build discoveryRequests, with a given version and nonce.
+#+begin_src go
+func createRequest (version string, nonce string) *envoy_service_discovery_v3.DiscoveryRequest {
+	return &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: version,
+		Node: &envoy_config_core_v3.Node{
+			Id: "test-id",
+		},
+		TypeUrl: resource.ClusterType,
+		// Note that for CDS it is also possible to send a request w/o ResourceNames,
+		// and it will return all clusters (wildcard request)
+		// ResourceNames: []string{},
+		ResponseNonce: nonce,
+	}
+}
+#+end_src
+
+I set up a stream with the server in the same way as before, this time with the CDS.
+#+begin_src go
+	client := cluster_service.NewClusterDiscoveryServiceClient(conn)
+
+	// Stream, send, and receive following integration test.
+	stream, err := client.StreamClusters(ctx)
+	if err != nil {
+		log.Fatalf("err setting up stream: %v", err.Error())
+	}
+
+	waitc := make(chan *envoy_service_discovery_v3.DiscoveryResponse)
+#+end_src
+
+I setup a [[file:~/Projects/xDS-conformance/tester-prototype/main.go::go func () {][go routine]] for receiving reponses from that stream, printing them to
+stdout, and putting them into the waitc channel.
+
+Then, the big change, is a final infinite for loop([[file:~/Projects/xDS-conformance/tester-prototype/main.go::lastVersion := ""][code]]).
+#+begin_src go
+	lastVersion := ""
+	for {
+      dres := <-waitc
+		if dres.VersionInfo != lastVersion {
+			dreq = createRequest(dres.VersionInfo, dres.Nonce)
+			requestJSON, err:= json.MarshalIndent(dreq, "", "  ")
+			if err != nil {
+				log.Fatalf("error marshalling discovery request: %v", err.Error())
+			}
+
+			fmt.Printf("sending DiscoveryRequest:\n%v\n ", string(requestJSON))
+			if err = stream.Send(dreq); err != nil {
+				log.Fatalf("err sending discoveryRequest: %v", err.Error())
+			}
+			// this is a sanity check. Since we are communicating with CDS, we could expect that if new clusters are added,
+			// then we should see a new version and a new number of resources from previous.
+	        log.Printf("\nLast Version: %v, \nNew Version: %v,\nResources: %v\n", lastVersion, dres.VersionInfo, len(dres.GetResources()))
+			lastVersion = dres.VersionInfo
+		}
+	}
+}
+#+end_src
+This loop makes an initial discovery request and then, everytime a new response
+is received, it sends a new request with that response's version and nonce. Then
+it prints out a summary of the versions and resources.
+
+Rough-ish code, but it's helping with making the xDS and gRPC behaviours a bit
+more transparent.
+
+* Next Steps
+Two big changes could be made to make this prototype a bit sturdier.
+
+1. Simulate ACK/NACK. For some set of discovery responses, I should send back
+   the _previous_ version instead, simulating a NACK. Then the server /should/
+   send me the new discovery response again, to ensure I get it.
+2. I should print out more solid messages, to make it seem more like a test
+   runner. This would just be a printing of expectations, the heart of the
+   response that matters, and whether the expectation was met before I move to
+   the next course. The summary right now of last version, this version,
+   resources is a bit confusing if you arent' in my head in the moment.
+
+Really, though, this is starting to get to a point where I would want to be able
+to feed this client test cases and have it, in some way related to the case,
+send the proper changes to the server and measure the responses, e.g. instead of
+manually editing the config.yaml, it should be a part of running this prototype.
+At that point, we'd have an actual test runner and test adapter prototype.
+
+My next immediate steps is to move through the xDS transport protocol docs and
+write up simple test cases for each heading, and investigate testing DSL's to
+see which could be a fit for stateful machines like a xDS server, and begin
+implementing the runner in earnest.
+
+* Questions
+Not to answer right away, just personal ponderings:
+
+- I'd be curious to look more into the xDS server implementation and why
+  changing the resource name doesn't delete a resource like I think it would.
+  What is the correct way to rename a cluster?
+- How would i implement directions to the server (like adding a cluster) while
+  keeping a clean test environment? I would want these changes to be directed by
+  the test case itself, but it would need to be turned into some form of code in
+  the runner implementation, I assume. I think I would want the runner implementation
+  testable by itself to trust its results.
+- What are useful commands to use with the admin interface? I feel like i am
+  just scratching the surface of it, but it's already helping quite a bit iwth
+  my logging. I wanna go further!
