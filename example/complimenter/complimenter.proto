@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/zachmandeville/tester-prototype/example/complimenter";
+
+package complimenter;
+
+message ComplimentRequest {
+  string name = 1;
+}
+
+message ComplimentResponse {
+  string compliment = 1;
+}
+
+service Complimenter {
+  rpc GiveCompliment(ComplimentRequest) returns (ComplimentResponse);
+};

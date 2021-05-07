@@ -4,3 +4,4 @@
 tmp/
 tmate*.log
 nohup.out
+example/*/*.pb.go

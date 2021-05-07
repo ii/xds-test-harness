@@ -1,0 +1,123 @@
+#+TITLE: Setup
+#+PROPERTY: header-args:shell+ :results output silent
+
+* Goal
+Get setup to run tests, write new ones, and develop on this tester-prototype. If
+you are running through this file on emacs, on code blocks are executable and
+will show the results in your minibuffer. Otherwise, you'll want to run the
+commands in your terminal.
+
+* Dependencies
+Our project has three main dependencies: go, protobuf, and godog
+** Go
+You want to be using go 1.16+. You can check your version with:
+
+#+begin_src shell :results silent
+go version
+#+end_src
+
+You can install, or update, go from the golang.org page: https://golang.org/dl/
+After downloading it for your system, follow golangs [[https://golang.org/doc/install][installation instructions]]
+
+** Protobuf
+Specifically, you want to have the protocol buffer code generation tools for golang.
+You can get everything you need from [[https://grpc.io/docs/languages/go/quickstart/][the grpc quickstart page]] , but putting them here too.
+*** Protoc
+This is the general protocol buffer compiler. You want version 3+
+Check your version with
+#+begin_src shell
+protoc --version
+#+end_src
+
+If you need to update or install, do so following [[https://grpc.io/docs/protoc-installation/][the protoc install instructions]]
+*** proto go plugins
+
+These let us generate all the go code we need from proto files
+#+begin_src shell
+protoc-gen-go --version
+protoc-gen-go-grpc --version
+#+end_src
+
+If you need, install them with:
+#+begin_src shell
+go get google.golang.org/protobuf/cmd/protoc-gen-go \
+         google.golang.org/grpc/cmd/protoc-gen-go-grpc
+#+end_src
+
+And update your path so ~protoc~ can find these modules
+#+begin_src shell
+export PATH="$PATH:$(go env GOPATH)/bin"
+#+end_src
+
+
+
+
+
+** Godog
+This is our test framework. It works with gherkin feature files and go test
+files to make sure all our tests are passing.
+
+You want version 0.11.0+
+
+#+begin_src shell
+godog --version
+#+end_src
+
+You can install it with:
+#+begin_src shell
+go get github.com/cucumber/godog/cmd/godog@v0.11.0
+#+end_src
+
+
+
+* Check it works
+We have an example dir to test your setup. You should be able to generate go
+code from a proto file, run a test suite with godog, and see all the tests pass.
+** Move to example directory and see its contents
+
+Moving to the docs and running tree should show you the below output
+#+begin_src shell :dir (ii/workdir+ "") :results output replace
+cd example
+tree
+#+end_src
+
+: .
+: ├── compliment_server.go
+: ├── compliment_test.go
+: ├── complimenter
+: │   └── complimenter.proto
+: └── feature
+:     └── compliment.feature
+
+Notice, ~compliment/complimenter.proto~, but there are no generated files.
+
+If you run the below protoc command, and then tree,  you should see them generated.
+
+#+begin_src shell :dir (ii/workdir+ "example") :results output
+ protoc --go_out=. --go_opt=paths=source_relative \
+        --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+        complimenter/complimenter.proto
+ tree
+#+end_src
+
+With this set we can now start up the server and run our test with it.
+This will conform we:
+- can run go programs
+- can get a working grpc server
+- can run the godog tests to check the server.
+
+You will want to run the server and the tests in two windows (or use our tmate blocks)
+
+#+NAME: the server
+#+begin_src tmate :dir (ii/workdir+ "example") :window test
+  tmate split-window -h
+  go run compliment_server.go
+#+end_src
+
+#+NAME: the tests
+#+begin_src tmate :dir (ii/workdir+ "") :window test.left
+godog feature
+#+end_src
+
+If it all worked, you should see successful test output in your godog window.
+If not, check the error messages and ensure you have everything installed!
