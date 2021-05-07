@@ -8,6 +8,7 @@ At the moment, it is a client expected to send a discovery request to the [go co
 ## Diary
 I am recording my "journey of UNDERSTANDING" in the org directory.  These files give 
 more context for what I've written and why!
+- [Setup](./docs/setup.org)
 - [Initial Request](./org/initial-request.org)
-<!-- - [Streaming Request](./org/streaming-request.org) -->
-<!-- - [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org) -->
+- [Streaming Request](./org/streaming-request.org)
+- [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org)
