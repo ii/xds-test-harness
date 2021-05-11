@@ -1,0 +1,1141 @@
+#+TITLE: Basic Harness
+#+Property: header-args :noweb yes
+#+Property: header-args:shell :results output
+#+PROPERTY: header-args:go :main no :package 'discard
+
+* Goal
+Make a dead-simple test harness, with adapter and runner, that can be iterated upon for our test suite.
+From this, build a proto-test framework that matches the SoW diagram.
+* What is the test adapter?
+
+The adapter is a grpc server that can communicate with an arbitrary test target
+And that can be connected to by our test runner. It's purpose is to help setup
+the target with the proper state for the tests to run consistently. It also
+accesses the state of the target to check the test results.
+
+From the SoW:
+#+begin_quote
+The test runner will interact with an adapter in order to setup necessary state
+and query state in the test target. For example, if the test target is a new
+control plane implementation and a test case wants to verify that requesting a
+LDS resource result in delivery of the LDS resource, the adapter would have an
+interface such as RegisterResource(..listener arg..) that allows the test
+runner to create the necessary listener resource in the test target prior to
+executing the test case. The test adapter will be either a standalone process
+or linked with the test target. The test runner will communicate with the test
+adapter via a gRPC interface.
+#+end_quote
+
+* What is the test harness?
+A combination of test case, test runner, test adapter, and test target.
+
+It should largely follow the diagram given in the [[https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit#heading=h.tqf1i1hfnem9\]\]][Statement of Work]]
+#+begin_src dot :file assets/sow-v2.png :cmdline -Kdot -Tpng
+digraph "Test Harness" {
+  rankdir=LR
+  node [fontname = "IBM Plex Mono"fontsize=10.0]
+  edge [fontname = "IBM Plex Mono"fontsize=10.0]
+
+"Test cases" -> "Test runner" [label=" test case description"]
+"Test runner" -> "Test target" [label=" xDS"]
+"Test runner" -> "Test adapter" [label=" Adapter gRPC"]
+"Test adapter" -> "Test target" [label=" Target specific setup"]
+}
+
+#+end_src
+
+#+RESULTS:
+[[file:assets/sow-v2.png]]
+
+* Setup environment
+Simple as possible, follow the grpc example repos...
+
+#+begin_src shell :dir (ii/workdir+ "")
+mkdir -p adapter/{adapter,adapter_client,adapter_server}
+touch adapter/adapter/adapter.proto
+touch adapter/adapter_{client,server}/main.go
+tree adapter
+#+end_src
+
+#+RESULTS:
+: adapter
+: ├── adapter
+: │   └── adapter.proto
+: ├── adapter_client
+: │   └── main.go
+: └── adapter_server
+:     └── main.go
+:
+: 3 directories, 3 files
+
+* First iteration: a client can talk to the test adapter
+We know we want the test adapter to be communicable as a gRPC interface. So we
+want it to work as a gRPC server that we can reach through some arbitrary
+client. In later iterations, this client will be our test runner, but for now
+let's setup a dummy proto schema and basic implementations of the gRPC
+client/server, confirm they are talking to each other, and build from there.
+
+**OUR SUCCESS MARKER**: Client sets up a server stream with the adapter server,
+then receives a stream of compliments when you give it a name.
+
+** Write up proto schema for compliment server
+First iteration is a server-streaming service that brings in a steady stream of
+compliments for a named person.
+
+We will create a Complimenter service, with one rpc that shows server-side streaming
+
+#+NAME: Adapter service, v1
+#+begin_src c
+service Adapter {
+  rpc GiveCompliments (Name) returns (stream Compliment){}
+}
+#+end_src
+
+This rpc mentions two types, which we define as messages
+
+#+NAME: Complimenter Messages
+#+begin_src c
+message Name {
+  string name = 1;
+}
+
+message Compliment {
+  string message = 1;
+}
+#+end_src
+
+We can now build the  proto file, with the standard boilerplate of syntax and package name:
+
+#+NAME: adapter proto, v1
+#+begin_src  c :tangle (ii/workdir+ "adapter/adapter/adapter.proto")
+syntax = "proto3";
+
+option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter";
+
+package adapter;
+
+<<Adapter service, v1>>
+
+<<Complimenter Messages>>
+#+end_src
+
+We can call our [[*Generate protobuf code][Generate protobuf code function]] with this directive
+
+#+CALL: Generate protobuf code() :dir (ii/workdir+ "adapter") :results silent
+
+And will see a few new ~pb.go~ files in our adapter directory.
+
+#+begin_src shell :dir (ii/workdir+ "adapter")
+tree
+#+end_src
+
+#+RESULTS:
+#+begin_example
+.
+├── adapter
+│   ├── adapter.pb.go
+│   ├── adapter.proto
+│   └── adapter_grpc.pb.go
+├── adapter_client
+│   └── main.go
+└── adapter_server
+    └── main.go
+
+3 directories, 5 files
+#+end_example
+
+These files have everthing we need to build our server and client.
+Let's start with the server!
+
+** Build the server
+The first implementation is simple, with the code structured like the gRPC examples on [[https://grpc.io][grpc.io]].
+
+#+NAME: Server, v1
+#+begin_src go :tangle (ii/workdir+ "adapter/adapter_server/main.go")
+package main
+
+import (
+	"fmt"
+	"log"
+	"net"
+
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<Constants>>
+
+<<Define server struct>>
+
+<<Define server.GiveCompliments>>
+<<main function, v1>>
+#+end_src
+
+Notice in the imports we are bringing in our adapter/adapter pb files, aliased
+to pb. the gRPC import will be used to register this as a gRPC server listening
+in on our port constant.
+
+*** Constants
+We only have a single constant, the address our server will be listening on.
+#+NAME: Constants
+#+begin_src go
+const (
+	port = ":6767"
+)
+#+end_src
+*** Server Struct
+This is work already done for us because we are using protobuffers.  The code generated a basic, unimplented server that has all the methods defined.  We can overwrite them with our own versions.
+#+NAME: Define server struct
+#+begin_src go
+type server struct {
+	pb.UnimplementedAdapterServer
+}
+#+end_src
+
+*** Define server method Give Compliments
+This is a premade server method whose implementation we are overwriting.
+
+The function is basic: take 4 nice adjectives someone's name, and cycle through
+telling $name they are $adj 28 times.
+
+Key thing here is we are using a stream defined for us in our pb files, and its
+Send method.
+
+#+NAME: Define server.GiveCompliments
+#+begin_src go
+func (s *server) GiveCompliments(name *pb.Name, stream pb.Adapter_GiveComplimentsServer) error {
+	adjectives := []string{"cool", "fun", "smart", "awesome"}
+	for i := 0; i <= 28; i++ {
+		adjective := adjectives[i%len(adjectives)]
+		compliment := fmt.Sprintf("You, %v, are %v", name.Name, adjective)
+		if err := stream.Send(&pb.Compliment{Message: compliment}); err != nil {
+			log.Fatalf("could not send compliment: %v", err)
+		}
+	}
+	return nil
+}
+#+end_src
+*** Initial main function
+This initial main function is common, e.g. i see it in all the gRPC examples.  Setup a listening port, create a new grpc server, and then register whatever server you defined in yr proto files with this grpc server, then run ~server.Serve~ and you're good to go.
+
+#+NAME: main function, v1
+#+begin_src go
+func main() {
+	lis, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	s := grpc.NewServer()
+	pb.RegisterAdapterServer(s, &server{})
+	fmt.Printf("Compliment Server started on port %v", port)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("Failed to server: %v", err)
+	}
+}
+#+end_src
+** Build the client
+We built this at [[file:~/Projects/xDS-conformance/tester-prototype/adapter/adapter_client/main.go][file:~/Projects/xDS-conformance/tester-prototype/adapter/adapter_client/main.go]]
+
+It is as simple as the server, following a similar structure
+
+#+NAME: Client, v1
+#+begin_src go :tangle (ii/workdir+ "adapter/adapter_client/main.go")
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<Client: constants>>
+
+<<Define streamCompliments>>
+
+<<Client: main func, v1>>
+#+end_src
+*** constants
+Similar constant, in thise case the client needs to know which server it wants
+to connect to. In this case, it's where our adapter will be listening.
+#+NAME: Client: constants
+#+begin_src go
+const (
+	adapterAddress = "localhost:6767"
+)
+#+end_src
+*** Define streamCompliments
+
+This is our own function that takes an adapter client and a name to send to our server.
+
+The client will be registered in the main function and connected to our Adapter
+server, which lets us run the sister command ~stream.Recv~. We will keep
+receiving messages from the server until there is an end of file directive, and
+then quit.
+
+#+NAME: Define streamCompliments
+#+begin_src go
+func streamCompliments (c pb.AdapterClient , name *pb.Name) {
+	stream, err := c.GiveCompliments(context.Background(), name)
+	if err != nil {
+		log.Fatalf("unable to start receiving compliments: %v", err)
+	}
+	for {
+		compliment, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Compliment messed up in some way: %v", err)
+		}
+		log.Println(compliment)
+	}
+}
+#+end_src
+*** main function, v1
+
+So now we kick off the client, with the key thing being the registering of an
+adapterClient.
+
+We dial into the server(which is the same process you'd use to connect to an xDS
+server). A key aspect of gRPC is that you can run commands in the client as if
+you wer eon the server. So once we are connected, we can see that this server
+has a method of ~NewAdapterClient~. we set our client with this, and run our
+streamCompliments command.
+
+#+NAME: Client: main func, v1
+#+begin_src go
+func main () {
+	fmt.Println("Client Started")
+	conn, err := grpc.Dial(adapterAddress, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("unable to connect to %v: %v", adapterAddress, err)
+	}
+	defer conn.Close()
+
+	c := pb.NewAdapterClient(conn)
+
+	name := &pb.Name{
+		Name: "Caleb",
+	}
+	streamCompliments(c, name)
+}
+#+end_src
+
+* Check first iteration works
+
+We will do this in a tmate session showing the client and server
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test
+echo "We are ready to test"
+  tmate split-window -h
+#+end_src
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.left
+  clear -x
+echo "This will be the server"
+#+end_src
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.right
+echo "This will be the client"
+#+end_src
+
+We start up the server
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.left
+go run adapter/adapter_server/main.go
+#+end_src
+
+Then start up the client, where we see a slew of compliments given to caleb.
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.right
+go run adapter/adapter_client/main.go
+#+end_src
+
+Excellent, first iteration works!
+* Second iteration: Client requests adapter to connect to xDS server
+
+This iteration brings us closer to the harness. We want the runner to be able to
+send requests to the adapter that get sent up to the server. This will let us
+design an api for checking the status of a resource based on some parameter of
+the test, or for the test to dictate instructions on a change in state.
+
+**SUCCESS MARKER**: The client sends a connection request to the adapter, with
+the port address of the target to connect to. The adapter connects to the server
+with this address.
+
+Future iterations will have some nuance on when the test should send requests
+directly to the server, and when it should be reading the state via the adapter.
+At this point, we will say the runner only knows the address of the target, and
+the adapter is the one doing all the calls to the target.
+** Extend Schema
+
+This schema is closer to what I imagine the actual adapter will look like.
+We will keep our compliments (cos they're nice) and extend with connection request/response.
+
+#+NAME: Connection Messages
+#+begin_src c
+message ConnectionRequest {
+  string port = 1;
+}
+
+message ConnectionResponse {
+  string message = 1;
+}
+#+end_src
+
+And extend our service with a simple rpc of request and response
+
+#+NAME: Adapter service, v2
+#+begin_src c
+service Adapter {
+  rpc GiveCompliments (Name) returns (stream Compliment){}
+  rpc ConnectToTarget (ConnectionRequest) returns (ConnectionResponse){}
+}
+#+end_src
+
+
+So our proto file is structured as so:
+
+#+NAME: adapter proto, v2
+#+begin_src  c :tangle (ii/workdir+ "adapter/adapter/adapter.proto")
+syntax = "proto3";
+
+option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter";
+
+package adapter;
+
+<<Complimenter Messages>>
+
+<<Connection Messages>>
+
+<<Adapter service, v2>>
+#+end_src
+
+
+Now I can tangle and call, generating more functions for our client/server iterations
+
+#+CALL: Generate protobuf code() :dir (ii/workdir+ "adapter") :results silent
+
+
+** Iterate on server
+
+I imagine multiple requests sent ot the adapter as we move thorugh the test
+suite, each of them intended for our target.
+
+For example:
+- Is the target reachable?
+- I want the target to have FOO cluster, make it happen
+- I want the target to have BAR listener, make it happen
+
+Because of this, I want to maintain a connection between the adapter and the target.
+
+What I will set up for this is a target var, based off a Target struct, that the
+adapter checks. If there's an active connection,we can use it, otherwise we
+connect, set the var to this connection, and keep going.
+
+With that set, we can then define the method for connecting to the target and
+sending back a connection response to our client.
+
+Our main function needs no changes, we'll keep it to its v1 iteration.
+
+#+NAME: Server, v2
+#+begin_src go :tangle (ii/workdir+ "adapter/adapter_server/main.go")
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"time"
+
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<Constants>>
+
+<<Define server struct>>
+
+<<Define Target struct>>
+
+<<Set target var>>
+
+<<Define server.GiveCompliments>>
+
+<<Define server.ConnectToTarget>>
+
+<<main function, v1>>
+#+end_src
+*** Define Target struct and set target var
+
+This may not be the right way to do this, and feedback is definitely welcome.
+For now, I have a struct with the port of the target, and our grpc.ClientConn
+that is either nil or the active connection.
+
+#+NAME: Define Target struct
+#+begin_src go
+type Target struct {
+    Port       string
+    Connection *grpc.ClientConn
+}
+#+end_src
+
+We can then initialize a var based off this struct that we'll update at the start of the suite.
+
+#+NAME: Set target var
+#+begin_src go
+var (
+    target *Target = nil
+)
+#+end_src
+*** Define ConnectToTarget
+
+Like our GiveCompliments method, the signature for this function was generated
+for us, and we now define its implementation.
+
+Notice in the center fo the function a side effect, where we set our target var
+if the connection is a success. We then return a custom success message so our
+client knows we can connect. It's a bit indirect, but I think works as an
+example.
+
+#+NAME: Define server.ConnectToTarget
+#+begin_src go
+func (s *server) ConnectToTarget(ctx context.Context, req *pb.ConnectionRequest) (res *pb.ConnectionResponse, err error) {
+    fmt.Printf("Connecting to test target at %v\n", req.Port)
+    conn, err := grpc.Dial(req.Port, grpc.WithInsecure(), grpc.WithBlock(),grpc.WithTimeout(time.Second * 5))
+    if err != nil {
+        fmt.Printf("Error dialing into %v: %v", req.Port, err)
+		  return &pb.ConnectionResponse{}, err
+    }
+    target = &Target{
+        Port: req.Port,
+        Connection: conn,
+    }
+    response := &pb.ConnectionResponse{
+        Message: "Connected to test target.",
+    }
+    return response, nil
+}
+#+end_src
+
+** Iterate Client
+
+For this, I need to iterate on our constants as we'll now have our adapter address and a target address we send to the adapter. I then need to define our connectToServer function and have our main run this function too.
+
+#+NAME: Client, v2
+#+begin_src go :tangle (ii/workdir+ "adapter/adapter_client/main.go")
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<Client: constants, v2>>
+
+<<Define streamCompliments>>
+
+<<Define connectToTarget>>
+
+<<Client: main func, v2>>
+#+end_src
+*** Update constants
+#+NAME: Client: constants, v2
+#+begin_src go
+const (
+	adapterAddress = "localhost:6767"
+	targetAddress = "localhost:18000"
+)
+#+end_src
+*** Define connectToTarget
+our actual ConnectToTarget function was generated for us, we just need to setup
+the correct request body and handle what we do with the response(for now, print it out.)
+
+#+NAME: Define connectToTarget
+#+begin_src go
+func connectToTarget (c pb.AdapterClient, address string) {
+	target := &pb.ConnectionRequest{
+		Port: address,
+	}
+	state, err := c.ConnectToTarget(context.Background(), target)
+	if err != nil {
+		log.Fatalf("errrrrrrrr....%v", err)
+	}
+	fmt.Printf("Target state: %v", state)
+}
+#+end_src
+*** Extend main func
+Ideally straightforward, just add our connectToTarget at the bottom.
+
+
+#+NAME: Client: main func, v2
+#+begin_src go
+func main () {
+	fmt.Println("Client Started")
+	conn, err := grpc.Dial(adapterAddress, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("unable to connect to %v: %v", adapterAddress, err)
+	}
+	defer conn.Close()
+
+	c := pb.NewAdapterClient(conn)
+
+	name := &pb.Name{
+		Name: "Caleb",
+	}
+	streamCompliments(c, name)
+	connectToTarget(c,targetAddress)
+}
+
+#+end_src
+
+* Check second iteration works
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test
+echo "We are ready to test"
+  tmate split-window -h
+#+end_src
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.left
+  clear -x
+echo "This will be the server"
+#+end_src
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.right
+echo "This will be the client"
+#+end_src
+
+We start up the server
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.left
+go run adapter/adapter_server/main.go
+#+end_src
+
+Then start up the client, If this works we should get a stream of compliments
+and then a success message. Can't feel any better!
+
+#+begin_src tmate :dir (ii/workdir+ "") :window test.right
+go run adapter/adapter_client/main.go
+#+end_src
+
+Excellent, second iteration works! At this point, our client is basically
+setting up and passing a test. Our third iteration, then, will make a godog test
+file our "client" and see if we can use the adapter server to pass our first
+test.
+* Third iteration: can run a test that succeeds upon connection to xDS server
+For this we are going to set up some godog.  Our feature is dead-simple: "test target should exist and be connectable".
+** Write out our feature
+
+The only thing we are testing now is that the target is a valid gRPC server:
+given a port, when I attempt a connection through gRPC, that connection is
+successful.
+
+#+NAME: valid target feature
+#+begin_src feature  :tangle (ii/workdir+ "features/valid_target.feature")
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program,
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:
+    Given a target address
+    When I attempt to connect to the address
+    Then I get a success message
+#+end_src
+
+I will tangle this and run godog, which gives me a nice template to start from.
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program.
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:                                 # features/valid_target.feature:9
+    Given a target address
+    When I attempt to connect to the address
+    Then I get a success message
+
+1 scenarios (1 undefined)
+3 steps (3 undefined)
+476.472µs
+
+You can implement step definitions for undefined steps with these snippets:
+
+func aTargetAddress() error {
+	return godog.ErrPending
+}
+
+func iAttemptToConnectToTheAddress() error {
+	return godog.ErrPending
+}
+
+func iGetASuccessMessage() error {
+	return godog.ErrPending
+}
+
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	ctx.Step(`^a target address$`, aTargetAddress)
+	ctx.Step(`^I attempt to connect to the address$`, iAttemptToConnectToTheAddress)
+	ctx.Step(`^I get a success message$`, iGetASuccessMessage)
+}
+
+#+end_example
+
+
+I will use this, and my client code, to write valid_target_test.go
+** Generate test template
+At first, i want to just make sure the test file can be run with godog correctly.
+I should get all failed tests, but they should connect to the lines in my code.
+
+#+NAME: valid_target_test.go, v1
+#+begin_src go :tangle (ii/workdir+ "valid_target_test.go")
+package main
+
+import (
+"github.com/cucumber/godog"
+)
+
+func aTargetAddress() error {
+	return godog.ErrPending
+}
+
+func iAttemptToConnectToTheAddress() error {
+	return godog.ErrPending
+}
+
+func iGetASuccessMessage() error {
+	return godog.ErrPending
+}
+
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	ctx.Step(`^a target address$`, aTargetAddress)
+	ctx.Step(`^I attempt to connect to the address$`, iAttemptToConnectToTheAddress)
+	ctx.Step(`^I get a success message$`, iGetASuccessMessage)
+}
+#+end_src
+
+Now when I run godog, I can see it's including these tests
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program.
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:                                 # features/valid_target.feature:9
+    Given a target address                   # valid_target_test.go:8 -> aTargetAddress
+      TODO: write pending definition
+    When I attempt to connect to the address # valid_target_test.go:12 -> iAttemptToConnectToTheAddress
+    Then I get a success message             # valid_target_test.go:16 -> iGetASuccessMessage
+
+1 scenarios (1 pending)
+3 steps (1 pending, 2 skipped)
+1.022862ms
+#+end_example
+
+Excellent, let's move through the examples.
+
+** Pass first step
+
+I will make this simple as at first. A struct that contains an address and a
+success message. Both are empty strings. For the first test, I just set the
+address string to the port address given in the rule, later iterations this
+would be set by a yaml that a target could fill out to set up the tests.
+
+I am going to follow the semaphor example, ands so will have a Runner struct
+which has methods that i call upon it, and a results struct with output i can
+check.
+*** Extend test.go
+We bring in our runner struct and then have our targetAddress function be a
+method of this struct. This will allow us to more easily pass on the results
+from step to step.
+
+#+NAME: Define runner and results struct type
+#+begin_src go
+type Results struct {
+	target string
+	message string
+}
+
+func NewResults () *Results {
+  return &Results {
+	  target: "",
+	  message: "",
+  }
+}
+
+type runner struct {
+	results *Results
+}
+#+end_src
+
+
+Our target address, given a runner, sets its target to the address of an xDS
+test target. I am hardcodiong this to the target we'll be using--an
+implementation of the go control plane.
+
+#+NAME: aTargetAddress, v1
+#+begin_src go
+func (r *runner) aTargetAddress() error {
+	r.results.target = "localhost:18000"
+	return nil
+}
+#+end_src
+
+Then, in our initializeScenario, we setup a runner var, that is this runner
+struct, and setup results for it before the scneario starts. We will update and
+pass along the results through the second and third steps.
+
+#+NAME: InitializeScenario, v1
+#+begin_src go
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	runner := &runner{}
+	ctx.BeforeScenario(func (sc *godog.Scenario) {
+		runner.results = NewResults();
+	})
+	ctx.Step(`^a target address$`, runner.aTargetAddress)
+	ctx.Step(`^I attempt to connect to the address$`, iAttemptToConnectToTheAddress)
+	ctx.Step(`^I get a success message$`, iGetASuccessMessage)
+}
+#+end_src
+
+
+And here is our file all in all, ready to tangle
+
+#+NAME: valid_target_test.go, v1
+#+begin_src go :tangle (ii/workdir+ "valid_target_test.go")
+package main
+
+import (
+"github.com/cucumber/godog"
+)
+
+<<Define runner and results struct type>>
+
+<<aTargetAddress, v1>>
+
+func iAttemptToConnectToTheAddress() error {
+	return godog.ErrPending
+}
+
+func iGetASuccessMessage() error {
+	return godog.ErrPending
+}
+
+<<InitializeScenario, v1>>
+#+end_src
+
+*** Check it worked
+If this worked, our first step should pass.
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program.
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:                                 # features/valid_target.feature:9
+    Given a target address                   # valid_target_test.go:11 -> *runner
+    When I attempt to connect to the address # valid_target_test.go:17 -> iAttemptToConnectToTheAddress
+      TODO: write pending definition
+    Then I get a success message             # valid_target_test.go:21 -> iGetASuccessMessage
+
+1 scenarios (1 pending)
+3 steps (1 passed, 1 pending, 1 skipped)
+1.182884ms
+#+end_example
+
+Sweet!  One down, two to go.
+** Pass second step
+
+Now it is more interesting. We want to bring in our adapter, run our connect
+request, and do something with the results.
+*** Update runner
+We should update the runner to include a section for the adapter connection, so
+we can use it again, similar to how we did it in the adapter itself.
+
+#+NAME: runner and results, v2
+#+begin_src go
+type Results struct {
+	target string
+	message string
+}
+
+func NewResults () *Results {
+  return &Results {
+	  target: "",
+	  message: "",
+  }
+}
+
+type runner struct {
+	results *Results
+	adapter *grpc.ClientConn
+}
+#+end_src
+#+end_src
+
+*** Define connect method
+Similar to our first step, we'll define a runner method for connecting to the
+target. The method will connect to the adapter and then run the ConnectToTarget
+method we defined in iteration two.
+
+#+NAME: iAttemptToConnectToTheAddress, v2
+#+begin_src go
+func (r *runner) iAttemptToConnectToTheAddress() error {
+	conn, err := grpc.Dial("localhost:6767", grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("error connecting to adapter: %v", err)
+	}
+	r.adapter = conn
+	c := pb.NewAdapterClient(conn)
+	target := &pb.ConnectionRequest{
+		Port: r.results.target,
+	}
+	success, err := c.ConnectToTarget(context.Background(), target)
+	if err != nil {
+		fmt.Printf("errrrrrrrr....%v\n", err)
+	}
+	r.results.message = success.Message
+	return nil
+}
+#+end_src
+
+As you see, it's basically the second iteration but updating the runner instead
+of printing to stdout.
+
+*** update Initialize Scenario
+A small update, just adjusting the function called in the second step.
+
+#+NAME: InitializeScenario, v2
+#+begin_src go
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	runner := &runner{}
+	ctx.BeforeScenario(func (sc *godog.Scenario) {
+		runner.results = NewResults();
+	})
+	ctx.Step(`^a target address$`, runner.aTargetAddress)
+	ctx.Step(`^I attempt to connect to the address$`, runner.iAttemptToConnectToTheAddress)
+	ctx.Step(`^I get a success message$`, iGetASuccessMessage)
+}
+#+end_src
+
+
+Which makes our test file look like so.  Notice the extended imports, as the test file is also a grpc client now.
+
+#+NAME: valid_target_test.go, v2
+#+begin_src go :tangle (ii/workdir+ "valid_target_test.go")
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/cucumber/godog"
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<runner and results, v2>>
+
+<<aTargetAddress, v1>>
+
+<<iAttemptToConnectToTheAddress, v2>>
+
+func iGetASuccessMessage() error {
+	return godog.ErrPending
+}
+
+<<InitializeScenario, v2>>
+#+end_src
+
+
+*** Check it worked
+
+Same as before, tangle and godog and we should get the first two steps passing.
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program,
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:                                 # features/valid_target.feature:9
+    Given a target address                   # valid_target_test.go:18 -> *runner
+    When I attempt to connect to the address # valid_target_test.go:23 -> *runner
+    Then I get a success message             # valid_target_test.go:42 -> iGetASuccessMessage
+      TODO: write pending definition
+
+1 scenarios (1 pending)
+3 steps (2 passed, 1 pending)
+8.963425ms
+#+end_example
+
+Almost there!
+
+** Pass third step: when i connect, I get a success message!
+
+This one is a simple one, our success message should equal  "Connected to test target."
+
+No need to change our runner, just adjust our success message function to be:
+
+#+NAME: iGetASuccessMessage, v2
+#+begin_src go
+func (r *runner) iGetASuccessMessage() error {
+	if r.results.message == "Connected to test target." {
+		return nil
+	} else {
+		return godog.ErrPending
+	}
+}
+#+end_src
+
+Then update our initialize function to call this method:
+
+#+NAME: InitializeScenario, v3
+#+begin_src go
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	runner := &runner{}
+	ctx.BeforeScenario(func (sc *godog.Scenario) {
+		runner.results = NewResults();
+	})
+	ctx.Step(`^a target address$`, runner.aTargetAddress)
+	ctx.Step(`^I attempt to connect to the address$`, runner.iAttemptToConnectToTheAddress)
+	ctx.Step(`^I get a success message$`, runner.iGetASuccessMessage)
+}
+#+end_src
+
+and our final test to tangle
+
+#+NAME: valid_target_test.go, v3
+#+begin_src go :tangle (ii/workdir+ "valid_target_test.go")
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/cucumber/godog"
+	"google.golang.org/grpc"
+
+	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
+)
+
+<<runner and results, v2>>
+
+<<aTargetAddress, v1>>
+
+<<iAttemptToConnectToTheAddress, v2>>
+
+<<iGetASuccessMessage, v2>>
+
+<<InitializeScenario, v3>>
+#+end_src
+
+#+NAME:
+
+*** Check it worked
+
+This should be all green now.
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Valid Test Target
+  as a test runner
+  I want a target I can reach with my program,
+  so i can run my tests.
+
+  Rules:
+  - target address is 18000
+
+  Scenario:                                 # features/valid_target.feature:9
+    Given a target address                   # valid_target_test.go:18 -> *runner
+    When I attempt to connect to the address # valid_target_test.go:23 -> *runner
+    Then I get a success message             # valid_target_test.go:41 -> *runner
+
+1 scenarios (1 passed)
+3 steps (3 passed)
+9.645969ms
+#+end_example
+
+Incredible.
+
+* Conclusion | Next Steps
+
+Godog is a nice way to iterate through a testing process with continual
+feedback. We can have our test file be a grpc client fairly easily.
+
+The next step would be to have this be a more real-world test, like sending a
+discovery request and getting a correct response. In this case, we'd use the
+adapter to prepare the server to have the resources we want, request them, and
+validate that we have what we expect there.
+
+* Footnotes
+** Generate protobuf code
+We will want to generate new proto code throughout this document, so i will set the code block here, so we can call it easily.
+
+#+NAME: Generate protobuf code
+#+begin_src shell :dir (ii/workdir+ "adapter") :results silent
+protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    adapter/adapter.proto
+#+end_src
+
+We can use it throughout the doc with
+
+#+CALL: Generate protobuf code() :dir (ii/workdir+ "adapter") :results silent
