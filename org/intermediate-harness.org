@@ -1,0 +1,40 @@
+#+TITLE: Intermediate Harness
+
+* Goal
+Have an adapter that can prepare our target with the necessary resources, as
+given in a test-case, and update these resources as needed by the test case.
+* Limits
+- We are focussing on an example xDS server using the go-control-plane.
+  - Specifically, a modification of that repo's example server, but whose initial configuration does not include any clusters.
+
+In the future, there will need to be some sort of shim for the test target to tell our adapter how it can setup and adjust the resources.  That's outside the scope and focus of this intermediate step.
+* Strategy
+** DONE Clone go-control-plane to local dir
+
+I have forked the repo and cloned it to to my envoy folder
+#+begin_src shell
+cd ~/Projects/envoy/go-control-plane
+git remote -v
+#+end_src
+
+#+RESULTS:
+| origin   | git@github.com:zachmandeville/go-control-plane.git (fetch) |
+| origin   | git@github.com:zachmandeville/go-control-plane.git (push)  |
+| upstream | git@github.com:envoyproxy/go-control-plane.git (fetch)     |
+| upstream | git@github.com:envoyproxy/go-control-plane.git (push)      |
+
+** TODO extract example server to its own directory
+#+NAME: our xDS directory
+#+begin_src shell :dir ~/Projects/xDS-conformance
+ls
+#+end_src
+
+** TODO start up our own example server
+** TODO Be able to read cluster information from unchanged example server
+** TODO Adjust example server to not have clusters
+** TODO Confirm we can read from iteration, and see no clusters
+** TODO Add a cluster resource to server from adapter call.
+** TODO  Generalize this addition to a gRPC service
+** TODO Write test case using example configuration yaml
+** TODO Setup test target using code snippet in test case
+test case -> generated function template -> function with call to adapter
