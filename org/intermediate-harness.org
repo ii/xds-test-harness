@@ -1,4 +1,5 @@
 #+TITLE: Intermediate Harness
+#+PROPERTY: header-args :results output
 
 * Goal
 Have an adapter that can prepare our target with the necessary resources, as
@@ -23,15 +24,448 @@ git remote -v
 | upstream | git@github.com:envoyproxy/go-control-plane.git (fetch)     |
 | upstream | git@github.com:envoyproxy/go-control-plane.git (push)      |
 
-** TODO extract example server to its own directory
+** DONE extract example server to its own directory
 #+NAME: our xDS directory
-#+begin_src shell :dir ~/Projects/xDS-conformance
-ls
+#+begin_src shell :dir ~/Projects/xDS-conformance :results output
+cp -R ~/Projects/envoy/go-control-plane/internal/example example-xds-server
+tree -L 1
 #+end_src
 
-** TODO start up our own example server
-** TODO Be able to read cluster information from unchanged example server
+#+RESULTS: our xDS directory
+: .
+: ├── example-xds-server
+: └── test-harness
+:
+: 2 directories, 0 files
+
+** DONE start up our own example server
+:PROPERTIES:
+:header-args: :dir ~/Projects/xDs-conformance/example-xds-server :results output
+:END:
+
+
+the README of the example says to run a make command, which means we need to extract the make example from the go-control-plane's makefile, and adapt it to our needs.
+
+The relevant part of the makefile is
+
+#+begin_example
+#--------------------------------------
+#-- example xDS control plane server
+#--------------------------------------
+.PHONY: $(BINDIR)/example example
+
+$(BINDIR)/example:
+	@go build -race -o $@ internal/example/main/main.go
+
+example: $(BINDIR)/example
+	@build/example.sh
+
+#+end_example
+
+with the example.sh referenced being:
+
+#+begin_src sh
+#!/usr/bin/env bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+##
+## Runs Envoy and the example control plane server.  See
+## `internal/example` for the go source.
+##
+
+# Envoy start-up command
+ENVOY=${ENVOY:-/usr/local/bin/envoy}
+
+# Start envoy: important to keep drain time short
+(${ENVOY} -c sample/bootstrap-xds.yaml --drain-time-s 1 -l debug)&
+ENVOY_PID=$!
+
+function cleanup() {
+  kill ${ENVOY_PID}
+}
+trap cleanup EXIT
+
+# Run the control plane
+bin/example -debug $@
+#+end_src
+
+I'll do some rearranging of our extracted repo to have its own makefile, bin, build, and src directories and we should be able to setup the example then using the same ~make example~ invocation
+
+*** Rearrange repo
+
+#+begin_src shell :results output
+mkdir -p {internal,main,build,bin}
+go mod init github.com/zachmandeville/example-xds-server
+tree
+#+end_src
+
+#+RESULTS:
+: .
+: ├── bin
+: ├── build
+: ├── go.mod
+: ├── internal
+: └── main
+:
+: 4 directories, 1 file
+
+*** Create files
+
+I will not go into all the file details here, but i moved the example server
+files over to the new structure, and updated the import statements in
+main/main.go to reference the right packages in our internal dir.
+
+Our makefile is identical except for directory structure
+
+#+NAME: Makefile
+#+begin_src shell :tangle ~/Projects/xDS-conformance/example-xds-server/Makefile
+#--------------------------------------
+#-- example xDS control plane server
+#--------------------------------------
+.PHONY: bin/example example
+
+bin/example:
+	@go build -race -o $@ main/main.go
+
+example: bin/example
+	@build/example.sh
+#+end_src
+
+Our shell script is the same, too, though i am interested in what it's like without an envoy instance
+
+#+NAME: build/example.sh
+#+begin_src shell :tangle ~/Projects/xDS-conformance/example-xds-server/build/example.sh
+#!/usr/bin/env bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+##
+## Runs Envoy and the example control plane server.  See
+## `internal/example` for the go source.
+##
+
+# Envoy start-up command
+ENVOY=${ENVOY:-/usr/local/bin/envoy}
+
+# Start envoy: important to keep drain time short
+(${ENVOY} -c bootstrap-xds.yaml --drain-time-s 1 -l debug)&
+ENVOY_PID=$!
+
+function cleanup() {
+  kill ${ENVOY_PID}
+}
+trap cleanup EXIT
+
+# Run the control plane
+bin/example -debug $@
+#+end_src
+
+And lastly, we need the bootstrap-xds.yaml mentioned, which we'll place in the root of the repo.
+
+#+NAME: bootstrap-xds.yaml
+#+begin_src yaml :tangle ~/Projects/xDS-conformance/example-xds-server/bootstrap-xds.yaml
+# Base config for a split xDS management server on 18000, admin port on 19000
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 19000
+dynamic_resources:
+  cds_config:
+    resource_api_version: V3
+    api_config_source:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: xds_cluster
+      set_node_on_first_message_only: true
+  lds_config:
+    resource_api_version: V3
+    api_config_source:
+      api_type: GRPC
+      transport_api_version: V3
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: xds_cluster
+      set_node_on_first_message_only: true
+node:
+  cluster: test-cluster
+  id: test-id
+static_resources:
+  clusters:
+  - connect_timeout: 1s
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 18000
+    http2_protocol_options: {}
+    name: xds_cluster
+layered_runtime:
+  layers:
+    - name: runtime-0
+      rtds_layer:
+        rtds_config:
+          resource_api_version: V3
+          api_config_source:
+            transport_api_version: V3
+            api_type: GRPC
+            grpc_services:
+              envoy_grpc:
+                cluster_name: xds_cluster
+        name: runtime-0
+#+end_src
+
+With this, we'll have an admin interface at 19000 and the clusters and listeners for envoy configured dynamically through the instructions given in the xds server at 18000
+
+The full directory (ignoring developer tmate output) is:
+
+#+begin_src shell :dir ~/Projects/xDs-conformance/example-xds-server :results output
+tree -I "tmate*"
+#+end_src
+
+#+RESULTS:
+#+begin_example
+.
+├── Makefile
+├── bin
+│   └── example
+├── bootstrap-xds.yaml
+├── build
+│   └── example.sh
+├── go.mod
+├── go.sum
+├── internal
+│   ├── logger
+│   │   └── logger.go
+│   ├── resources
+│   │   └── resources.go
+│   └── server
+│       └── server.go
+└── main
+    └── main.go
+
+7 directories, 10 files
+#+end_example
+
+*** Start it up
+We should be able to start it up now with the ~make example~ command (making sure the example shell script is executable)
+
+#+NAME: start up example server
+#+begin_src tmate :dir ~/Projects/xDS-conformance/example-xds-server
+chmod +x build/example.sh
+make example
+#+end_src
+
+*** Test it
+When it is up, we should have admin access at :19000
+#+begin_src shell :results output
+curl localhost:19000/ready
+#+end_src
+
+#+RESULTS:
+: LIVE
+
+The default server creates a single cluster, which redirects to envoyproxy.io
+
+#+begin_src shell
+curl localhost:19000/config_dump | jq ".configs[1].dynamic_active_clusters[0]"
+#+end_src
+
+#+RESULTS:
+#+begin_example
+{
+  "version_info": "1",
+  "cluster": {
+    "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+    "name": "example_proxy_cluster",
+    "type": "LOGICAL_DNS",
+    "connect_timeout": "5s",
+    "dns_lookup_family": "V4_ONLY",
+    "load_assignment": {
+      "cluster_name": "example_proxy_cluster",
+      "endpoints": [
+        {
+          "lb_endpoints": [
+            {
+              "endpoint": {
+                "address": {
+                  "socket_address": {
+                    "address": "www.envoyproxy.io",
+                    "port_value": 80
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "last_updated": "2021-05-12T02:14:27.714Z"
+}
+#+end_example
+
+It has one dynamic listener, which listens to :1000 and directs to the above cluster
+#+begin_src shell
+curl localhost:19000/config_dump | jq ".configs[2].dynamic_listeners[0]"
+#+end_src
+
+#+RESULTS:
+#+begin_example
+{
+  "name": "listener_0",
+  "active_state": {
+    "version_info": "1",
+    "listener": {
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
+      "name": "listener_0",
+      "address": {
+        "socket_address": {
+          "address": "0.0.0.0",
+          "port_value": 10000
+        }
+      },
+      "filter_chains": [
+        {
+          "filters": [
+            {
+              "name": "envoy.filters.network.http_connection_manager",
+              "typed_config": {
+                "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+                "stat_prefix": "http",
+                "rds": {
+                  "config_source": {
+                    "api_config_source": {
+                      "api_type": "GRPC",
+                      "grpc_services": [
+                        {
+                          "envoy_grpc": {
+                            "cluster_name": "xds_cluster"
+                          }
+                        }
+                      ],
+                      "set_node_on_first_message_only": true,
+                      "transport_api_version": "V3"
+                    },
+                    "resource_api_version": "V3"
+                  },
+                  "route_config_name": "local_route"
+                },
+                "http_filters": [
+                  {
+                    "name": "envoy.filters.http.router"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "last_updated": "2021-05-12T02:14:27.772Z"
+  }
+}
+#+end_example
+
+and so pinging localhost:10000 should briong us to envoyproxy.io
+
+#+begin_src shell
+curl localhost:10000
+#+end_src
+
+#+RESULTS:
+: Redirecting to https://www.envoyproxy.io/
+
+Our server works as expected, successfully extracted from the go control plane.  Now we change it!
+** DONE Be able to read cluster information from unchanged example server
+So I don't actually need to run envoy. That's good for the example, but if i I
+just start up the server, it will stillb e listening at 18000, but without an
+admin interface.
+
+What i could do, then, is run a client that starts up a new ClusterDiscoveryClient with our connection to the management server and then
+outputs the results of running fetchCluster to stdout
+
+
+
+It looks something like this:
+#+begin_src go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	clusterservice "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"google.golang.org/grpc"
+)
+
+func main() {
+	dReq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: "",
+		Node: &envoy_config_core_v3.Node{
+			Id: "test-id",
+		},
+	}
+
+	conn, err := grpc.Dial(":18000", grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("error: %v", err)
+	}
+	c := clusterservice.NewClusterDiscoveryServiceClient(conn)
+	clusters, err := c.FetchClusters(context.Background(), dReq)
+	if err != nil {
+		fmt.Printf("error fetching clusters: %v", err)
+	}
+	responseJSON, err := json.MarshalIndent(clusters, "", "  ")
+	if err != nil {
+		fmt.Printf("error marshalling response: %v", err)
+	}
+	fmt.Printf("our Client: %v\n\n%v", string(responseJSON), clusters.GetResources())
+}
+#+end_src
+
+This will show a single cluster returned and the output is hard to read now, but i can see the example proxy.
+So i am proving that I can read info from the unchanged server, as long as it's registering these xDS servers.
+Lol, I think i'm starting to viscerally get the universal data plane.
+
 ** TODO Adjust example server to not have clusters
+I'd do this in the resource.go for the initial snapshot that gets made.
+
+in resources/resources.go, there is the function to generate the snapshot
+if i comment out all the clusters, routes, and listeners, i will get an empty xDS server.
+
+#+begin_src go
+func GenerateSnapshot() cache.Snapshot {
+	return cache.NewSnapshot(
+		"1",
+		[]types.Resource{}, // endpoints
+		// []types.Resource{makeCluster(ClusterName)},
+		// []types.Resource{makeRoute(RouteName, ClusterName)},
+		// []types.Resource{makeHTTPListener(ListenerName, RouteName)},
+		[]types.Resource{}, // clusters
+		[]types.Resource{}, // routes
+		[]types.Resource{}, // listeners
+		[]types.Resource{}, // runtimes
+		[]types.Resource{}, // secrets
+	)
+}
+
+#+end_src
+
+With this, I can still send discovery requests to the clusterDiscoveryService and i just get no resources back.
 ** TODO Confirm we can read from iteration, and see no clusters
 ** TODO Add a cluster resource to server from adapter call.
 ** TODO  Generalize this addition to a gRPC service
