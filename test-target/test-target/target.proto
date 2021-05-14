@@ -12,6 +12,15 @@ message ComplimentResponse {
   string compliment = 1;
 }
 
+message ClusterRequest {
+  string cluster = 1;
+}
+
+message ClusterResponse {
+  string message = 1;
+}
+
 service Shim {
   rpc GiveCompliment(ComplimentRequest) returns (ComplimentResponse){}
+  rpc AddCluster(ClusterRequest) returns (ClusterResponse){}
 }

@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ShimClient interface {
 	GiveCompliment(ctx context.Context, in *ComplimentRequest, opts ...grpc.CallOption) (*ComplimentResponse, error)
+	AddCluster(ctx context.Context, in *ClusterRequest, opts ...grpc.CallOption) (*ClusterResponse, error)
 }
 
 type shimClient struct {
@@ -38,11 +39,21 @@ func (c *shimClient) GiveCompliment(ctx context.Context, in *ComplimentRequest, 
 	return out, nil
 }
 
+func (c *shimClient) AddCluster(ctx context.Context, in *ClusterRequest, opts ...grpc.CallOption) (*ClusterResponse, error) {
+	out := new(ClusterResponse)
+	err := c.cc.Invoke(ctx, "/testtarget.Shim/AddCluster", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ShimServer is the server API for Shim service.
 // All implementations must embed UnimplementedShimServer
 // for forward compatibility
 type ShimServer interface {
 	GiveCompliment(context.Context, *ComplimentRequest) (*ComplimentResponse, error)
+	AddCluster(context.Context, *ClusterRequest) (*ClusterResponse, error)
 	mustEmbedUnimplementedShimServer()
 }
 
@@ -52,6 +63,9 @@ type UnimplementedShimServer struct {
 
 func (UnimplementedShimServer) GiveCompliment(context.Context, *ComplimentRequest) (*ComplimentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GiveCompliment not implemented")
+}
+func (UnimplementedShimServer) AddCluster(context.Context, *ClusterRequest) (*ClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddCluster not implemented")
 }
 func (UnimplementedShimServer) mustEmbedUnimplementedShimServer() {}
 
@@ -84,6 +98,24 @@ func _Shim_GiveCompliment_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Shim_AddCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ShimServer).AddCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/testtarget.Shim/AddCluster",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ShimServer).AddCluster(ctx, req.(*ClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Shim_ServiceDesc is the grpc.ServiceDesc for Shim service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -94,6 +126,10 @@ var Shim_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GiveCompliment",
 			Handler:    _Shim_GiveCompliment_Handler,
+		},
+		{
+			MethodName: "AddCluster",
+			Handler:    _Shim_AddCluster_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
