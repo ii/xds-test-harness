@@ -71,6 +71,18 @@ func getCompliment(c shim.ShimClient, name string) {
 	fmt.Println(compliment.Compliment)
 }
 
+func addCluster (c shim.ShimClient, cluster string) {
+	req := &shim.ClusterRequest{
+		Cluster: cluster,
+	}
+	response, err := c.AddCluster(context.Background(), req)
+	if err != nil {
+		log.Printf("failed to add a cluster: %v\n", err)
+	}
+	fmt.Println(response.Message)
+	fmt.Println("check the config_dump")
+}
+
 func main() {
 	go func() {
 		lis, err := net.Listen("tcp", port)
@@ -86,15 +98,17 @@ func main() {
 	}()
 
 	go func() {
-	fmt.Println("\nConnecting to Shim")
-	conn, err := grpc.Dial(shimPort, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
-	if err != nil {
-		log.Fatalf("unable to connect to %v: %v", shimPort, err)
-	}
-	defer conn.Close()
-	c := shim.NewShimClient(conn)
-	getCompliment(c, "zach")
+		fmt.Println("\nConnecting to Shim")
+		conn, err := grpc.Dial(shimPort, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
+		if err != nil {
+			log.Fatalf("unable to connect to %v: %v", shimPort, err)
+		}
+		defer conn.Close()
+		c := shim.NewShimClient(conn)
+		getCompliment(c, "zach")
+		addCluster(c, "foo")
 	}()
+
 	for {
 		if 1 == 2 {
 			fmt.Println("hi")
