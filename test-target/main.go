@@ -22,6 +22,7 @@ var (
 	l        logrus.FieldLogger
 	shimPort string
 	port     uint
+	proc *processor.Processor
 )
 
 type shimServer struct {
@@ -36,6 +37,16 @@ func (s *shimServer) GiveCompliment(ctx context.Context, req *pb.ComplimentReque
 	return compliment, nil
 }
 
+func (s *shimServer) AddCluster(ctx context.Context, req *pb.ClusterRequest) (res *pb.ClusterResponse, err error) {
+	cluster := req.Cluster
+	proc.UpdateSnapshot(cluster)
+	response := &pb.ClusterResponse{
+		Message: fmt.Sprintf("A cluster named %v was added\n",cluster),
+	}
+	return response, nil
+}
+
+
 func init() {
 	l = logrus.New()
 	logrus.SetLevel(logrus.DebugLevel)
@@ -47,10 +58,8 @@ func init() {
 func main() {
 	flag.Parse()
 	cache := cache.NewSnapshotCache(false, cache.IDHash{}, l)
-	proc := processor.NewProcessor(
+	proc = processor.NewProcessor(
 		cache, nodeID, logrus.WithField("context", "processor"))
-
-	proc.UpdateSnapshot("foooo")
 	go func() {
 		// Run the xDS server
 		ctx := context.Background()
