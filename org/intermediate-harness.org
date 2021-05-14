@@ -441,7 +441,7 @@ This will show a single cluster returned and the output is hard to read now, but
 So i am proving that I can read info from the unchanged server, as long as it's registering these xDS servers.
 Lol, I think i'm starting to viscerally get the universal data plane.
 
-** TODO Adjust example server to not have clusters
+** DONE Adjust example server to not have clusters
 I'd do this in the resource.go for the initial snapshot that gets made.
 
 in resources/resources.go, there is the function to generate the snapshot
@@ -465,10 +465,37 @@ func GenerateSnapshot() cache.Snapshot {
 
 #+end_src
 
-With this, I can still send discovery requests to the clusterDiscoveryService and i just get no resources back.
-** TODO Confirm we can read from iteration, and see no clusters
-** TODO Add a cluster resource to server from adapter call.
+** DONE Confirm we can read from iteration, and see no clusters
+With that updated resources.go, I can start up the server and see its initial snapshot is empty.
+Then, i can use the same function in my client to get clusters from the cluster discovery service. I still get back a version and a type url, but the resources are empty as i'd expect!
+** DONE Add a cluster resource to server from adapter call.
+This i would do through setting the snapshot, I do believe.
+A good example of this is in sloka's implementation. I think I would want to do something similar, but allowing you to set the thing you are updating and the yaml of how it should be updated. e.g.
+
+adapter.registerResource(yaml)
+and that yaml being something like:
+
+
+#+begin_example yaml
+clusters:
+- name: something
+  address: place
+#+end_example
+
+I have the initial call done, though not yet with yaml...that is it's own project.  It ended up more difficult than i anticipated, mostly wrapping my head around the target and the adapter being servers and clients simultaneously.  But at the moment, I can run addCluster('foo') from the adapter and see that a new cluster was added to our envoy mesh.
+** TODO add cluster using yaml
+first iteration is that i can add a request like
+registerResource("cluster",yaml)
+with the yaml being:
+#+begin_example yaml
+clusters:
+- name: something
+#+end_example
+
+and it will add ~something~ to the envoy instance.  It won't do anything, and will have no loadbalancing, but can be see with a config_dump
+
 ** TODO  Generalize this addition to a gRPC service
+i should be able to send the yaml to adapter from some client and see envoy updated.  this will be replaced by our test case.
 ** TODO Write test case using example configuration yaml
 ** TODO Setup test target using code snippet in test case
 test case -> generated function template -> function with call to adapter
