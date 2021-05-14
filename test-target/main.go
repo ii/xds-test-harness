@@ -58,7 +58,6 @@ func main() {
 		server.RunServer(ctx, srv, port)
 	}()
 
-	go func() {
 		lis, err := net.Listen("tcp", shimPort)
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
@@ -67,13 +66,6 @@ func main() {
 		pb.RegisterShimServer(s, &shimServer{})
 		log.Printf("shim server listening on port %v\n", shimPort)
 		if err := s.Serve(lis); err != nil {
-			log.Fatalf("Failed to server: %v", err)
+			log.Fatalf("Failed to serve: %v", err)
 		}
-	}()
-
-	for {
-		if "wha" == "who" {
-			fmt.Println("unsure how to keep the server running without this")
-		}
-	}
 }
