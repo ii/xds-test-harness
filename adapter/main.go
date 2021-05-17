@@ -82,29 +82,6 @@ func (s *server) RegisterResource(ctx context.Context, in *pb.ResourceSpec) (*pb
 	return response, nil
 }
 
-func getCompliment(c shimpb.ShimClient, name string) {
-	request := &shimpb.ComplimentRequest{
-		Name: name,
-	}
-	compliment, err := c.GiveCompliment(context.Background(), request)
-	if err != nil {
-		log.Printf("failed to get compliment: %v\n", err)
-	}
-	fmt.Println(compliment.Compliment)
-}
-
-// func addClusters (c shim.ShimClient, clusters string) {
-// 	req := &shim.ClusterRequest{
-// 		Cluster: clusters,
-// 	}
-// 	response, err := c.AddCluster(context.Background(), req)
-// 	if err != nil {
-// 		log.Printf("failed to add a cluster: %v\n", err)
-// 	}
-// 	fmt.Println(response.Message)
-// 	fmt.Println("check the config_dump")
-// }
-
 func main() {
 	go func() {
 		lis, err := net.Listen("tcp", port)
@@ -118,26 +95,6 @@ func main() {
 			log.Fatalf("Failed to serve: %v", err)
 		}
 	}()
-
-// 	go func() {
-// 		fmt.Println("\nConnecting to Shim")
-// 		conn, err := grpc.Dial(shimPort, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
-// 		if err != nil {
-// 			log.Fatalf("unable to connect to %v: %v", shimPort, err)
-// 		}
-// 		defer conn.Close()
-// 		c := shimpb.NewShimClient(conn)
-// 		getCompliment(c, "zach")
-
-// // 		clusters := `
-// // name: test_config
-// // spec:
-// //   clusters:
-// //   - name: ecco
-// //   - name: echo
-// // `
-// 		// addClusters(c, clusters)
-// 	}()
 
 	for {
 		if 1 == 2 {

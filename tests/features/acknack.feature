@@ -1,5 +1,5 @@
 Feature: Conformance ACK/NACK
-  Discovery Request's and Responses should follow the behaviour outlined in the
+  Discovery Requests and Responses should follow the behaviour outlined in the
   API docs.
 
   Background:
