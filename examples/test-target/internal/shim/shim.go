@@ -30,8 +30,8 @@ func (s *shimServer) GiveCompliment(ctx context.Context, req *pb.ComplimentReque
 }
 
 func (s *shimServer) AddCluster(ctx context.Context, req *pb.ClusterRequest) (res *pb.ClusterResponse, err error) {
-	cluster := req.Cluster
-	snapshot, err := proc.UpdateSnapshot(cluster)
+	clusters := req.Cluster
+	snapshot, err := proc.UpdateSnapshot(clusters)
 	if err != nil {
 		log.Printf("error updating snapshot: %v", err)
 	}
@@ -41,7 +41,7 @@ func (s *shimServer) AddCluster(ctx context.Context, req *pb.ClusterRequest) (re
 	}
 	fmt.Printf("snapshot JSON: %v", string(snapJSON))
 	response := &pb.ClusterResponse{
-		Message: fmt.Sprintf("A cluster named %v was added\n", cluster),
+		Message: fmt.Sprintf("Clusters added from this yaml: %v", clusters),
 		Snapshot: string(snapJSON),
 	}
 	return response, nil
