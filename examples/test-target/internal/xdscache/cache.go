@@ -2,7 +2,7 @@ package xdscache
 
 import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/zachmandeville/tester-prototype/test-target/internal/resources"
+	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/resources"
 )
 
 type XDSCache struct {

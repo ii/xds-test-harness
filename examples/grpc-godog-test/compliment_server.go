@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/zachmandeville/tester-prototype/example/complimenter"
+	pb "github.com/zachmandeville/tester-prototype/examples/grpc-godog-test/complimenter"
 )
 
 const (

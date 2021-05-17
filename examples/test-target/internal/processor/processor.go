@@ -9,8 +9,8 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/zachmandeville/tester-prototype/test-target/internal/resources"
-	"github.com/zachmandeville/tester-prototype/test-target/internal/xdscache"
+	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/resources"
+	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/xdscache"
 )
 
 type Processor struct {
@@ -37,18 +37,19 @@ func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogg
 }
 
 func (p *Processor) newSnapshotVersion() string {
-	if p.snapshotVersion == math.MaxInt64 {
+	//reset if it number gets too high, and make sure our first snapshot is version 1
+	if p.snapshotVersion == math.MaxInt64 || p.snapshotVersion == 1 {
 		p.snapshotVersion = 0
 	}
 	p.snapshotVersion++
 	return strconv.FormatInt(p.snapshotVersion, 10)
 }
 
-func (p *Processor) UpdateSnapshot(cluster string) {
+func (p *Processor) UpdateSnapshot(cluster string) (snapshot cache.Snapshot, err error){
 
 	p.xdsCache.AddCluster(cluster)
 
-	snapshot := cache.NewSnapshot(
+	snapshot = cache.NewSnapshot(
 		p.newSnapshotVersion(),
 		// p.xdsCache.EndpointsContents(),
 		[]types.Resource{}, // endpoints
@@ -61,15 +62,17 @@ func (p *Processor) UpdateSnapshot(cluster string) {
 		[]types.Resource{}, // secrets
 	)
 
-	if err := snapshot.Consistent(); err != nil {
+	if err = snapshot.Consistent(); err != nil {
 		p.Errorf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
 		return
 	}
 	p.Debugf("will serve snapshot %+v", snapshot)
 
 	// Add the snapshot to the cache
+
 	if err := p.cache.SetSnapshot(p.nodeID, snapshot); err != nil {
 		p.Errorf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
+	return snapshot, err
 }

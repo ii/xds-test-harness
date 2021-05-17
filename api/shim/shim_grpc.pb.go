@@ -133,5 +133,5 @@ var Shim_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "test-target/target.proto",
+	Metadata: "api/shim/shim.proto",
 }

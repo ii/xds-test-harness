@@ -9,8 +9,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/zachmandeville/tester-prototype/adapter/adapter"
-	shim "github.com/zachmandeville/tester-prototype/test-target/test-target"
+	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	shim "github.com/zachmandeville/tester-prototype/api/shim"
 )
 
 const (
