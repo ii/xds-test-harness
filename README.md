@@ -12,3 +12,4 @@ more context for what I've written and why!
 - [Initial Request](./org/initial-request.org)
 - [Streaming Request](./org/streaming-request.org)
 - [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org)
+- [Basic Test Harness](./org/basic-harness.org)

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter";
+
+package adapter;
+
+message Name {
+  string name = 1;
+}
+
+message Compliment {
+  string message = 1;
+}
+
+message ResourceSpec {
+  // yaml specifying resources for an xds management server
+  string spec = 1;
+}
+
+message Snapshot {
+  // xDS snapshot cache as json string
+  string snapshot = 1;
+
+}
+
+message ShimRequest {
+  string port = 1;
+}
+
+message ShimResponse {
+  string message = 1;
+}
+
+service Adapter {
+  rpc GiveCompliments (Name) returns (stream Compliment){}
+  rpc RegisterResource(ResourceSpec) returns (Snapshot){}
+  rpc ConnectToShim(ShimRequest) returns (ShimResponse){}
+}

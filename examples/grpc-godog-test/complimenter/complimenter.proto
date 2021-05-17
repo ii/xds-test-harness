@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/zachmandeville/tester-prototype/example/complimenter";
+option go_package = "github.com/zachmandeville/tester-prototype/examples/grpc-godog-test/complimenter";
 
 package complimenter;
 
