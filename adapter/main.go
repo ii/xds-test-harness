@@ -71,9 +71,9 @@ func getCompliment(c shim.ShimClient, name string) {
 	fmt.Println(compliment.Compliment)
 }
 
-func addCluster (c shim.ShimClient, cluster string) {
+func addClusters (c shim.ShimClient, clusters string) {
 	req := &shim.ClusterRequest{
-		Cluster: cluster,
+		Cluster: clusters,
 	}
 	response, err := c.AddCluster(context.Background(), req)
 	if err != nil {
@@ -106,7 +106,15 @@ func main() {
 		defer conn.Close()
 		c := shim.NewShimClient(conn)
 		getCompliment(c, "zach")
-		addCluster(c, "foo")
+
+		clusters := `
+name: test_config
+spec:
+  clusters:
+  - name: ecco
+  - name: echo
+`
+		addClusters(c, clusters)
 	}()
 
 	for {
