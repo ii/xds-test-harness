@@ -12,15 +12,27 @@ message Compliment {
   string message = 1;
 }
 
-message ConnectionRequest {
+message ResourceSpec {
+  // yaml specifying resources for an xds management server
+  string spec = 1;
+}
+
+message Snapshot {
+  // xDS snapshot cache as json string
+  string snapshot = 1;
+
+}
+
+message ShimRequest {
   string port = 1;
 }
 
-message ConnectionResponse {
+message ShimResponse {
   string message = 1;
 }
 
 service Adapter {
   rpc GiveCompliments (Name) returns (stream Compliment){}
-  rpc ConnectToTarget (ConnectionRequest) returns (ConnectionResponse){}
+  rpc RegisterResource(ResourceSpec) returns (Snapshot){}
+  rpc ConnectToShim(ShimRequest) returns (ShimResponse){}
 }

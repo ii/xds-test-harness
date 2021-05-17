@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
-	shim "github.com/zachmandeville/tester-prototype/api/shim"
+	shimpb "github.com/zachmandeville/tester-prototype/api/shim"
 )
 
 const (
@@ -27,8 +27,14 @@ type Target struct {
 	Connection *grpc.ClientConn
 }
 
+type Shim struct {
+	Port string
+	Connection *grpc.ClientConn
+}
+
 var (
 	target *Target = nil
+	shim *Shim = nil
 )
 
 func (s *server) GiveCompliments(name *pb.Name, stream pb.Adapter_GiveComplimentsServer) error {
@@ -43,25 +49,41 @@ func (s *server) GiveCompliments(name *pb.Name, stream pb.Adapter_GiveCompliment
 	return nil
 }
 
-func (s *server) ConnectToTarget(ctx context.Context, req *pb.ConnectionRequest) (res *pb.ConnectionResponse, err error) {
-	fmt.Printf("Connecting to test target at %v\n", req.Port)
-	conn, err := grpc.Dial(req.Port, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
+func (s *server) ConnectToShim(ctx context.Context, req *pb.ShimRequest) (res *pb.ShimResponse, err error) {
+	port := req.Port
+	conn, err := grpc.Dial(port, grpc.WithInsecure(), grpc.WithTimeout(time.Second *5), grpc.WithBlock())
 	if err != nil {
-		fmt.Printf("Error dialing into %v: %v", req.Port, err)
-		return &pb.ConnectionResponse{}, err
+		log.Printf("error connecting to shim: %v", err)
+		return nil, err
 	}
-	target = &Target{
-		Port:       req.Port,
+	shim = &Shim{
+		Port:       port,
 		Connection: conn,
 	}
-	response := &pb.ConnectionResponse{
-		Message: "Connected to test target.",
+	response := &pb.ShimResponse{
+		Message: "connected to shim",
 	}
 	return response, nil
 }
 
-func getCompliment(c shim.ShimClient, name string) {
-	request := &shim.ComplimentRequest{
+func (s *server) RegisterResource(ctx context.Context, in *pb.ResourceSpec) (*pb.Snapshot, error) {
+	c := shimpb.NewShimClient(shim.Connection)
+	clusters := in.Spec
+	req := &shimpb.ClusterRequest{
+		Cluster: clusters,
+	}
+	snapshot, err := c.AddCluster(context.Background(), req)
+	if err != nil {
+		log.Printf("failed to add a cluster: %v\n", err)
+	}
+	response := &pb.Snapshot{
+		Snapshot: snapshot.Snapshot,
+	}
+	return response, nil
+}
+
+func getCompliment(c shimpb.ShimClient, name string) {
+	request := &shimpb.ComplimentRequest{
 		Name: name,
 	}
 	compliment, err := c.GiveCompliment(context.Background(), request)
@@ -71,17 +93,17 @@ func getCompliment(c shim.ShimClient, name string) {
 	fmt.Println(compliment.Compliment)
 }
 
-func addClusters (c shim.ShimClient, clusters string) {
-	req := &shim.ClusterRequest{
-		Cluster: clusters,
-	}
-	response, err := c.AddCluster(context.Background(), req)
-	if err != nil {
-		log.Printf("failed to add a cluster: %v\n", err)
-	}
-	fmt.Println(response.Message)
-	fmt.Println("check the config_dump")
-}
+// func addClusters (c shim.ShimClient, clusters string) {
+// 	req := &shim.ClusterRequest{
+// 		Cluster: clusters,
+// 	}
+// 	response, err := c.AddCluster(context.Background(), req)
+// 	if err != nil {
+// 		log.Printf("failed to add a cluster: %v\n", err)
+// 	}
+// 	fmt.Println(response.Message)
+// 	fmt.Println("check the config_dump")
+// }
 
 func main() {
 	go func() {
@@ -97,25 +119,25 @@ func main() {
 		}
 	}()
 
-	go func() {
-		fmt.Println("\nConnecting to Shim")
-		conn, err := grpc.Dial(shimPort, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
-		if err != nil {
-			log.Fatalf("unable to connect to %v: %v", shimPort, err)
-		}
-		defer conn.Close()
-		c := shim.NewShimClient(conn)
-		getCompliment(c, "zach")
+// 	go func() {
+// 		fmt.Println("\nConnecting to Shim")
+// 		conn, err := grpc.Dial(shimPort, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
+// 		if err != nil {
+// 			log.Fatalf("unable to connect to %v: %v", shimPort, err)
+// 		}
+// 		defer conn.Close()
+// 		c := shimpb.NewShimClient(conn)
+// 		getCompliment(c, "zach")
 
-		clusters := `
-name: test_config
-spec:
-  clusters:
-  - name: ecco
-  - name: echo
-`
-		addClusters(c, clusters)
-	}()
+// // 		clusters := `
+// // name: test_config
+// // spec:
+// //   clusters:
+// //   - name: ecco
+// //   - name: echo
+// // `
+// 		// addClusters(c, clusters)
+// 	}()
 
 	for {
 		if 1 == 2 {
