@@ -30,5 +30,17 @@ type Cluster struct {
 
 type Endpoint struct {
 	Address string `yaml:"address"`
-	Port    uint32 `yaml:port"`
+	Port    uint32 `yaml:"port"`
+}
+
+type EnvoyNode struct {
+	ID string `yaml:"id"`
+}
+
+type TestDiscoveryRequest struct {
+	VersionInfo string `default:"" yaml:"version_info"`
+	ResourceNames []string `default:[]string yaml:"resource_names"`
+	TypeURL string `default:"" yaml:"type_url"`
+	ResponseNonce string `default:"" yaml:"response_nonce"`
+	Node EnvoyNode `yaml:"node"`
 }
