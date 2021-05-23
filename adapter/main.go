@@ -28,13 +28,13 @@ type Target struct {
 }
 
 type Shim struct {
-	Port string
+	Port       string
 	Connection *grpc.ClientConn
 }
 
 var (
 	target *Target = nil
-	shim *Shim = nil
+	shim   *Shim   = nil
 )
 
 func (s *server) GiveCompliments(name *pb.Name, stream pb.Adapter_GiveComplimentsServer) error {
@@ -51,7 +51,7 @@ func (s *server) GiveCompliments(name *pb.Name, stream pb.Adapter_GiveCompliment
 
 func (s *server) ConnectToShim(ctx context.Context, req *pb.ShimRequest) (res *pb.ShimResponse, err error) {
 	port := req.Port
-	conn, err := grpc.Dial(port, grpc.WithInsecure(), grpc.WithTimeout(time.Second *5), grpc.WithBlock())
+	conn, err := grpc.Dial(port, grpc.WithInsecure(), grpc.WithTimeout(time.Second*5), grpc.WithBlock())
 	if err != nil {
 		log.Printf("error connecting to shim: %v", err)
 		return nil, err
