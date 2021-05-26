@@ -3,17 +3,26 @@ Feature: Conformance ACK/NACK
   API docs.
 
   Background:
-    Given an Adapter located at "localhost:6767"
-    And a Target located at "localhost:18000"
-    And a Shim located at "localhost:17000"
+    Given "adapter" is reachable via grpc
+    And "target" is reachable via grpc
 
   Scenario:
-    Given a Target with clusters specified with yaml:
+    Given a Target setup with snapshot matching yaml:
      ```
-     name: test_config
-     spec:
+     ---
+     node:
+       name: test-id
+     version: '1'
+     resources:
+       endpoints:
        clusters:
        - name: foo
+         connect_timeout:
+           seconds: 5
+       routes:
+       listeners:
+       runtimes:
+       secrets:
      ```
      When I send a discovery request matching yaml:
      ```
