@@ -14,7 +14,7 @@ message Endpoints {
 message Clusters {
   message Cluster {
     string name = 1;
-    map<string,string> connect_timeout = 2;
+    map<string,int32> connect_timeout = 2;
   }
   repeated Cluster items = 1;
 }
