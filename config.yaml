@@ -1,4 +1,3 @@
 ---
-adapter: :6767
+adapter: :17000
 target: :18000
-target_adapter: :17000

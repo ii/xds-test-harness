@@ -5,34 +5,19 @@ Feature: Conformance ACK/NACK
   Background:
     Given "adapter" is reachable via grpc
     And "target" is reachable via grpc
-    And "target_adapter" is reachable via grpc
 
   Scenario:
     Given a Target setup with snapshot matching yaml:
      ```
      ---
-     Node:
-       name: test-id
-     Resources:
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items:
-         foo:
-           Resource:
-             name: foo
-             connect_timeout:
-               seconds: 5
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
+     node: test-id
+     version: "1"
+     resources:
+       endpoints:
+       clusters:
+       - name: foo
+         connect_timeout:
+           seconds: 5
      ```
      When I send a discovery request matching yaml:
      ```
