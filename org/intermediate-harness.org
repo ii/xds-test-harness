@@ -281,6 +281,87 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 #+end_example
 
 
-Notice that there are multiple lines in our background and example, but only four steps.  Since we are writing them in a consistent way, we can develop generic, reusable functions for them, reducing complexity.
+Notice that there are multiple lines in our background and example, but only
+four steps. Since we are writing them in a consistent way, we can develop
+generic, reusable functions for them, reducing complexity.
+
+* Improving test runner call
+At the moment, we run our suite by going into the tests folder and running
+`godog`. This is messy. Instead, I want it so we can run `go test` and it runs
+godog as part of the testmain function. This will allow us to pass in command
+line flags, like the target, adapter, and testadapter ports.
+
+#+NAME: main.go as test
+#+begin_src
+
+#+end_src
+
 
 * Implementing the first test
+#+begin_src shell :dir (ii/workdir+ "tests")
+godog
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: Conformance ACK/NACK
+  Discovery Requests and Responses should follow the behaviour outlined in the
+  API docs.
+
+  Background:
+    Given "adapter" is reachable via grpc             # acknack_test.go:35 -> isReachableViaGrpc
+    And "target" is reachable via grpc                # acknack_test.go:35 -> isReachableViaGrpc
+    And "target_adapter" is reachable via grpc        # acknack_test.go:35 -> isReachableViaGrpc
+
+  Scenario:                                          # features/acknack.feature:10
+    Given a Target setup with snapshot matching yaml: # acknack_test.go:23 -> aTargetSetupWithSnapshotMatchingYaml
+      ```
+      ---
+      Node:
+        name: test-id
+      Resources:
+      - Version: '1'
+        Items: {}
+      - Version: '1'
+        Items:
+          foo:
+            Resource:
+              name: foo
+              connect_timeout:
+                seconds: 5
+      - Version: '1'
+        Items: {}
+      - Version: '1'
+        Items: {}
+      - Version: '1'
+        Items: {}
+      - Version: '1'
+        Items: {}
+      - Version: '1'
+        Items: {}
+      ```
+      TODO: write pending definition
+    When I send a discovery request matching yaml:    # acknack_test.go:31 -> iSendADiscoveryRequestMatchingYaml
+      ```
+      version_info:
+      node: { id: test-id }
+      resource_names:
+      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
+      response_nonce:
+      ```
+    Then I get a discovery response matching json:    # acknack_test.go:27 -> iGetADiscoveryResponseMatchingJson
+      ```
+      {
+        "versionInfo":"1",
+        "resources":[
+          {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
+           "value":"CgNmb28iAggF"}
+         ],
+         "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
+      }
+      ```
+
+1 scenarios (1 passed, 1 pending)
+6 steps (3 passed, 1 pending, 2 skipped)
+1.067593ms
+#+end_example
