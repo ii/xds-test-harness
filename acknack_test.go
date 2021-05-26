@@ -32,7 +32,6 @@ type ClientConfig struct {
 type Runner struct {
 	Adapter           *ClientConfig
 	Target            *ClientConfig
-	TargetAdapter     *ClientConfig
 	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
 }
 
@@ -45,15 +44,34 @@ func (r *Runner) addPorts(*godog.Scenario)  {
 	if err != nil {
 		fmt.Printf("Error parsing yaml file: %v", err)
 	}
-	r.Adapter = &ClientConfig{}
-	r.Adapter.Port = yamlConfig.Adapter
-	r.Target = &ClientConfig{}
-	r.Target.Port = yamlConfig.Target
-	r.TargetAdapter = &ClientConfig{}
-	r.TargetAdapter.Port = yamlConfig.TargetAdapter
+	r.Adapter = &ClientConfig{
+		Port: yamlConfig.Adapter,
+	}
+	r.Target = &ClientConfig{
+		Port: yamlConfig.Target,
+	}
 }
 
-func aTargetSetupWithSnapshotMatchingYaml(arg1 *godog.DocString) error {
+func aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString) error {
+	_, err := parser.YamlToSnapshot(snapYaml.Content)
+	if err != nil {
+		fmt.Printf("Error parsing snapshot yaml: %v", err)
+	}
+	// snapshot := &pb.Snapshot{
+	// 	Version:   "",
+	// 	Endpoints: &pb.Endpoints{
+	// 		Items: []*pb.Endpoints_Endpoint{
+	// 			&pb.Endpoints_Endpoint{
+	// 				Name: "butts",
+	// 			},
+	// 		},
+	// 	},
+		// Clusters:  &pb.Clusters{},
+		// Routes:    &pb.Routes{},
+		// Listeners: &pb.Listeners{},
+		// Runtimes:  &pb.Runtimes{},
+		// Secrets:   &pb.Secrets{},
+	// }
 	return godog.ErrPending
 }
 
@@ -83,9 +101,6 @@ func (r *Runner) isReachableViaGrpc(server string) error {
 	case "target":
 		err := connectViaGRPC(r.Target, server)
 		return err
-	case "target_adapter":
-		err := connectViaGRPC(r.TargetAdapter, server)
-		return err
 	default:
 		return godog.ErrPending
 	}
@@ -94,12 +109,10 @@ func (r *Runner) isReachableViaGrpc(server string) error {
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
-	ctx.BeforeScenario(runner.addPorts)
 	ctx.BeforeScenario(func(s *godog.Scenario) {
-		opts = append(opts, grpc.WithInsecure())
-		opts = append(opts, grpc.WithBlock())
-		opts = append(opts, grpc.WithTimeout(time.Second*5))
+		opts = append(opts, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
 	})
+	ctx.BeforeScenario(runner.addPorts)
 	ctx.Step(`^a Target setup with snapshot matching yaml:$`, aTargetSetupWithSnapshotMatchingYaml)
 	ctx.Step(`^I get a discovery response matching json:$`, iGetADiscoveryResponseMatchingJson)
 	ctx.Step(`^I send a discovery request matching yaml:$`, iSendADiscoveryRequestMatchingYaml)
