@@ -1,5 +1,8 @@
 package parser
 
+type EnvoyNode struct {
+	ID string `yaml:"id"`
+}
 type ConnectTimeout struct {
 	seconds int32 `yaml:"seconds"`
 }
@@ -59,9 +62,9 @@ type InitConfig struct {
 }
 
 type TestDiscoveryRequest struct {
-	VersionInfo   string   `default:"" yaml:"version_info"`
-	ResourceNames []string `default:[]string yaml:"resource_names"`
-	TypeURL       string   `default:"" yaml:"type_url"`
-	ResponseNonce string   `default:"" yaml:"response_nonce"`
-	// Node          EnvoyNode `yaml:"node"`
+	VersionInfo   string    `default:"" yaml:"version_info"`
+	ResourceNames []string  `default:[]string yaml:"resource_names"`
+	TypeURL       string    `default:"" yaml:"type_url"`
+	ResponseNonce string    `default:"" yaml:"response_nonce"`
+	Node          EnvoyNode `yaml:"node"`
 }

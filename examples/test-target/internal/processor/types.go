@@ -12,7 +12,7 @@
 
 package processor
 
-type EnvoyConfig struct {
+type GCPSnapshot struct {
 	Name string `yaml:"name"`
 	Spec `yaml:"spec"`
 }

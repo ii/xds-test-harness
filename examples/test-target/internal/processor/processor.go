@@ -8,21 +8,11 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 
+	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/resources"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/xdscache"
 )
-// helper functions
-func parseYaml(yml string) (*EnvoyConfig, error) {
-	var config EnvoyConfig
-
-	err := yaml.Unmarshal([]byte(yml), &config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
 
 type Processor struct {
 	cache           cache.SnapshotCache
@@ -31,7 +21,6 @@ type Processor struct {
 	logrus.FieldLogger
 	xdsCache xdscache.XDSCache
 }
-
 
 func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogger) *Processor {
 	return &Processor{
@@ -57,16 +46,10 @@ func (p *Processor) newSnapshotVersion() string {
 	return strconv.FormatInt(p.snapshotVersion, 10)
 }
 
-func (p *Processor) UpdateSnapshot(yml string) (snapshot cache.Snapshot, err error){
-
-	envoyConfig, err := parseYaml(yml)
-	if err != nil {
-		p.Errorf("error parsing yaml file: %+v", err)
-		return
-	}
+func (p *Processor) UpdateSnapshot(state *pb.Snapshot) (snapshot cache.Snapshot, err error) {
 
 	// Parse Clusters
-	for _, c := range envoyConfig.Clusters {
+	for _, c := range state.Clusters.Items {
 		p.xdsCache.AddCluster(c.Name)
 	}
 
@@ -91,7 +74,7 @@ func (p *Processor) UpdateSnapshot(yml string) (snapshot cache.Snapshot, err err
 
 	// Add the snapshot to the cache
 
-	if err := p.cache.SetSnapshot(p.nodeID, snapshot); err != nil {
+	if err := p.cache.SetSnapshot(state.Node, snapshot); err != nil {
 		p.Errorf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}

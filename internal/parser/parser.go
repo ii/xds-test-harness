@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"gopkg.in/yaml.v2"
 )
@@ -22,7 +21,7 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 		return nil, err
 	}
 
-	snapshot := &pb.Snapshot{}
+	snapshot := &pb.Snapshot{Node: s.Node}
 	if s.Resources.Endpoints != nil {
 		endpoints := &pb.Endpoints{}
 		for _, e := range s.Resources.Endpoints {
@@ -81,35 +80,24 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 			})
 		}
 	}
-	fmt.Printf("snapshot: %v", snapshot)
 	return snapshot, nil
 }
 
-// func ParseYaml(yml string) (*EnvoyConfig, error) {
-// 	var config EnvoyConfig
+func NewDiscoveryRequest() TestDiscoveryRequest {
+	dr := TestDiscoveryRequest{}
+	dr.VersionInfo = ""
+	dr.ResponseNonce = ""
+	dr.TypeURL = ""
+	dr.VersionInfo = ""
+	dr.Node.ID = ""
+	return dr
+}
 
-// 	err := yaml.Unmarshal([]byte(yml), &config)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &config, nil
-// }
-
-// func NewDiscoveryRequest() TestDiscoveryRequest {
-// 	dr := TestDiscoveryRequest{}
-// 	dr.VersionInfo = ""
-// 	dr.ResponseNonce = ""
-// 	dr.TypeURL = ""
-// 	dr.VersionInfo = ""
-// 	dr.Node.ID = ""
-// 	return dr
-// }
-
-// func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
-// 	request := NewDiscoveryRequest()
-// 	err := yaml.Unmarshal([]byte(yml), &request)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &request, nil
-// }
+func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
+	request := NewDiscoveryRequest()
+	err := yaml.Unmarshal([]byte(yml), &request)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
