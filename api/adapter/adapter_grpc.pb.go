@@ -18,7 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdapterClient interface {
-	SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*Snapshot, error)
+	SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*SetStateResponse, error)
 }
 
 type adapterClient struct {
@@ -29,8 +29,8 @@ func NewAdapterClient(cc grpc.ClientConnInterface) AdapterClient {
 	return &adapterClient{cc}
 }
 
-func (c *adapterClient) SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*Snapshot, error) {
-	out := new(Snapshot)
+func (c *adapterClient) SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*SetStateResponse, error) {
+	out := new(SetStateResponse)
 	err := c.cc.Invoke(ctx, "/adapter.Adapter/SetState", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (c *adapterClient) SetState(ctx context.Context, in *Snapshot, opts ...grpc
 // All implementations must embed UnimplementedAdapterServer
 // for forward compatibility
 type AdapterServer interface {
-	SetState(context.Context, *Snapshot) (*Snapshot, error)
+	SetState(context.Context, *Snapshot) (*SetStateResponse, error)
 	mustEmbedUnimplementedAdapterServer()
 }
 
@@ -50,7 +50,7 @@ type AdapterServer interface {
 type UnimplementedAdapterServer struct {
 }
 
-func (UnimplementedAdapterServer) SetState(context.Context, *Snapshot) (*Snapshot, error) {
+func (UnimplementedAdapterServer) SetState(context.Context, *Snapshot) (*SetStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
 }
 func (UnimplementedAdapterServer) mustEmbedUnimplementedAdapterServer() {}

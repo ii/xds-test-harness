@@ -48,15 +48,20 @@ message Secrets {
 }
 
 message Snapshot {
-  string version = 1;
-  Endpoints endpoints = 2;
-  Clusters clusters = 3;
-  Routes routes = 4;
-  Listeners listeners = 5;
-  Runtimes runtimes = 6;
-  Secrets secrets = 7;
+  string node = 1;
+  string version = 2;
+  Endpoints endpoints = 3;
+  Clusters clusters = 4;
+  Routes routes = 5;
+  Listeners listeners = 6;
+  Runtimes runtimes = 7;
+  Secrets secrets = 8;
+}
+
+message SetStateResponse {
+  string message = 1;
 }
 
 service Adapter {
-  rpc SetState(Snapshot) returns (Snapshot){}
+  rpc SetState(Snapshot) returns (SetStateResponse){}
 }
