@@ -23,7 +23,11 @@ import (
 const configFile string = "config.yaml"
 
 var (
-	opts []grpc.DialOption
+	opts []grpc.DialOption = []grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithTimeout(time.Second * 5),
+	}
 )
 
 type ClientConfig struct {
@@ -38,19 +42,19 @@ type Runner struct {
 }
 
 func (r *Runner) addPorts(*godog.Scenario) {
-	yamlFile, err := ioutil.ReadFile(configFile)
+	configYaml, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		fmt.Printf("Error reading setup file: %v", err)
 	}
-	yamlConfig, err := parser.ParseInitConfig(yamlFile)
+	config, err := parser.ParseInitConfig(configYaml)
 	if err != nil {
 		fmt.Printf("Error parsing yaml file: %v", err)
 	}
 	r.Adapter = &ClientConfig{
-		Port: yamlConfig.Adapter,
+		Port: config.Adapter,
 	}
 	r.Target = &ClientConfig{
-		Port: yamlConfig.Target,
+		Port: config.Target,
 	}
 }
 
@@ -136,9 +140,6 @@ func (r *Runner) isReachableViaGrpc(server string) error {
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
-	ctx.BeforeScenario(func(s *godog.Scenario) {
-		opts = append(opts, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Second*5))
-	})
 	ctx.BeforeScenario(runner.addPorts)
 	ctx.Step(`^a Target setup with snapshot matching yaml:$`, runner.aTargetSetupWithSnapshotMatchingYaml)
 	ctx.Step(`^I get a discovery response matching json:$`, runner.iGetADiscoveryResponseMatchingJson)
