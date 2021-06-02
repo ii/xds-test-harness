@@ -1,19 +1,23 @@
-Feature: Conformance ACK/NACK
+Feature: Conformance ACK
   Discovery Requests and Responses should follow the behaviour outlined in the
   API docs.
 
   Background:
-    Given an Adapter located at "localhost:6767"
-    And a Target located at "localhost:18000"
-    And a Shim located at "localhost:17000"
+    Given "adapter" is reachable via gRPC
+    And "target" is reachable via gRPC
 
   Scenario:
-    Given a Target with clusters specified with yaml:
+    Given a Target setup with snapshot matching yaml:
      ```
-     name: test_config
-     spec:
+     ---
+     node: test-id
+     version: "1"
+     resources:
+       endpoints:
        clusters:
        - name: foo
+         connect_timeout:
+           seconds: 5
      ```
      When I send a discovery request matching yaml:
      ```

@@ -4,35 +4,64 @@ option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter"
 
 package adapter;
 
-message Name {
-  string name = 1;
+message Endpoints {
+  message Endpoint {
+    string name = 1;
+  }
+  repeated Endpoint items = 1;
 }
 
-message Compliment {
-  string message = 1;
+message Clusters {
+  message Cluster {
+    string name = 1;
+    map<string,int32> connect_timeout = 2;
+  }
+  repeated Cluster items = 1;
 }
 
-message ResourceSpec {
-  // yaml specifying resources for an xds management server
-  string spec = 1;
+message Routes {
+  message Route {
+    string name = 1;
+  }
+  repeated Route items = 1;
+}
+
+message Listeners {
+  message Listener {
+    string name = 1;
+  }
+  repeated Listener items = 1;
+}
+
+message Runtimes {
+  message Runtime {
+    string name = 1;
+  }
+  repeated Runtime items = 1;
+}
+
+message Secrets {
+  message Secret {
+    string name = 1;
+  }
+  repeated Secret items = 1;
 }
 
 message Snapshot {
-  // xDS snapshot cache as json string
-  string snapshot = 1;
-
+  string node = 1;
+  string version = 2;
+  Endpoints endpoints = 3;
+  Clusters clusters = 4;
+  Routes routes = 5;
+  Listeners listeners = 6;
+  Runtimes runtimes = 7;
+  Secrets secrets = 8;
 }
 
-message ShimRequest {
-  string port = 1;
-}
-
-message ShimResponse {
+message SetStateResponse {
   string message = 1;
 }
 
 service Adapter {
-  rpc GiveCompliments (Name) returns (stream Compliment){}
-  rpc RegisterResource(ResourceSpec) returns (Snapshot){}
-  rpc ConnectToShim(ShimRequest) returns (ShimResponse){}
+  rpc SetState(Snapshot) returns (SetStateResponse){}
 }

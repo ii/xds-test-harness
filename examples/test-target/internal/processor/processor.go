@@ -5,24 +5,14 @@ import (
 	"os"
 	"strconv"
 
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/resources"
+	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/xdscache"
 )
-// helper functions
-func parseYaml(yml string) (*EnvoyConfig, error) {
-	var config EnvoyConfig
-
-	err := yaml.Unmarshal([]byte(yml), &config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
 
 type Processor struct {
 	cache           cache.SnapshotCache
@@ -32,7 +22,6 @@ type Processor struct {
 	xdsCache xdscache.XDSCache
 }
 
-
 func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogger) *Processor {
 	return &Processor{
 		cache:           cache,
@@ -40,10 +29,10 @@ func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogg
 		snapshotVersion: 1,
 		FieldLogger:     log,
 		xdsCache: xdscache.XDSCache{
-			Listeners: make(map[string]resources.Listener),
-			Clusters:  make(map[string]resources.Cluster),
-			Routes:    make(map[string]resources.Route),
-			Endpoints: make(map[string]resources.Endpoint),
+			Listeners: make(map[string]xdscache.Listener),
+			Clusters:  make(map[string]*cluster.Cluster),
+			Routes:    make(map[string]xdscache.Route),
+			Endpoints: make(map[string]xdscache.Endpoint),
 		},
 	}
 }
@@ -57,17 +46,11 @@ func (p *Processor) newSnapshotVersion() string {
 	return strconv.FormatInt(p.snapshotVersion, 10)
 }
 
-func (p *Processor) UpdateSnapshot(yml string) (snapshot cache.Snapshot, err error){
-
-	envoyConfig, err := parseYaml(yml)
-	if err != nil {
-		p.Errorf("error parsing yaml file: %+v", err)
-		return
-	}
+func (p *Processor) UpdateSnapshot(state *pb.Snapshot) (snapshot cache.Snapshot, err error) {
 
 	// Parse Clusters
-	for _, c := range envoyConfig.Clusters {
-		p.xdsCache.AddCluster(c.Name)
+	for _, c := range state.Clusters.Items {
+		p.xdsCache.AddCluster(c)
 	}
 
 	snapshot = cache.NewSnapshot(
@@ -87,11 +70,11 @@ func (p *Processor) UpdateSnapshot(yml string) (snapshot cache.Snapshot, err err
 		p.Errorf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
 		return
 	}
-	p.Debugf("will serve snapshot %+v", snapshot)
+	p.Debugf(" will serve snapshot:\n%+v\n\n", snapshot)
 
 	// Add the snapshot to the cache
 
-	if err := p.cache.SetSnapshot(p.nodeID, snapshot); err != nil {
+	if err := p.cache.SetSnapshot(state.Node, snapshot); err != nil {
 		p.Errorf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}

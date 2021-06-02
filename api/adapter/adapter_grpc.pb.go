@@ -18,9 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdapterClient interface {
-	GiveCompliments(ctx context.Context, in *Name, opts ...grpc.CallOption) (Adapter_GiveComplimentsClient, error)
-	RegisterResource(ctx context.Context, in *ResourceSpec, opts ...grpc.CallOption) (*Snapshot, error)
-	ConnectToShim(ctx context.Context, in *ShimRequest, opts ...grpc.CallOption) (*ShimResponse, error)
+	SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*SetStateResponse, error)
 }
 
 type adapterClient struct {
@@ -31,50 +29,9 @@ func NewAdapterClient(cc grpc.ClientConnInterface) AdapterClient {
 	return &adapterClient{cc}
 }
 
-func (c *adapterClient) GiveCompliments(ctx context.Context, in *Name, opts ...grpc.CallOption) (Adapter_GiveComplimentsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Adapter_ServiceDesc.Streams[0], "/adapter.Adapter/GiveCompliments", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &adapterGiveComplimentsClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Adapter_GiveComplimentsClient interface {
-	Recv() (*Compliment, error)
-	grpc.ClientStream
-}
-
-type adapterGiveComplimentsClient struct {
-	grpc.ClientStream
-}
-
-func (x *adapterGiveComplimentsClient) Recv() (*Compliment, error) {
-	m := new(Compliment)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *adapterClient) RegisterResource(ctx context.Context, in *ResourceSpec, opts ...grpc.CallOption) (*Snapshot, error) {
-	out := new(Snapshot)
-	err := c.cc.Invoke(ctx, "/adapter.Adapter/RegisterResource", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *adapterClient) ConnectToShim(ctx context.Context, in *ShimRequest, opts ...grpc.CallOption) (*ShimResponse, error) {
-	out := new(ShimResponse)
-	err := c.cc.Invoke(ctx, "/adapter.Adapter/ConnectToShim", in, out, opts...)
+func (c *adapterClient) SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*SetStateResponse, error) {
+	out := new(SetStateResponse)
+	err := c.cc.Invoke(ctx, "/adapter.Adapter/SetState", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +42,7 @@ func (c *adapterClient) ConnectToShim(ctx context.Context, in *ShimRequest, opts
 // All implementations must embed UnimplementedAdapterServer
 // for forward compatibility
 type AdapterServer interface {
-	GiveCompliments(*Name, Adapter_GiveComplimentsServer) error
-	RegisterResource(context.Context, *ResourceSpec) (*Snapshot, error)
-	ConnectToShim(context.Context, *ShimRequest) (*ShimResponse, error)
+	SetState(context.Context, *Snapshot) (*SetStateResponse, error)
 	mustEmbedUnimplementedAdapterServer()
 }
 
@@ -95,14 +50,8 @@ type AdapterServer interface {
 type UnimplementedAdapterServer struct {
 }
 
-func (UnimplementedAdapterServer) GiveCompliments(*Name, Adapter_GiveComplimentsServer) error {
-	return status.Errorf(codes.Unimplemented, "method GiveCompliments not implemented")
-}
-func (UnimplementedAdapterServer) RegisterResource(context.Context, *ResourceSpec) (*Snapshot, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterResource not implemented")
-}
-func (UnimplementedAdapterServer) ConnectToShim(context.Context, *ShimRequest) (*ShimResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ConnectToShim not implemented")
+func (UnimplementedAdapterServer) SetState(context.Context, *Snapshot) (*SetStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
 }
 func (UnimplementedAdapterServer) mustEmbedUnimplementedAdapterServer() {}
 
@@ -117,59 +66,20 @@ func RegisterAdapterServer(s grpc.ServiceRegistrar, srv AdapterServer) {
 	s.RegisterService(&Adapter_ServiceDesc, srv)
 }
 
-func _Adapter_GiveCompliments_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Name)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(AdapterServer).GiveCompliments(m, &adapterGiveComplimentsServer{stream})
-}
-
-type Adapter_GiveComplimentsServer interface {
-	Send(*Compliment) error
-	grpc.ServerStream
-}
-
-type adapterGiveComplimentsServer struct {
-	grpc.ServerStream
-}
-
-func (x *adapterGiveComplimentsServer) Send(m *Compliment) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func _Adapter_RegisterResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResourceSpec)
+func _Adapter_SetState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Snapshot)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AdapterServer).RegisterResource(ctx, in)
+		return srv.(AdapterServer).SetState(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/adapter.Adapter/RegisterResource",
+		FullMethod: "/adapter.Adapter/SetState",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdapterServer).RegisterResource(ctx, req.(*ResourceSpec))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Adapter_ConnectToShim_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ShimRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdapterServer).ConnectToShim(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/adapter.Adapter/ConnectToShim",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdapterServer).ConnectToShim(ctx, req.(*ShimRequest))
+		return srv.(AdapterServer).SetState(ctx, req.(*Snapshot))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -182,20 +92,10 @@ var Adapter_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AdapterServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RegisterResource",
-			Handler:    _Adapter_RegisterResource_Handler,
-		},
-		{
-			MethodName: "ConnectToShim",
-			Handler:    _Adapter_ConnectToShim_Handler,
+			MethodName: "SetState",
+			Handler:    _Adapter_SetState_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "GiveCompliments",
-			Handler:       _Adapter_GiveCompliments_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "api/adapter/adapter.proto",
 }

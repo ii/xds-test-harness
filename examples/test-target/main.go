@@ -7,17 +7,17 @@ import (
 	serverv3 "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	logrus "github.com/sirupsen/logrus"
 
+	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/adapter"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/processor"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/server"
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/shim"
 )
 
 var (
-	nodeID   string
-	l        logrus.FieldLogger
-	shimPort string
-	port     uint
-	proc     *processor.Processor
+	nodeID      string
+	l           logrus.FieldLogger
+	adapterPort string
+	port        uint
+	proc        *processor.Processor
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 	logrus.SetLevel(logrus.DebugLevel)
 	flag.UintVar(&port, "port", 18000, "xDS management server port")
 	flag.StringVar(&nodeID, "nodeID", "test-id", "NodeID")
-	flag.StringVar(&shimPort, "shimPort", ":17000", "port of xds server shim")
+	flag.StringVar(&adapterPort, "adapterPort", ":17000", "port of test suite adapter")
 }
 
 func main() {
@@ -40,5 +40,5 @@ func main() {
 		server.RunServer(ctx, srv, port)
 	}()
 
-	shim.RunServer(proc, shimPort)
+	adapter.RunServer(proc, adapterPort)
 }
