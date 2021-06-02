@@ -13,3 +13,4 @@ more context for what I've written and why!
 - [Streaming Request](./org/streaming-request.org)
 - [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org)
 - [Basic Test Harness](./org/basic-harness.org)
+- [Intermediate Test Harness](./org/intermediate-harness.org)
