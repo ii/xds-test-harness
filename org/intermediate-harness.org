@@ -1,5 +1,6 @@
 #+TITLE: Intermediate Harness
-#+PROPERTY: header-args :results output
+#+PROPERTY: header-args :results output :noweb yes
+#+PROPERTY: header-args:go+ :main no
 
 * Goal
 Setup a harness that models the initial diagram in the SoW, with a test case
@@ -7,7 +8,7 @@ being read by a test runner, the runner setting up the necessary state on the
 target via a test adapter, and running through a real-life test scenario: in
 this case, sending a discovery request, and receiving the appropriate discovery
 response.
-* Long-Term Goals
+* Design Goals
 This is a Proof-of-Concept, but I still want to set up some patterns that will
 be important for the eventual test framework.
 1. *Test Cases are separate from their implementation*
@@ -24,26 +25,11 @@ be important for the eventual test framework.
    it should be an api that can be implemented on the target and runner, so
    there is a known contract to set up and retrieve state.
 3. *Adapter is separate from the runner*
-   As the adapter is an API, and an implementation of that api, we could
-   implement the testing half directly into the test runner. This would reduce
-   the surface area of the framework. However, as we have not explored all the
-   test scenarios yet, it could be possible that someo f these scenarios need
-   specialized runners to implement. In this case, we'd want each runner to
-   interact with the same adapter, so we are not having to write multiple
-   versions of the same API. Because of this, we will have the adapter be a
-   separate server that the runner connects to, to make the framework more
-   modular.
-
-   We may find later on that this was an incorrect assumption, and all the tests
-   can be implemented in similar ways in one runner. In that case, it would make
-   sense for the testing adapter to be a part of the runner itself. This is
-   somethiong we'll want to return to and discuss more.
-
-
-
-
-
-
+   
+   By making the adapter an API, it allows for us to implement the client in
+   multiple languages if we find that certain tests need to be written in
+   something besides go.
+   
 * Current Layout
 The initial Harness is made of the following components:
 - Test Cases (spec) ::
@@ -51,9 +37,10 @@ The initial Harness is made of the following components:
   specification, but is implementation-agnostic. In this harness, they are
   stored in [[file:~/Projects/xDS-conformance/test-harness/tests/features/][tests/features]]
 - Tests and Test Runner ::
-  These are the implementations of the test cases.
-  At this moment, we have a single implemented test, at [[file:~/Projects/xDS-conformance/test-harness/tests/acknack_test.go][tests/acknack_test.go]]
-  Our runner is simple: the [[https://github.com/cucumber/godog][godog binary]].
+  These are the implementations of the test cases. At this moment, we have a
+  single implemented test, at [[file:~/Projects/xDS-conformance/test-harness/tests/acknack_test.go][tests/acknack_test.go]] Our runner is simple: the
+  [[https://github.com/cucumber/godog][godog binary]]. In the future, this will be wrapped into a larger go program,
+  but this method works well at the moment.
 
   When we run godog in our [[file:~/Projects/xDS-conformance/test-harness/tests/][tests]] directory, it compiles all our feature files and
   any test files, and matches the test implementation to each line in the test
@@ -63,10 +50,10 @@ The initial Harness is made of the following components:
   services between both the runner and the adapter, and the adapter and the
   target. Each target can then check out this proto, implement its half in their
   target-specific way, then let the runner know how to connect to the adapter.
-- Test Adapter ::
-  This is the implementation of the testing half of the adapter. It is located
-  at [[file:~/Projects/xDS-conformance/test-harness/adapter/main.go][adapter/main.go]] and is meant to be run separate from the test runner, based
-  on the long-term goals outlined above.
+- Test Target ::
+  We have an example implementation of the go-control-plane that we use as a
+  test target, to test our tests.  It is stored in [[file:~/Projects/xDS-conformance/test-harness/examples/test-target/][examples/test-target]]
+
 *  Benefit of Gherkin for test-writing
   An exciting part of this style is that we can write the tests in a consistent,
   generic pattern that is then implemented by a set of resuable test functions.
@@ -97,271 +84,36 @@ The initial Harness is made of the following components:
   will be handled automatically. It is also a style that matches a lot of the
   existing envoy and xDS docs.
 
+* Changes from Previous Harness
+** Adapter only set on Target
+Before, there were three different services to connect to, an adapter, a shim, and a target.  The adapter and the shim were doing the same thing and were an unnecessary complexity.
 
+Now, there is a single api defined, that of the adapter.
 
+At the moment, it only has a single service, ~setState~, which takes in a snapshot, sends it to the target, and returns a
+success message.
 
- 
+Most of the message definitions are to bring in a proper structure for that snapshot.
 
+You can read the schema at  [[file:~/Projects/xDS-conformance/test-harness/api/adapter/adapter.proto][api/adapter/adapter.proto]]
+** Target and Adapter locations set via a config file
+Before, I had the locations of the target, shim, and adapter defined in the
+gherkin spec. This felt distracting and too constrained. Really, all the tests
+should care about is that there is a target and adapter reachable via gRPC.
 
-* Dev Diary
-** Initial Test Case
-:PROPERTIES:
-:header-args: :tangle (ii/workdir+ "tests/features/acknack.feature")
-:END:
-
-A simple test I can run is, basically "if there's a target with a cluster resource named foo, and i send a discovery request for clusters, it should send me a discovery response with foo."
-
-In gherkin, this is written as:
-
-#+NAME: acknack test
-#+begin_src feature
-Feature: Conformance ACK/NACK
-  Discovery Requests and Responses should follow the behaviour outlined in the
-  API docs.
-
-  Background:
-    Given "adapter" is reachable via grpc
-    And "target" is reachable via grpc
-    And "target_adapter" is reachable via grpc
-
-  Scenario:
-    Given a Target setup with snapshot matching yaml:
-     ```
-     ---
-     Node:
-       name: test-id
-     Resources:
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items:
-         foo:
-           Resource:
-             name: foo
-             connect_timeout:
-               seconds: 5
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     - Version: '1'
-       Items: {}
-     ```
-     When I send a discovery request matching yaml:
-     ```
-     version_info:
-     node: { id: test-id }
-     resource_names:
-     type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-     response_nonce:
-     ```
-     Then I get a discovery response matching json:
-     ```
-     {
-       "versionInfo":"1",
-       "resources":[
-         {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-          "value":"CgNmb28iAggF"}
-        ],
-        "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-     }
-     ```
-#+end_src
-
-The background segment sets up the required layout for our harness. We will
-implement a --config flag that sets the ports for the adapter, target, and
-target adapter. The port for the target and its adapter could be the same, if
-that is hwo they implemented in it. In our test target implementation, we have
-it reachable through a separate port.
-
-I am intending for the state to match the format of a snapshot cache as closely
-as possible, while remaining readable yaml. Similarly, the request and response
-should follow the formats given in the xDS docs.
-
-* Generate Test Outline using godog
-
-In our tests folder, i can run godog and get a suggested outline for our tests.
-
-#+NAME: generate test outline
-#+begin_src shell :dir (ii/workdir+ "tests")
-godog
-#+end_src
-
-#+RESULTS: generate test outline
-#+begin_example
-Feature: Conformance ACK/NACK
-  Discovery Requests and Responses should follow the behaviour outlined in the
-  API docs.
-
-  Background:
-    Given "adapter" is reachable via grpc
-    And "target" is reachable via grpc
-    And "target_adapter" is reachable via grpc
-
-  Scenario:                                          # features/acknack.feature:10
-    Given a Target setup with snapshot matching yaml:
-      ```
-      ---
-      Node:
-        name: test-id
-      Resources:
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items:
-          foo:
-            Resource:
-              name: foo
-              connect_timeout:
-                seconds: 5
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      ```
-    When I send a discovery request matching yaml:
-      ```
-      version_info:
-      node: { id: test-id }
-      resource_names:
-      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-      response_nonce:
-      ```
-    Then I get a discovery response matching json:
-      ```
-      {
-        "versionInfo":"1",
-        "resources":[
-          {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-           "value":"CgNmb28iAggF"}
-         ],
-         "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-      }
-      ```
-
-1 scenarios (1 undefined)
-6 steps (6 undefined)
-1.016742ms
-
-You can implement step definitions for undefined steps with these snippets:
-
-func aTargetSetupWithSnapshotMatchingYaml(arg1 *messages.PickleStepArgument_PickleDocString) error {
-	return godog.ErrPending
-}
-
-func iGetADiscoveryResponseMatchingJson(arg1 *messages.PickleStepArgument_PickleDocString) error {
-	return godog.ErrPending
-}
-
-func iSendADiscoveryRequestMatchingYaml(arg1 *messages.PickleStepArgument_PickleDocString) error {
-	return godog.ErrPending
-}
-
-func isReachableViaGrpc(arg1 string) error {
-	return godog.ErrPending
-}
-
-func InitializeScenario(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a Target setup with snapshot matching yaml:$`, aTargetSetupWithSnapshotMatchingYaml)
-	ctx.Step(`^I get a discovery response matching json:$`, iGetADiscoveryResponseMatchingJson)
-	ctx.Step(`^I send a discovery request matching yaml:$`, iSendADiscoveryRequestMatchingYaml)
-	ctx.Step(`^"([^"]*)" is reachable via grpc$`, isReachableViaGrpc)
-}
-
-#+end_example
-
-
-Notice that there are multiple lines in our background and example, but only
-four steps. Since we are writing them in a consistent way, we can develop
-generic, reusable functions for them, reducing complexity.
-
-* Improving test runner call
-At the moment, we run our suite by going into the tests folder and running
-`godog`. This is messy. Instead, I want it so we can run `go test` and it runs
-godog as part of the testmain function. This will allow us to pass in command
-line flags, like the target, adapter, and testadapter ports.
-
-#+NAME: main.go as test
-#+begin_src
-
-#+end_src
-
-
-* Implementing the first test
-#+begin_src shell :dir (ii/workdir+ "tests")
-godog
-#+end_src
-
-#+RESULTS:
-#+begin_example
-Feature: Conformance ACK/NACK
-  Discovery Requests and Responses should follow the behaviour outlined in the
-  API docs.
-
-  Background:
-    Given "adapter" is reachable via grpc             # acknack_test.go:35 -> isReachableViaGrpc
-    And "target" is reachable via grpc                # acknack_test.go:35 -> isReachableViaGrpc
-    And "target_adapter" is reachable via grpc        # acknack_test.go:35 -> isReachableViaGrpc
-
-  Scenario:                                          # features/acknack.feature:10
-    Given a Target setup with snapshot matching yaml: # acknack_test.go:23 -> aTargetSetupWithSnapshotMatchingYaml
-      ```
-      ---
-      Node:
-        name: test-id
-      Resources:
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items:
-          foo:
-            Resource:
-              name: foo
-              connect_timeout:
-                seconds: 5
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      - Version: '1'
-        Items: {}
-      ```
-      TODO: write pending definition
-    When I send a discovery request matching yaml:    # acknack_test.go:31 -> iSendADiscoveryRequestMatchingYaml
-      ```
-      version_info:
-      node: { id: test-id }
-      resource_names:
-      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-      response_nonce:
-      ```
-    Then I get a discovery response matching json:    # acknack_test.go:27 -> iGetADiscoveryResponseMatchingJson
-      ```
-      {
-        "versionInfo":"1",
-        "resources":[
-          {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-           "value":"CgNmb28iAggF"}
-         ],
-         "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-      }
-      ```
-
-1 scenarios (1 passed, 1 pending)
-6 steps (3 passed, 1 pending, 2 skipped)
-1.067593ms
-#+end_example
+I updated the feature file to have a more generic description for the
+background, and then created a [[file:~/Projects/xDS-conformance/test-harness/config.yaml][config.yaml]] that holds their locations. This
+required writing a simple [[file:~/Projects/xDS-conformance/test-harness/internal/parser/parser.go][parser]] that converts from yaml to our clientConfig
+struct. I extended that parser to also handle our snapshot specification used in
+the above adapter.
+* Questions
+- **Is there an existing data type that is better for the Snapshot?**
+  I am defining my own Snapshot message in this api.  I know there is a Snapshot defined in the go-control-plane cache, and this draws heavily from it.  However, I did not want to use it as its definitions came from one implementation for envoy, and not directly from the xDS docs.  is there an implementation-agnostic data type that should be used instead?
+- **What should the expected response be?**
+  The response now is a bit of a dummy definition.  This service triggers a side effect, namely the setting of state in some xDS server.  If it worked, then the current state should match the given snapshot...but how that is depicted could change per implementation.  I had one version of this that sent a snapshot and returned a snapshot, but it felt a little bit silly because they were always identical.  It made more sense for it to return a pass or fail, which i simplified to be a message string.  Is there a smarter exchange to be used here?
+* Next Steps
+From here, I want to make a couple more involved tests to see how I would need
+to extend the Runner struct to handle them. Then, I think it is useful to spend
+time away from the code and focus on the larger design, polishing the syntax in
+these tests to fit xDS and to establish some useful building blocks for the
+reusable test functions.
