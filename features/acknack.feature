@@ -1,10 +1,10 @@
-Feature: Conformance ACK/NACK
+Feature: Conformance ACK
   Discovery Requests and Responses should follow the behaviour outlined in the
   API docs.
 
   Background:
-    Given "adapter" is reachable via grpc
-    And "target" is reachable via grpc
+    Given "adapter" is reachable via gRPC
+    And "target" is reachable via gRPC
 
   Scenario:
     Given a Target setup with snapshot matching yaml:
