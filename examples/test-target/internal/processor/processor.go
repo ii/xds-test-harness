@@ -5,12 +5,12 @@ import (
 	"os"
 	"strconv"
 
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/resources"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/xdscache"
 )
 
@@ -29,10 +29,10 @@ func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogg
 		snapshotVersion: 1,
 		FieldLogger:     log,
 		xdsCache: xdscache.XDSCache{
-			Listeners: make(map[string]resources.Listener),
-			Clusters:  make(map[string]resources.Cluster),
-			Routes:    make(map[string]resources.Route),
-			Endpoints: make(map[string]resources.Endpoint),
+			Listeners: make(map[string]xdscache.Listener),
+			Clusters:  make(map[string]*cluster.Cluster),
+			Routes:    make(map[string]xdscache.Route),
+			Endpoints: make(map[string]xdscache.Endpoint),
 		},
 	}
 }
@@ -50,7 +50,7 @@ func (p *Processor) UpdateSnapshot(state *pb.Snapshot) (snapshot cache.Snapshot,
 
 	// Parse Clusters
 	for _, c := range state.Clusters.Items {
-		p.xdsCache.AddCluster(c.Name)
+		p.xdsCache.AddCluster(c)
 	}
 
 	snapshot = cache.NewSnapshot(
@@ -70,7 +70,7 @@ func (p *Processor) UpdateSnapshot(state *pb.Snapshot) (snapshot cache.Snapshot,
 		p.Errorf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
 		return
 	}
-	p.Debugf("will serve snapshot %+v", snapshot)
+	p.Debugf(" will serve snapshot:\n%+v\n\n", snapshot)
 
 	// Add the snapshot to the cache
 

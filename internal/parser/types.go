@@ -4,7 +4,7 @@ type EnvoyNode struct {
 	ID string `yaml:"id"`
 }
 type ConnectTimeout struct {
-	seconds int32 `yaml:"seconds"`
+	Seconds int32 `yaml:"seconds"`
 }
 
 type Endpoint struct {

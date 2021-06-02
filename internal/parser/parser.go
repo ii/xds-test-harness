@@ -35,7 +35,7 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 		for _, c := range s.Resources.Clusters {
 			clusters.Items = append(clusters.Items, &pb.Clusters_Cluster{
 				Name:           c.Name,
-				ConnectTimeout: map[string]int32{"seconds": c.ConnectTimeout.seconds},
+				ConnectTimeout: map[string]int32{"seconds": int32(c.ConnectTimeout.Seconds)},
 			})
 		}
 		snapshot.Clusters = clusters

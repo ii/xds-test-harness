@@ -9,7 +9,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/processor"
 )
