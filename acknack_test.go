@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,8 +12,8 @@ import (
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	cluster_service "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"github.com/zachmandeville/tester-prototype/internal/parser"
@@ -99,18 +98,14 @@ func (r *Runner) iSendADiscoveryRequestMatchingYaml(dryaml *godog.DocString) err
 	return nil
 }
 
-func (r *Runner) iGetADiscoveryResponseMatchingJson(arg1 *godog.DocString) error {
-	var expected, actual interface{}
-	m := jsonpb.Marshaler{}
-	result, _ := m.MarshalToString(r.DiscoveryResponse)
-	if err := json.Unmarshal([]byte(result), &actual); err != nil {
+func (r *Runner) iGetADiscoveryResponseMatchingYaml(arg1 *godog.DocString) error {
+	var expected parser.DiscoveryResponse
+	if err := yaml.Unmarshal([]byte(arg1.Content), &expected); err != nil {
 		return err
 	}
-	if err := json.Unmarshal([]byte(arg1.Content), &expected); err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(expected, actual) {
-		return fmt.Errorf("expected JSON does not match actual, %v vs. %v", expected, actual)
+	actual, _ := parser.ParseDiscoveryResponse(r.DiscoveryResponse)
+	if !reflect.DeepEqual(expected, *actual) {
+		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expected, *actual)
 	}
 	return nil
 }
@@ -134,7 +129,7 @@ func (r *Runner) isReachableViaGRPC(server string) error {
 		err := connectViaGRPC(r.Target, server)
 		return err
 	default:
-		err := fmt.Errorf("buttholes: %v", server)
+		err := fmt.Errorf("unexpected server name: %v", server)
 		return err
 	}
 }
@@ -143,7 +138,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
 	ctx.BeforeScenario(runner.addPorts)
 	ctx.Step(`^a Target setup with snapshot matching yaml:$`, runner.aTargetSetupWithSnapshotMatchingYaml)
-	ctx.Step(`^I get a discovery response matching json:$`, runner.iGetADiscoveryResponseMatchingJson)
+	ctx.Step(`^I get a discovery response matching yaml:$`, runner.iGetADiscoveryResponseMatchingYaml)
 	ctx.Step(`^I send a discovery request matching yaml:$`, runner.iSendADiscoveryRequestMatchingYaml)
 	ctx.Step(`^"([^"]*)" is reachable via gRPC$`, runner.isReachableViaGRPC)
 }

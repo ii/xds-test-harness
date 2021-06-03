@@ -27,14 +27,12 @@ Feature: Conformance ACK
      type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
      response_nonce:
      ```
-     Then I get a discovery response matching json:
+     Then I get a discovery response matching yaml:
      ```
-     {
-       "versionInfo":"1",
-       "resources":[
-         {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-          "value":"CgNmb28iAggF"}
-        ],
-        "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-     }
+     version_info: "1"
+     resources:
+     - name: foo
+       connect_timeout:
+         seconds: 5
+     type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
      ```
