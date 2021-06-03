@@ -24,57 +24,140 @@ make sure when a resource is added we get an additional discovery response.
 For now, this is how i've phrased it
 #+NAME: new resourcescenario
 #+begin_src feature
-  Scenario:
-    Given a Target setup with snapshot matching yaml:
-     ```
-     ---
-     node: test-id
-     version: "1"
-     resources:
-       endpoints:
-       clusters:
-       - name: foo
-         connect_timeout:
-           seconds: 5
-     ```
-     And an established CDS stream, with the last discovery request matching yaml:
-     ```
-     version_info: 1
-     node: { id: test-id }
-     resource_names:
-     type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
-     response_nonce:
-     ```
-     When Target State is updated to match yaml:
-     ```
-     ---
-     node: test-id
-     version: "2"
-     resources:
-       endpoints:
-       clusters:
-       - name: foo
-         connect_timeout:
-           seconds: 5
-       - name: bar
-         connect_timeout:
-           seconds: 5
-     ```
+Scenario:
+  Given a Target setup with snapshot matching yaml:
+  ```
+  ---
+  node: test-id
+  version: "1"
+  resources:
+  endpoints:
+  clusters:
+  - name: foo
+  connect_timeout:
+  seconds: 5
+  ```
+  And an established CDS stream, with the last discovery request matching yaml:
+  ```
+  version_info: 1
+  node: { id: test-id }
+  resource_names:
+  type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
+  response_nonce:
+  ```
+  When Target State is updated to match yaml:
+  ```
+  ---
+  node: test-id
+  version: "2"
+  resources:
+  endpoints:
+  clusters:
+  - name: foo
+  connect_timeout:
+  seconds: 5
+  - name: bar
+  connect_timeout:
+  seconds: 5
+  ```
 
-     Then I get a discovery response matching json:
-     ```
-     {
-       "versionInfo":"1",
-       "resources":[
-         {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-          "value":"CgNmb28iAggF"}
-        ],
-        "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-     }
-     ```
+  Then I get a discovery response matching json:
+  ```
+  {
+  "versionInfo":"1",
+  "resources":[
+  {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
+  "value":"CgNmb28iAggF"}
+  ],
+  "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
+  }
+  ```
+#+end_src
 
-     There's some particularities in herre to figure out.  The discovery request should have a response nonce, and i need to see if those are dynamic or not.  The discvoery response should be made cleaner, no longer using a hash but nicely outlined description of the state.
+There's some particularities in herre to figure out. The discovery request
+should have a response nonce, and i need to see if those are dynamic or
+not. The discvoery response should be made cleaner, no longer using a hash
+but nicely outlined description of the state.
+* Dev Diary
+** TODO setup a reset state function
+This looks to be as simple as just adding the snapshot to the cache, in other words, using the existing adapter function.
+
+In the existing test, I have this function:
+#+NAME: target setup with snapshot
+#+begin_src go
+func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString) error {
+	snapshot, err := parser.YamlToSnapshot(snapYaml.Content)
+	sndsnapshot, err := parser.YamlToSnapshot(thing)
+	if err != nil {
+		err = fmt.Errorf("Error parsing snapshot yaml: %v", err)
+		return err
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	_, err = c.SetState(context.Background(), snapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	fmt.Printf("snapshot: %v", snapshot)
+	_, err = c.SetState(context.Background(), sndsnapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	return nil
+}
 
 #+end_src
+
+I then wrote a var that is identical to the snapshot in our feature, save the connect timeout, and set it to snapshotB,
+and rewrote the above function to set the server to snapshot, then snapshotB, then snapshot again
+#+NAME: target setup with snapshot
+#+begin_src go
+func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString) error {
+	snapshot, err := parser.YamlToSnapshot(snapYaml.Content)
+	snapshotB, err := parser.YamlToSnapshot(snapB)
+	if err != nil {
+		err = fmt.Errorf("Error parsing snapshot yaml: %v", err)
+		return err
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	_, err = c.SetState(context.Background(), snapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	fmt.Printf("snapshot: %v", snapshot)
+	_, err = c.SetState(context.Background(), sndsnapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	_, err = c.SetState(context.Background(), snapshotB)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	_, err = c.SetState(context.Background(), snapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+#+end_src
+
+Running this, the output logs show new snapshots, with consistent "version 1", but with the new state.
+As long as we close the client streams per test, I think setting up new state will be simple.
+
+This means we will want another service for "updateState", though, when we want
+to increment the version and test that it works properly.
+** TODO determine if nonce's are dynamic
+** TODO send back clean yaml/json for resources instead of hash
+** TODO Write an updateState function
+** TODO rewrite first test step for new json response
+** TODO implement latest test
 * Questions
 ** Best phrasing for the test, specifically the ack portion
