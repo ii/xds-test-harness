@@ -79,7 +79,7 @@ should have a response nonce, and i need to see if those are dynamic or
 not. The discvoery response should be made cleaner, no longer using a hash
 but nicely outlined description of the state.
 * Dev Diary
-** TODO setup a reset state function
+** DONE setup a reset state function
 This looks to be as simple as just adding the snapshot to the cache, in other words, using the existing adapter function.
 
 In the existing test, I have this function:
@@ -155,6 +155,9 @@ As long as we close the client streams per test, I think setting up new state wi
 This means we will want another service for "updateState", though, when we want
 to increment the version and test that it works properly.
 ** TODO determine if nonce's are dynamic
+For the next set, I think it would be easiest to set up a dummy go program that has a CDS stream and outputs the discovery responses.
+It will stay running listening for the DR's, and I will update the state through a secondary go routine.
+
 ** TODO send back clean yaml/json for resources instead of hash
 ** TODO Write an updateState function
 ** TODO rewrite first test step for new json response
