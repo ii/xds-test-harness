@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+
+	// "protobuf/jsonb"
 	"time"
 
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	cluster_service "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 )
 
@@ -62,6 +67,17 @@ func (r *Runner) startStream() {
 			fmt.Println("what error 2!")
 			break
 		}
+		resources := res.GetResources()
+		var m cluster.Cluster
+		err = ptypes.UnmarshalAny(resources[0], &m)
+		if err != nil {
+			fmt.Printf("anypb error: %v\n", err)
+		}
+		mj, err := json.Marshal(m)
+		if err != nil {
+			fmt.Printf("error marshaling to json: %v", err)
+		}
+		fmt.Printf("anypb resources: %v\n", string(mj))
 		r.ResC <- res
 	}
 }
