@@ -73,7 +73,7 @@ func (r *Runner) startStream() {
 		if err != nil {
 			fmt.Printf("anypb error: %v\n", err)
 		}
-		mj, err := json.Marshal(m)
+		mj, err := json.Marshal(&m)
 		if err != nil {
 			fmt.Printf("error marshaling to json: %v", err)
 		}
