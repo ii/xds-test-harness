@@ -1,0 +1,20 @@
+#!/bin/bash
+
+cd $(dirname $0)
+GIT_ROOT=$(git rev-parse --show-toplevel)
+cd $GIT_ROOT
+
+# install dependencies
+(
+    set -x
+    cd $HOME
+    go get google.golang.org/protobuf/cmd/protoc-gen-go \
+        google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
+    go get github.com/cucumber/godog/cmd/godog@v0.11.0
+
+    cd $(mktemp -d)
+    curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
+    sudo unzip -n protoc-3.15.8-linux-x86_64.zip -x readme.txt -d /usr/local
+)
+
