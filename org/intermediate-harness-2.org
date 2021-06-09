@@ -16,12 +16,34 @@ Better is to start and connect to it and then contionually reset the state.
 This is still a part of the acknack feature set, and so am appending this
 scenario to the file.
 
-I am uncertain the best wording for our given Basically, we want ot have an
-established stream setup for the initial state that already has already been
-acked. We don't care about the first discovery request and response, we want to
-make sure when a resource is added we get an additional discovery response.
+I am uncertain the best wording for our given test. Basically, we want to have
+an established stream setup for the initial state. This means a discovery
+request/response/request trade to show that the current version is ACKed by the
+client. Then, we want the resources requested to change in some way, and to have
+a new discovery response sent, without the client needing to do anything.
 
-For now, this is how i've phrased it
+This test comes from the envoy docs: [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#when-to-send-an-update][When to Send an Update.]] One thing I am
+curious on is this section of the doc:
+#+begin_quote
+The management server should only send updates to the Envoy client when the
+resources in the DiscoveryResponse have changed
+#+end_quote
+
+If I send a wildcard discovery request, do new resources beign added count as a
+change to the resources in the discovery response?
+
+For example, if the initial state only has a single cluster named ~foo~, and so
+the response to my first wildcard CDS request is to list that resource. Then,
+~bar~ gets added as a cluster. Technically, this wasn't a resource in the first
+discovery response, and so wouldn't trigger an update? However, the spirit of
+the initial request was for any clusters, which you might think includes ones
+made after that request.
+
+I marked this as a question in the org, but for now will only update a resource
+in the test and not add a new one.
+
+Here, then, is the initial test:
+
 #+NAME: new resourcescenario
 #+begin_src feature
 Scenario:
@@ -55,32 +77,51 @@ Scenario:
   clusters:
   - name: foo
   connect_timeout:
-  seconds: 5
-  - name: bar
-  connect_timeout:
-  seconds: 5
+  seconds: 10
   ```
 
-  Then I get a discovery response matching json:
+  Then I get a discovery response matching yaml:
   ```
-  {
-  "versionInfo":"1",
-  "resources":[
-  {"typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster",
-  "value":"CgNmb28iAggF"}
-  ],
-  "typeUrl":"type.googleapis.com/envoy.config.cluster.v3.Cluster"
-  }
+  version: 2
+  typeUrl:"type.googleapis.com/envoy.config.cluster.v3.Cluster"
+  resources:
+  - foo
+    connect_timeout:
+      seconds: 5
+  nonce: 2
   ```
 #+end_src
 
 There's some particularities in herre to figure out. The discovery request
 should have a response nonce, and i need to see if those are dynamic or
-not. The discvoery response should be made cleaner, no longer using a hash
-but nicely outlined description of the state.
+not. The discovery response, as compared to intermediate harness, is now explicit yaml instead of a json hash. I will neeed to figure out how to do that.
 * Dev Diary
-** DONE setup a reset state function
+** DONE determine if nonce's are dynamic
+For the next set, I think it would be easiest to set up a dummy go program that
+has a CDS stream and outputs the discovery responses. It will stay running
+listening for the DR's, and I will update the state through a secondary go
+routine.
+
+** DONE send back clean yaml/json for resources instead of hash
+This was a bit more difficult thatn i first expected due to yaml library
+mismatch and a bit of confusion on parsing the discovery responses.
+
+Right now, it takes a discovery response and casts it to the parser's discovery
+response type (as this makes it easier for me to parse the yaml). For the
+resources, i would like for it to check the resources value type an then do an
+anypb unmarshalling to that type, but was finding that increasingly difficult
+and so am casting them all to clusters for right now. This is a stopgap to just
+get the test working in the general structure i want, but will need to revisit
+the go typecasting to make sure I understand the best way to do these data
+conversions.
+
+** TODO Set up a stream function that passes requests and responses to our test functions
+this is so we can have multiple steps that investigate the discovery responses
+we are getting, but not block the process as we wait for the response.
+** TODO implement latest test
+** TODO setup a reset state function
 This looks to be as simple as just adding the snapshot to the cache, in other words, using the existing adapter function.
+In practice, it is not that simple.
 
 In the existing test, I have this function:
 #+NAME: target setup with snapshot
@@ -149,30 +190,8 @@ func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString)
 
 #+end_src
 
-Running this, the output logs show new snapshots, with consistent "version 1", but with the new state.
-As long as we close the client streams per test, I think setting up new state will be simple.
-
-This means we will want another service for "updateState", though, when we want
-to increment the version and test that it works properly.
-** DONE determine if nonce's are dynamic
-For the next set, I think it would be easiest to set up a dummy go program that has a CDS stream and outputs the discovery responses.
-It will stay running listening for the DR's, and I will update the state through a secondary go routine.
-
-* TODO send back clean yaml/json for resources instead of hash
-This was a bit more difficult thatn i first expected due to yaml library
-mismatch and a bit of confusion on parsing the discovery responses.
-
-Right now, it takes a discovery response and casts it to the parser's discovery
-response type (as this makes it easier for me to parse the yaml). For the
-resources, i would like for it to check the resources value type an then do an
-anypb unmarshalling to that type, but was finding that increasingly difficult
-and so am casting them all to clusters for right now. This is a stopgap to just
-get the test working in the general structure i want, but will need to revisit
-the go typecasting to make sure I understand the best way to do these data
-conversions.
-
-** TODO Write an updateState function
-** TODO rewrite first test step for new json response
-** TODO implement latest test
 * Questions
 ** Best phrasing for the test, specifically the ack portion
+** Should a discovery response be sent when new resources are added?
+see [[If I send a wildcard discovery request, do new resources beign added count as a
+change to the resources in the discovery response?][Our Test section]] .
