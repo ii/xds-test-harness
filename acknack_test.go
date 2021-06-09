@@ -38,6 +38,10 @@ type Runner struct {
 	Adapter           *ClientConfig
 	Target            *ClientConfig
 	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
+	CDS               struct {
+		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
+		Responses *envoy_service_discovery_v3.DiscoveryResponse
+	}
 }
 
 func (r *Runner) addPorts(*godog.Scenario) {
@@ -70,6 +74,54 @@ func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString)
 		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
 		return err
 	}
+	return nil
+}
+
+func (r *Runner) aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml(arg1 *godog.DocString) error {
+	drdata, err := parser.ParseDiscoveryRequest(arg1.Content)
+	if err != nil {
+		err = fmt.Errorf("error parsing discovery request: %v\n", err)
+		return err
+	}
+	dreq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: drdata.VersionInfo,
+		Node: &envoy_config_core_v3.Node{
+			Id: drdata.Node.ID,
+		},
+		ResourceNames: drdata.ResourceNames,
+		TypeUrl:       drdata.TypeURL,
+		ResponseNonce: drdata.ResponseNonce,
+	}
+	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
+	stream, err := c.StreamClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting CDS stream: %v\n", err)
+		return err
+	}
+	r.CDS.Stream = stream
+	r.CDS.Stream.Send(dreq)
+	res, err := stream.Recv()
+	r.CDS.Responses = res
+	return nil
+}
+
+func (r *Runner) theStreamWasACKedWithADiscoveryRequestMatchingYaml(arg1 *godog.DocString) error {
+	drdata, err := parser.ParseDiscoveryRequest(arg1.Content)
+	if err != nil {
+		err = fmt.Errorf("error parsing discovery request: %v\n", err)
+		return err
+	}
+	dreq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: drdata.VersionInfo,
+		Node: &envoy_config_core_v3.Node{
+			Id: drdata.Node.ID,
+		},
+		ResourceNames: drdata.ResourceNames,
+		TypeUrl:       drdata.TypeURL,
+		ResponseNonce: drdata.ResponseNonce,
+	}
+	fmt.Printf("dreq: %v\n", dreq)
+	r.CDS.Stream.Send(dreq)
 	return nil
 }
 
@@ -134,11 +186,53 @@ func (r *Runner) isReachableViaGRPC(server string) error {
 	}
 }
 
+func (r *Runner) targetIsUpdatedToMatchYaml(yml *godog.DocString) error {
+	snapshot, err := parser.YamlToSnapshot(yml.Content)
+	if err != nil {
+		err = fmt.Errorf("Error parsing snapshot yaml: %v", err)
+		return err
+	}
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	_, err = c.SetState(context.Background(), snapshot)
+	if err != nil {
+		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocString) error {
+	dreq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: "1",
+		Node: &envoy_config_core_v3.Node{
+			Id: "test-id",
+		},
+		ResourceNames: []string{},
+		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+		ResponseNonce: "1",
+	}
+	fmt.Printf("dreq: %v\n", dreq)
+	r.CDS.Stream.Send(dreq)
+	res, err := r.CDS.Stream.Recv()
+	if err != nil {
+		err = fmt.Errorf("error receiving discovery response: %v\n", err)
+		return err
+	}
+	fmt.Printf("res: %v\n", res)
+	return godog.ErrPending
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
+
 	ctx.BeforeScenario(runner.addPorts)
+
 	ctx.Step(`^a Target setup with snapshot matching yaml:$`, runner.aTargetSetupWithSnapshotMatchingYaml)
 	ctx.Step(`^I get a discovery response matching yaml:$`, runner.iGetADiscoveryResponseMatchingYaml)
 	ctx.Step(`^I send a discovery request matching yaml:$`, runner.iSendADiscoveryRequestMatchingYaml)
 	ctx.Step(`^"([^"]*)" is reachable via gRPC$`, runner.isReachableViaGRPC)
+	ctx.Step(`^Target is updated to match yaml:$`, runner.targetIsUpdatedToMatchYaml)
+	ctx.Step(`^the client receives a discovery response matching yaml:$`, runner.theClientReceivesADiscoveryResponseMatchingYaml)
+	ctx.Step(`^a CDS stream was initiated with a discovery request matching yaml:$`, runner.aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml)
+	ctx.Step(`^the stream was ACKed with a discovery request matching yaml:$`, runner.theStreamWasACKedWithADiscoveryRequestMatchingYaml)
 }
