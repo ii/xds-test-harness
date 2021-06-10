@@ -25,7 +25,10 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 		return nil, err
 	}
 
-	snapshot := &pb.Snapshot{Node: s.Node}
+	snapshot := &pb.Snapshot{
+		Node:    s.Node,
+		Version: s.Version,
+	}
 	if s.Resources.Endpoints != nil {
 		endpoints := &pb.Endpoints{}
 		for _, e := range s.Resources.Endpoints {
