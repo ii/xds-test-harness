@@ -34,16 +34,14 @@ type ClientConfig struct {
 	Conn *grpc.ClientConn
 }
 
-type CDS struct {
-	Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
-	Responses *envoy_service_discovery_v3.DiscoveryResponse
-}
-
 type Runner struct {
 	Adapter           *ClientConfig
 	Target            *ClientConfig
 	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
-	CDS               *CDS
+	CDS               struct {
+		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
+		Responses *envoy_service_discovery_v3.DiscoveryResponse
+	}
 }
 
 func (r *Runner) addPorts(*godog.Scenario) {
