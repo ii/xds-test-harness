@@ -14,3 +14,4 @@ more context for what I've written and why!
 - [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org)
 - [Basic Test Harness](./org/basic-harness.org)
 - [Intermediate Test Harness](./org/intermediate-harness.org)
+- [Intermediate Test Harness, Part Two](./org/intermediate-harness-2.org)
