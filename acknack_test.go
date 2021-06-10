@@ -34,14 +34,16 @@ type ClientConfig struct {
 	Conn *grpc.ClientConn
 }
 
+type CDS struct {
+	Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
+	Responses *envoy_service_discovery_v3.DiscoveryResponse
+}
+
 type Runner struct {
 	Adapter           *ClientConfig
 	Target            *ClientConfig
 	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
-	CDS               struct {
-		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
-		Responses *envoy_service_discovery_v3.DiscoveryResponse
-	}
+	CDS               *CDS
 }
 
 func (r *Runner) addPorts(*godog.Scenario) {
@@ -219,7 +221,15 @@ func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocS
 		return err
 	}
 	fmt.Printf("res: %v\n", res)
-	return godog.ErrPending
+	var expected parser.DiscoveryResponse
+	if err := yaml.Unmarshal([]byte(yml.Content), &expected); err != nil {
+		return err
+	}
+	actual, _ := parser.ParseDiscoveryResponse(res)
+	if !reflect.DeepEqual(expected, *actual) {
+		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expected, *actual)
+	}
+	return nil
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
