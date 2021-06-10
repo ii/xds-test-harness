@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 
-	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
@@ -19,7 +18,7 @@ type Processor struct {
 	nodeID          string
 	snapshotVersion int64
 	logrus.FieldLogger
-	xdsCache xdscache.XDSCache
+	xdsCache *xdscache.XDSCache
 }
 
 func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogger) *Processor {
@@ -28,12 +27,7 @@ func NewProcessor(cache cache.SnapshotCache, nodeID string, log logrus.FieldLogg
 		nodeID:          nodeID,
 		snapshotVersion: 1,
 		FieldLogger:     log,
-		xdsCache: xdscache.XDSCache{
-			Listeners: make(map[string]xdscache.Listener),
-			Clusters:  make(map[string]*cluster.Cluster),
-			Routes:    make(map[string]xdscache.Route),
-			Endpoints: make(map[string]xdscache.Endpoint),
-		},
+		xdsCache:        xdscache.NewXDSCache(),
 	}
 }
 
@@ -48,35 +42,44 @@ func (p *Processor) newSnapshotVersion() string {
 
 func (p *Processor) UpdateSnapshot(state *pb.Snapshot) (snapshot cache.Snapshot, err error) {
 
+	// Clear out the server cache, and our testing cache
+	p.cache.ClearSnapshot(state.Node)
+	p.xdsCache = xdscache.NewXDSCache()
+
 	// Parse Clusters
 	for _, c := range state.Clusters.Items {
 		p.xdsCache.AddCluster(c)
 	}
 
 	snapshot = cache.NewSnapshot(
-		p.newSnapshotVersion(),
+		state.Version,
 		// p.xdsCache.EndpointsContents(),
 		[]types.Resource{}, // endpoints
 		p.xdsCache.ClusterContents(),
 		[]types.Resource{}, // routes
 		// p.xdsCache.RouteContents(),     // routes
+
 		[]types.Resource{}, // listeners
 		// p.xdsCache.ListenerContents(),  // listeners
 		[]types.Resource{}, // runtimes
 		[]types.Resource{}, // secrets
 	)
-
 	if err = snapshot.Consistent(); err != nil {
 		p.Errorf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
 		return
 	}
-	p.Debugf(" will serve snapshot:\n%+v\n\n", snapshot)
 
 	// Add the snapshot to the cache
-
 	if err := p.cache.SetSnapshot(state.Node, snapshot); err != nil {
 		p.Errorf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
+
+	// check the new snapshot in the server
+	newSnap, err := p.cache.GetSnapshot(state.Node)
+	if err != nil {
+		p.Debugf("error getting snapshot: %v\n", err)
+	}
+	p.Debugf("New Snapshot: %v\n", newSnap)
 	return snapshot, err
 }
