@@ -29,7 +29,7 @@ The management server should only send updates to the Envoy client when the
 resources in the DiscoveryResponse have changed
 #+end_quote
 
-If I send a wildcard discovery request, do new resources beign added count as a
+If I send a wildcard discovery request, do new resources been added count as a
 change to the resources in the discovery response?
 
 For example, if the initial state only has a single cluster named ~foo~, and so
@@ -92,7 +92,7 @@ Scenario:
   ```
 #+end_src
 
-There's some particularities in herre to figure out. The discovery request
+There's some particularities in here to figure out. The discovery request
 should have a response nonce, and i need to see if those are dynamic or
 not. The discovery response, as compared to intermediate harness, is now explicit yaml instead of a json hash. I will neeed to figure out how to do that.
 * Dev Diary
@@ -103,13 +103,13 @@ listening for the DR's, and I will update the state through a secondary go
 routine.
 
 ** send back clean yaml/json for resources instead of hash
-This was a bit more difficult thatn i first expected due to yaml library
+This was a bit more difficult that i first expected due to yaml library
 mismatch and a bit of confusion on parsing the discovery responses.
 
 Right now, it takes a discovery response and casts it to the parser's discovery
 response type (as this makes it easier for me to parse the yaml). For the
 resources, i would like for it to check the resources value type an then do an
-anypb unmarshalling to that type, but was finding that increasingly difficult
+=anypb= unmarshalling to that type, but was finding that increasingly difficult
 and so am casting them all to clusters for right now. This is a stopgap to just
 get the test working in the general structure i want, but will need to revisit
 the go typecasting to make sure I understand the best way to do these data
@@ -117,14 +117,13 @@ conversions.
 
 ** setup a reset state function
 This looks to be as simple as just adding the snapshot to the cache, in other words, using the existing adapter function.
-We just need to make sure we are cleaning out the cache in the adapter before sending it to the server.  We updated the xdsCache package with a NewXDSCache() function, so that whenever we call setState, we know we are working with clean slates on the server and in our adapter.
+We just need to make sure we are cleaning out the cache in the adapter before sending it to the server.  We updated the /xdsCache/ package with a =NewXDSCache()= function, so that whenever we call setState, we know we are working with clean slates on the server and in our adapter.
 
 ** Set up a stream function that passes requests and responses to our test functions
 For this, We added a "CDS" struct to our Runner and pass the stream to that.  This lets us reference it in multiple steps.  [[file:~/Projects/xDS-conformance/test-harness/acknack_test.go::func (r *Runner) aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml(arg1 *godog.DocString) error {][In one step]] we send and receive requests/responses, and in the [[file:~/Projects/xDS-conformance/test-harness/acknack_test.go::func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocString) error {][next step]] we validate the response against the test yaml.
 
 ** implement latest test
 Our two tests work, though their usescases are a bit simple.  It is a good time, I think, to revisit the test syntax itself, to see if we can find a clearer way to illustrate an initial stream, and a more generic way to talk about receiving discovery requests.  Right now we have a few steps that are just slighly different in wording, but quite different in implementation.
-
 
 * Questions
 ** Best phrasing for the test, specifically the ack portion
