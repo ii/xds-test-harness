@@ -1,0 +1,32 @@
+#+TITLE: Envoy Documentation Env
+
+The purpose of this document is to describe the process of developing docs in a [[https://github.com/sharingio/pair][Pair instance]].
+
+* How to develop Envoy docs
+Ensure that Envoy is cloned
+
+#+begin_src shell :results silent
+git-clone-structured https://github.com/envoyproxy/envoy
+#+end_src
+
+Build the docs
+#+begin_src tmate :window envoy-docs :dir ~/envoyproxy/envoy
+./ci/run_envoy_docker.sh docs/build.sh
+#+end_src
+
+Ensure that the /public_html/ is not linked
+#+begin_src shell :results silent
+rm ~/public_html
+#+end_src
+(by default there is a symlink going to the /~/public_html/)
+
+Symlink the docs folder into the /public_html/
+#+begin_src shell :results silent
+ln -s ~/envoyproxy/envoy/generated/docs ~/public_html
+#+end_src
+
+Reset
+#+begin_src shell :results silent
+rm ~/public_html
+ln -s ~/.sharing.io/public_html ~/public_html
+#+end_src
