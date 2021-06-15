@@ -1,0 +1,19 @@
+#+TITLE: Debugging A Test
+
+Using [[https://github.com/go-delve/delve][dlv]] and [[https://github.com/cucumber/godog][godog]], a test can be debugged for easy inspection.
+
+* How to debug
+In the root of the repo, build a testable binary
+#+begin_src shell :results silent :dir ../
+godog build
+#+end_src
+
+Load up
+#+begin_src tmate :dir ~/ii/xds-test-harness :window xds-test-harness
+dlv exec ./godog.test
+#+end_src
+
+Setting a breakpoint
+#+begin_src tmate :dir ~/ii/xds-test-harness :window xds-test-harness
+b acknack_test.go:129
+#+end_src
