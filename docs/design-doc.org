@@ -4,11 +4,38 @@
 #+UPDATED: 2021-06-15
 
 * Context and Scope
-* Goals
+This document outlines the implementation of a conformance test suite for the
+xDS protocol. It builds off designs and requirements established in the [[https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit][xDS
+conformance Statement of Work]], outlining how these requirements can be best
+implemented.
+** Goals
+- Define a test case description format.
+- Define a test case grammar, in which new test cases can be easily composed.
+- Create a test binary that can be run against an arbitary xDS server and output
+  its results.
+- Set an extensible framework that can be easily modified to handle complex
+  scenarios as they are discovered.
 ** Non-goals
+- Write a test case language.
+- Test envoy specific scenarios (the cases should be implementation-agnostic).
+- Write all known test cases.
 * Overview
+The test suite is a language-agnostic binary that runs against a specified
+server that has been previously setup to be testable. This setup is, namely,
+implementing an adapter that we've specified through a gRPC schema. This
+adapter sets the required state for each test scenario and cleans up the
+enviornment between scenarios.
+
+The test cases are written separate from their implementation, using the [[https://cucumber.io/docs/gherkin/reference/][gherkin]]
+testing language. This allows for a consistency in how test scenarios are
+articulated, while allowing the test runner to be a patchwork of implementations
+written in multiple languages, depending on whichever is best suited for the
+test scenario.
 * Detailed Design
 ** Architecture
+#+begin_src dot
+
+#+end_src
 ** Definitions
 ** Test Case Format
 ** Iterating through the test cases
