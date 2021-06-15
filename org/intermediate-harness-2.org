@@ -11,7 +11,7 @@ and we want to make sure our tests can handle them as consistently and simply as
 possible.
 
 Ideally, we are not having to restart the management server for each scenario.
-Better is to start and connect to it and then contionually reset the state.
+Better is to start once and then continually reset the state.
 * Our Test
 This is still a part of the acknack feature set, and so am appending this
 scenario to the file.
@@ -29,7 +29,7 @@ The management server should only send updates to the Envoy client when the
 resources in the DiscoveryResponse have changed
 #+end_quote
 
-If I send a wildcard discovery request, do new resources been added count as a
+If I send a wildcard discovery request, do new resources being added count as a
 change to the resources in the discovery response?
 
 For example, if the initial state only has a single cluster named ~foo~, and so
@@ -92,9 +92,10 @@ Scenario:
   ```
 #+end_src
 
-There's some particularities in here to figure out. The discovery request
-should have a response nonce, and i need to see if those are dynamic or
-not. The discovery response, as compared to intermediate harness, is now explicit yaml instead of a json hash. I will neeed to figure out how to do that.
+There's some particularities in here to figure out. The discovery request should
+have a response nonce, and i need to see if those are dynamic or not. The
+discovery response, as compared to intermediate harness, is now explicit yaml
+instead of a json hash. I will neeed to figure out how to do that.
 * Dev Diary
 ** determine if nonce's are dynamic
 For the next set, I think it would be easiest to set up a dummy go program that
@@ -116,20 +117,30 @@ the go typecasting to make sure I understand the best way to do these data
 conversions.
 
 ** setup a reset state function
-This looks to be as simple as just adding the snapshot to the cache, in other words, using the existing adapter function.
-We just need to make sure we are cleaning out the cache in the adapter before sending it to the server.  We updated the /xdsCache/ package with a =NewXDSCache()= function, so that whenever we call setState, we know we are working with clean slates on the server and in our adapter.
+This looks to be as simple as just adding the snapshot to the cache, in other
+words, using the existing adapter function. We just need to make sure we are
+cleaning out the cache in the adapter before sending it to the server. We
+updated the /xdsCache/ package with a =NewXDSCache()= function, so that whenever
+we call setState, we know we are working with clean slates on the server and in
+our adapter.
 
 ** Set up a stream function that passes requests and responses to our test functions
-For this, We added a "CDS" struct to our Runner and pass the stream to that.  This lets us reference it in multiple steps.  [[file:~/Projects/xDS-conformance/test-harness/acknack_test.go::func (r *Runner) aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml(arg1 *godog.DocString) error {][In one step]] we send and receive requests/responses, and in the [[file:~/Projects/xDS-conformance/test-harness/acknack_test.go::func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocString) error {][next step]] we validate the response against the test yaml.
+For this, We added a "CDS" struct to our Runner and pass the stream to that.
+This lets us reference it in multiple steps. [[https://github.com/ii/xds-test-harness/blob/dstream/acknack_test.go#L80][In one step]] we send and receive
+requests/responses, and in the [[https://github.com/ii/xds-test-harness/blob/dstream/acknack_test.go#L153][next step]] we validate the response against the
+test yaml.
 
 ** implement latest test
-Our two tests work, though their usescases are a bit simple.  It is a good time, I think, to revisit the test syntax itself, to see if we can find a clearer way to illustrate an initial stream, and a more generic way to talk about receiving discovery requests.  Right now we have a few steps that are just slighly different in wording, but quite different in implementation.
+Our two tests work, though their usescases are a bit simple. It is a good time,
+I think, to revisit the test syntax itself, to see if we can find a clearer way
+to illustrate an initial stream, and a more generic way to talk about receiving
+discovery requests. Right now we have a few steps that are just slighly
+different in wording, but quite different in implementation.
 
 * Questions
 ** Best phrasing for the test, specifically the ack portion
 ** Should a discovery response be sent when new resources are added?
-see [[If I send a wildcard discovery request, do new resources beign added count as a
-change to the resources in the discovery response?][Our Test section]] .
+see [[https://github.com/ii/xds-test-harness/blob/dstream/org/intermediate-harness-2.org#L32][our test section]]
 
 ** Should there be  setState and updateState functions?
 Right now, whenever the adapter sets the state, it fully wipes the cache and
