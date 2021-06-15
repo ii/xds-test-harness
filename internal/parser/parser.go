@@ -1,6 +1,10 @@
 package parser
 
 import (
+	"fmt"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/golang/protobuf/ptypes"
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"gopkg.in/yaml.v2"
 )
@@ -21,7 +25,10 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 		return nil, err
 	}
 
-	snapshot := &pb.Snapshot{Node: s.Node}
+	snapshot := &pb.Snapshot{
+		Node:    s.Node,
+		Version: s.Version,
+	}
 	if s.Resources.Endpoints != nil {
 		endpoints := &pb.Endpoints{}
 		for _, e := range s.Resources.Endpoints {
@@ -93,6 +100,15 @@ func NewDiscoveryRequest() TestDiscoveryRequest {
 	return dr
 }
 
+func NewDiscoveryResponse() DiscoveryResponse {
+	dr := DiscoveryResponse{
+		VersionInfo: "",
+		TypeURL:     "",
+		Resources:   []Cluster{},
+	}
+	return dr
+}
+
 func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
 	request := NewDiscoveryRequest()
 	err := yaml.Unmarshal([]byte(yml), &request)
@@ -100,4 +116,28 @@ func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
 		return nil, err
 	}
 	return &request, nil
+}
+
+func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*DiscoveryResponse, error) {
+	response := DiscoveryResponse{
+		VersionInfo: dr.VersionInfo,
+		TypeURL:     dr.TypeUrl,
+	}
+	for i, _ := range dr.GetResources() {
+		var cpb cluster.Cluster
+		err := ptypes.UnmarshalAny(dr.GetResources()[i], &cpb)
+		if err != nil {
+			fmt.Printf("anypb error: %v\n", err)
+		}
+		// TODO: why is this necessary?
+		cc := Cluster{
+			Name: cpb.Name,
+			ConnectTimeout: ConnectTimeout{
+				Seconds: cpb.ConnectTimeout.Seconds,
+			},
+		}
+
+		response.Resources = append(response.Resources, cc)
+	}
+	return &response, nil
 }

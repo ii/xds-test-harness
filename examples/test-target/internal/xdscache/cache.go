@@ -17,6 +17,15 @@ type XDSCache struct {
 	Endpoints map[string]Endpoint
 }
 
+func NewXDSCache() *XDSCache {
+	return &XDSCache{
+		Listeners: make(map[string]Listener),
+		Clusters:  make(map[string]*cluster.Cluster),
+		Routes:    make(map[string]Route),
+		Endpoints: make(map[string]Endpoint),
+	}
+}
+
 func (xds *XDSCache) ClusterContents() []types.Resource {
 	var r []types.Resource
 	for _, c := range xds.Clusters {

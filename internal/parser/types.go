@@ -4,7 +4,7 @@ type EnvoyNode struct {
 	ID string `yaml:"id"`
 }
 type ConnectTimeout struct {
-	Seconds int32 `yaml:"seconds"`
+	Seconds int64 `yaml:"seconds"`
 }
 
 type Endpoint struct {
@@ -67,4 +67,10 @@ type TestDiscoveryRequest struct {
 	TypeURL       string    `default:"" yaml:"type_url"`
 	ResponseNonce string    `default:"" yaml:"response_nonce"`
 	Node          EnvoyNode `yaml:"node"`
+}
+
+type DiscoveryResponse struct {
+	VersionInfo string    `default:"" yaml:"version_info"`
+	TypeURL     string    `yaml:"type_url"`
+	Resources   []Cluster `yaml:"resources"` //hack for now, should be any type of resource
 }
