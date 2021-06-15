@@ -63,7 +63,7 @@ type InitConfig struct {
 
 type TestDiscoveryRequest struct {
 	VersionInfo   string    `default:"" yaml:"version_info"`
-	ResourceNames []string  `default:[]string yaml:"resource_names"`
+	ResourceNames []string  `yaml:"resource_names"`
 	TypeURL       string    `default:"" yaml:"type_url"`
 	ResponseNonce string    `default:"" yaml:"response_nonce"`
 	Node          EnvoyNode `yaml:"node"`
