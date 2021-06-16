@@ -40,7 +40,7 @@ and its adapter. It iterates over all the test cases, using the adapter to set
 the necessary state for a test, and the target to test the actual xDS behaviour,
 then logs the results to a shareable file.
 
-#+begin_src dot :file  (ii/workdir+ "docs/assets/architecture.png") :cmdline -Kdot -Tpng
+#+begin_src dot :file "./assets/architecture.png" :cmdline -Kdot -Tpng :results raw
 digraph {
         rankdir=LR;
     subgraph cluster_0 {
@@ -59,7 +59,7 @@ digraph {
 #+end_src
 
 #+RESULTS:
-[[file:/Users/workzach/Projects/xDS-conformance/test-harness/docs/assets/architecture.png]]
+[[file:./assets/architecture.png]]
 
 
 ** Definitions
