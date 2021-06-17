@@ -1,23 +1,23 @@
-- [Context and Scope](#org589d23f)
-  - [Goals](#org05007fe)
-  - [Non-goals](#org961b56b)
-- [Overview](#org11fb9b5)
-- [Detailed Design](#org58b0088)
-  - [Architecture](#org593ab60)
-  - [Definitions](#org0b5c8fe)
-  - [Test Case Format](#org6da64fe)
-  - [Iterating through the test cases](#org0fc8a07)
-  - [Implementing the tests](#org1512298)
-  - [The Adapter protocol](#orgbc2d68c)
-- [Considered Alternatives](#org7c66a42)
+- [Context and Scope](#org6d6e3f4)
+  - [Goals](#org11e2937)
+  - [Non-goals](#orga3da61e)
+- [Overview](#orgdbf254d)
+- [Detailed Design](#org79866f6)
+  - [Architecture](#org917dd85)
+  - [Definitions](#orgeb74efd)
+  - [Test Case Format](#org6a0f90a)
+  - [Iterating through the test cases](#org035dfac)
+  - [Implementing the tests](#org2f7548b)
+  - [The Adapter protocol](#orgd42e8d5)
+- [Considered Alternatives](#orgcc6a98d)
 
-<a id="org589d23f"></a>
+<a id="org6d6e3f4"></a>
 
 # Context and Scope
 
 This document outlines the implementation of a conformance test suite for the xDS protocol. It builds off designs and requirements established in the [xDS conformance Statement of Work](https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit), outlining how these requirements can be best implemented.
 
-<a id="org05007fe"></a>
+<a id="org11e2937"></a>
 
 ## Goals
 
@@ -26,7 +26,7 @@ This document outlines the implementation of a conformance test suite for the xD
 - Create a test binary that can be run against an arbitary xDS server and output its results.
 - Set an extensible framework that can be easily modified to handle complex scenarios as they are discovered.
 
-<a id="org961b56b"></a>
+<a id="orga3da61e"></a>
 
 ## Non-goals
 
@@ -34,7 +34,7 @@ This document outlines the implementation of a conformance test suite for the xD
 - Test envoy specific scenarios (the cases should be implementation-agnostic).
 - Write all known test cases.
 
-<a id="org11fb9b5"></a>
+<a id="orgdbf254d"></a>
 
 # Overview
 
@@ -42,11 +42,11 @@ The test suite is a language-agnostic binary that runs against a specified serve
 
 The test cases are written separate from their implementation, using the [gherkin](https://cucumber.io/docs/gherkin/reference/) testing language. This allows for a consistency in how test scenarios are articulated, while allowing the test runner to be a patchwork of implementations written in multiple languages, depending on whichever is best suited for the test scenario.
 
-<a id="org58b0088"></a>
+<a id="org79866f6"></a>
 
 # Detailed Design
 
-<a id="org593ab60"></a>
+<a id="org917dd85"></a>
 
 ## Architecture
 
@@ -54,9 +54,9 @@ The architecture closely matches the original diagram in the Statement of Work.
 
 A test runner is started with a simple config for how to connect to the target and its adapter. It iterates over all the test cases, using the adapter to set the necessary state for a test, and the target to test the actual xDS behaviour, then logs the results to a shareable file.
 
-![img](/Users/hh/src/xds-test-harness/docs/assets/architecture.png)
+![img](./assets/architecture.png)
 
-<a id="org0b5c8fe"></a>
+<a id="orgeb74efd"></a>
 
 ## Definitions
 
@@ -65,7 +65,7 @@ All definitions in the Statement of Work carry over to this design document. In 
 - **gherkin/cucumber:** A test case language intended for &ldquo;behaviour driven development&rdquo;. What our tests are written in.
 - **godog:** a go tool for structuring and running tests written in gherkin.
 
-<a id="org6da64fe"></a>
+<a id="org6a0f90a"></a>
 
 ## Test Case Format
 
@@ -113,7 +113,7 @@ While the composability is nice, it can make the tests less clear than we&rsquo;
 
 Ideally, much of the work of building the test suite will be in establishing a clear, reusable grammar with the implementation kept simple and functional
 
-<a id="org0fc8a07"></a>
+<a id="org035dfac"></a>
 
 ## Iterating through the test cases
 
@@ -121,7 +121,7 @@ Proper folder structure will let us use godog&rsquo;s default behaviour to itera
 
 There is no guaranteed order to how the tests are run, and so each scenario assumes a fresh state in the target server, runs through the test, and then rests the server for whichever scenario comes next.
 
-<a id="org1512298"></a>
+<a id="org2f7548b"></a>
 
 ## Implementing the tests
 
@@ -129,7 +129,7 @@ Our actual runner is a Go struct with a set of defined methods, each method mapp
 
 The Runner struct includes fields for maintaining connections to the target across steps, and channels for receiving messages from the target to be read by the appropriate step.
 
-<a id="orgbc2d68c"></a>
+<a id="orgd42e8d5"></a>
 
 ## The Adapter protocol
 
@@ -139,16 +139,16 @@ As part of conformance, the target is expected to implement this api and provide
 
 The adapter has two services `SetState` and `UpdateState`. `SetState` is used to clear out a target and set it to some new, clean state. Update is used when the scenario is stateful, e.g. when we need to track the chain of versions created across steps in one scenario.
 
-<a id="org7c66a42"></a>
+<a id="orgcc6a98d"></a>
 
 # Considered Alternatives
 
 Will need to visit this section with the team, and clarify what alternatives are available and whether there is a better alternative. I can see two forms of alternatives: one is to choose a different test syntax and format. The other is to choose a different way of implementing our test runner.
 
-For the test syntax, what are other used languages? To me it is a non-starter if the test is wrapped up in the implementation, or can only be described as a single line. So one option we could use is the native go testing, but it does not have a separate syntax that I am aware of and it limits us to haviong the entire runner written in go. An informal expectation we had is the abilikty to have like modules of a test runner, anticipating a situation where it is better to have an implementation written in Python or some other language, but still following the gherkin test spec. We couldn&rsquo;t do that with go testing.
+For the test syntax, what are other used languages? To me it is a non-starter if the test is wrapped up in the implementation, or can only be described as a single line. So one option we could use is the native go testing, but it does not have a separate syntax that I am aware of and it limits us to having the entire runner written in go. An informal expectation we had is the ability to have like modules of a test runner, anticipating a situation where it is better to have an implementation written in Python or some other language, but still following the gherkin test spec. We couldn&rsquo;t do that with go testing.
 
 However, this is assuming something larger (that this will need to be a multi-lingual test framework) and that is an assumption we should check.
 
-In terms of the implementation, I am not sure of clear, alternative structures for htis. In other words, the specification is vague enough at this stage that we know it will be revisited. During a revisit, I could imagine alternatives coming up based on specific parts of the implementation.
+In terms of the implementation, I am not sure of clear, alternative structures for this. In other words, the specification is vague enough at this stage that we know it will be revisited. During a revisit, I could imagine alternatives coming up based on specific parts of the implementation.
 
-This makes me realize this design doc, just yet, is perhaps not specific enough. It will be good to see from other teammembers what currentlyf eels unanswered in what I laid out.
+This makes me realize this design doc, just yet, is perhaps not specific enough. It will be good to see from other team members what currently feels unanswered in what I laid out.

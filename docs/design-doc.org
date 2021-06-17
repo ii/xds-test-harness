@@ -161,8 +161,8 @@ to choose a different way of implementing our test runner.
 For the test syntax, what are other used languages? To me it is a non-starter if
 the test is wrapped up in the implementation, or can only be described as a
 single line. So one option we could use is the native go testing, but it does
-not have a separate syntax that I am aware of and it limits us to haviong the
-entire runner written in go. An informal expectation we had is the abilikty to
+not have a separate syntax that I am aware of and it limits us to having the
+entire runner written in go. An informal expectation we had is the ability to
 have like modules of a test runner, anticipating a situation where it is better
 to have an implementation written in Python or some other language, but still
 following the gherkin test spec. We couldn't do that with go testing.
@@ -171,11 +171,11 @@ However, this is assuming something larger (that this will need to be a
 multi-lingual test framework) and that is an assumption we should check.
 
 In terms of the implementation, I am not sure of clear, alternative structures
-for htis. In other words, the specification is vague enough at this stage that
+for this. In other words, the specification is vague enough at this stage that
 we know it will be revisited. During a revisit, I could imagine alternatives
 coming up based on specific parts of the implementation.
 
 This makes me realize this design doc, just yet, is perhaps not specific enough.
-It will be good to see from other teammembers what currentlyf eels unanswered in
+It will be good to see from other team members what currently feels unanswered in
 what I laid out.
 :END:
