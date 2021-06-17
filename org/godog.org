@@ -1,0 +1,238 @@
+#+TITLE: Godog
+
+* Go Get Go Dog
+#+begin_src shell :results silent
+go get google.golang.org/protobuf/cmd/protoc-gen-go \
+   google.golang.org/grpc/cmd/protoc-gen-go-grpc
+go get github.com/cucumber/godog/cmd/godog@v0.11.0
+go get github.com/spf13/pflag@v1.0.5
+go get github.com/stretchr/testify/assert@v1.6.1
+#+end_src
+
+* Feature
+#+begin_src feature :tangle example.feature
+Feature: Example Feature File
+  In order to show our work
+  As a coder
+  I need things
+  Rules:
+  - FOO is BAR
+  - BAZ is FOO
+  Scenario: given, when, and then
+    Given a starting point
+    When a change is made
+    Then we see results
+#+end_src
+* example_test.go
+ Exploring all the [[https://pkg.go.dev/github.com/cucumber/godog][docs]].
+
+ There are some issues with the export wrapping 'main {}' around the test...
+#+begin_src go :tangle example_test.go :comments none
+// example_test.go
+//  Exploring all the [[https://pkg.go.dev/github.com/cucumber/godog][docs]]
+
+package main
+
+import (
+	"fmt"
+	"github.com/cucumber/godog"
+	"github.com/cucumber/godog/colors"
+	flag "github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"log"
+	"os"
+	"testing"
+)
+
+var opts = godog.Options{
+	Output: colors.Colored(os.Stdout),
+	Format: "progress", // can define default values
+}
+
+func init() {
+	godog.BindCommandLineFlags("godog.", &opts)
+}
+
+func TestMain(m *testing.M) {
+	log.Println("TestMain is being called with Testing.M")
+	// log.Println("TestMain is being called with Testing.M: %v", m.tests)
+	flag.Parse()
+	opts.Paths = flag.Args()
+
+	status := godog.TestSuite{
+		Name:                 "godogs",
+		TestSuiteInitializer: InitializeTestSuite,
+		ScenarioInitializer:  InitializeScenario,
+		Options:              &opts,
+	}.Run()
+
+	// Optional: Run `testing` package's logic besides godog.
+	if st := m.Run(); st > status {
+		status = st
+	}
+
+	os.Exit(status)
+
+}
+
+func aChangeIsMade() error {
+	log.Println("A Change was Made!!")
+	return nil
+}
+
+func aStartingPoint() error {
+	log.Println("We configured a starting point!!")
+	return nil
+}
+
+func weSeeResults() error {
+	log.Println("We canhaz results!!")
+	return nil
+}
+func InitializeTestSuite(ctx *godog.TestSuiteContext) {
+	log.Println("Adding BeforeSuite Func()")
+	ctx.BeforeSuite(func() {
+		log.Println("Running BeforeSuite()")
+	})
+	log.Println("Adding AfterSuite Func()")
+	ctx.AfterSuite(func() {
+		log.Println("Running AfterSuite()")
+	})
+}
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	ctx.BeforeScenario(func(sc *godog.Scenario) {
+		log.Printf("We are BeforeScenario : %#v : %#v : %#v\n",
+			sc.Uri,  // "example.feature"
+			sc.Name, // ""
+			sc.Id,   // "7"
+		)
+		log.Printf("Settings Godogs = 0")
+		// ./example_test.go:93:3: undefined: Godogs
+		// How do we set godocs?
+	})
+	ctx.AfterScenario(func(sc *godog.Scenario, err error) {
+		log.Printf("We are AfterScenario : %#v : %#v : %#v\n",
+			sc.Uri,  // "example.feature"
+			sc.Name, // ""
+			sc.Id,   // "7"
+		)
+		if err != nil {
+			log.Printf("AfterScenario err : %#v", err)
+			// log.Printf("AfterScenario err : %#v", err.errorString)
+		}
+	})
+	ctx.BeforeStep(func(st *godog.Step) {
+		log.Printf("We are BeforeStep : %#v : %#v\n", st.Id, st.Text)
+	})
+	ctx.AfterStep(func(st *godog.Step, err error) {
+		log.Printf("We are AfterStep : %#v : %#v\n", st.Id, st.Text)
+		if err != nil {
+			log.Printf("AfterStep err : %#v", err)
+			// log.Printf("AfterStep err : %#v", err.errorString)
+		}
+	})
+	ctx.Step(`^a starting point$`, aStartingPoint)
+	ctx.Step(`^a change is made$`, aChangeIsMade)
+	ctx.Step(`^we see results$`, weSeeResults)
+}
+
+// assertExpectedAndActual is a helper function to allow the step function to call
+// assertion functions where you want to compare an expected and an actual value.
+func assertExpectedAndActual(a expectedAndActualAssertion, expected, actual interface{}, msgAndArgs ...interface{}) error {
+	var t asserter
+	a(&t, expected, actual, msgAndArgs...)
+	return t.err
+}
+
+type expectedAndActualAssertion func(t assert.TestingT, expected, actual interface{}, msgAndArgs ...interface{}) bool
+
+// assertActual is a helper function to allow the step function to call
+// assertion functions where you want to compare an actual value to a
+// predined state like nil, empty or true/false.
+func assertActual(a actualAssertion, actual interface{}, msgAndArgs ...interface{}) error {
+	var t asserter
+	a(&t, actual, msgAndArgs...)
+	return t.err
+}
+
+type actualAssertion func(t assert.TestingT, actual interface{}, msgAndArgs ...interface{}) bool
+
+// asserter is used to be able to retrieve the error reported by the called assertion
+type asserter struct {
+	err error
+}
+
+// Errorf is used by the called assertion to report an error
+func (a *asserter) Errorf(format string, args ...interface{}) {
+	a.err = fmt.Errorf(format, args...)
+}
+#+end_src
+
+#+RESULTS:
+#+begin_SRC example
+#+end_SRC
+
+* Go Dog (on evolving file)
+#+begin_src shell :prologue "(\n" :epilogue "\n) 2>&1\n:\n"
+~/go/bin/godog --format junit:results.xml example.feature
+#+end_src
+
+#+RESULTS:
+#+begin_example
+2021/06/17 19:18:17 Adding BeforeSuite Func()
+2021/06/17 19:18:17 Adding AfterSuite Func()
+2021/06/17 19:18:17 Running BeforeSuite()
+2021/06/17 19:18:17 We are BeforeScenario : "example.feature" : "given, when, and then" : "7"
+2021/06/17 19:18:17 Settings Godogs = 0
+2021/06/17 19:18:17 We are BeforeStep : "4" : "a starting point"
+2021/06/17 19:18:17 We configured a starting point!!
+2021/06/17 19:18:17 We are AfterStep : "4" : "a starting point"
+2021/06/17 19:18:17 We are BeforeStep : "5" : "a change is made"
+2021/06/17 19:18:17 A Change was Made!!
+2021/06/17 19:18:17 We are AfterStep : "5" : "a change is made"
+2021/06/17 19:18:17 We are BeforeStep : "6" : "we see results"
+2021/06/17 19:18:17 We canhaz results!!
+2021/06/17 19:18:17 We are AfterStep : "6" : "we see results"
+2021/06/17 19:18:17 We are AfterScenario : "example.feature" : "given, when, and then" : "7"
+2021/06/17 19:18:17 Running AfterSuite()
+#+end_example
+* Go test
+Running go test instead!
+#+begin_src shell :prologue "(\n" :epilogue "\n) 2>&1\n:\n"
+go test --godog.format junit:results.xml
+#+end_src
+
+#+RESULTS:
+#+begin_example
+2021/06/17 19:19:03 TestMain is being called with Testing.M
+2021/06/17 19:19:03 Adding BeforeSuite Func()
+2021/06/17 19:19:03 Adding AfterSuite Func()
+2021/06/17 19:19:03 Running BeforeSuite()
+2021/06/17 19:19:03 We are BeforeScenario : "features/example.feature" : "given, when, and then" : "7"
+2021/06/17 19:19:03 Settings Godogs = 0
+2021/06/17 19:19:03 We are BeforeStep : "4" : "a starting point"
+2021/06/17 19:19:03 We configured a starting point!!
+2021/06/17 19:19:03 We are AfterStep : "4" : "a starting point"
+2021/06/17 19:19:03 We are BeforeStep : "5" : "a change is made"
+2021/06/17 19:19:03 A Change was Made!!
+2021/06/17 19:19:03 We are AfterStep : "5" : "a change is made"
+2021/06/17 19:19:03 We are BeforeStep : "6" : "we see results"
+2021/06/17 19:19:03 We canhaz results!!
+2021/06/17 19:19:03 We are AfterStep : "6" : "we see results"
+2021/06/17 19:19:03 We are AfterScenario : "features/example.feature" : "given, when, and then" : "7"
+2021/06/17 19:19:03 Running AfterSuite()
+testing: warning: no tests to run
+PASS
+ok  	github.com/zachmandeville/tester-prototype/org	0.410s
+#+end_example
+
+* junit.xml
+#+name: junit.yml
+#+begin_src xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="godogs" tests="1" skipped="0" failures="0" errors="0" time="0.001136417">
+  <testsuite name="Example!" tests="1" skipped="0" failures="0" errors="0" time="0.0005645">
+    <testcase name="given, when, and then" status="passed" time="0.0005645"></testcase>
+  </testsuite>
+</testsuites>
+#+end_src
