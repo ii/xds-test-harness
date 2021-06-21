@@ -120,7 +120,6 @@ func (r *Runner) theStreamWasACKedWithADiscoveryRequestMatchingYaml(arg1 *godog.
 		TypeUrl:       drdata.TypeURL,
 		ResponseNonce: drdata.ResponseNonce,
 	}
-	fmt.Printf("dreq: %v\n", dreq)
 	r.CDS.Stream.Send(dreq)
 	return nil
 }
@@ -211,14 +210,12 @@ func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocS
 		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
 		ResponseNonce: "1",
 	}
-	fmt.Printf("dreq: %v\n", dreq)
 	r.CDS.Stream.Send(dreq)
 	res, err := r.CDS.Stream.Recv()
 	if err != nil {
 		err = fmt.Errorf("error receiving discovery response: %v\n", err)
 		return err
 	}
-	fmt.Printf("res: %v\n", res)
 	var expected parser.DiscoveryResponse
 	if err := yaml.Unmarshal([]byte(yml.Content), &expected); err != nil {
 		return err
