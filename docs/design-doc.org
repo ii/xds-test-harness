@@ -48,7 +48,7 @@ features of xDS. The feature is then mapped to a test implementation that then
 checks whether the target adequately fulfills the expected behaviour.
 
 A core part of this approach is that a behaviour is written as a series of
-steps,t he steps following an agreed-upon syntax. The steps are then mapped to
+steps following an agreed-upon syntax. The steps are then mapped to
 their corresponding function. This means that new tests can be written using the
 same syntax as prior ones, re-using the corresponding functions. This allows for
 people to write new tests without having to write new code, or without having
@@ -94,7 +94,7 @@ analogy to a test.  A scenario is structured as:
 - When an action occurs
 - Then resulting state can be observed.
 
-Scenarios ar emeant to be declarative and not a line by line specification of
+Scenarios are meant to be declarative and not a line by line specification of
 how a test operates. Each line of a scenario is called a *step*.
 ** Steps
 A line in a scenario, written in gherkin syntax as a Keyword followed by some
@@ -203,13 +203,12 @@ aspects of jumproping not covered in our common library.
 
 They implement these new steps in golang in =steps/jumprope.go=
 
-Lastly, they add these new steps toa collection of them in our =main.go=. The
+Lastly, they add these new steps to a collection a mapping =main.go=. The
 order of placement is not important, as the steps are mapped to the scenarios
 via regex.
 
 Their pr would include changes to these three files: =features/jumprope.go=,
 =steps/jumprope.go=, and =main.go=.
-
 
 Later on, nuances are found within jumproping that need to have their own tests.
 A test-writer, without golang proficiency, reads through the =jumprope.feature=
