@@ -197,7 +197,7 @@ To start, they'd write up a features file at =features/jumprope.feature= This
 would describe the jumproping feature at 10,000ft, illustrated with a set of
 scenarios for each aspect of it.
 
-The scnearios would contain steps pulled from the common library: setting state,
+The scenarios would contain steps pulled from the common library: setting state,
 passing along messages, validating responses, etc. In addition, there are some
 aspects of jumproping not covered in our common library.
 
