@@ -8,16 +8,16 @@ This document outlines the implementation of a conformance test suite for the
 xDS protocol. It builds off designs and requirements established in the [[https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit][xDS
 conformance Statement of Work]], outlining how these requirements can be best
 implemented.
+
 ** Goals
-- Define a test case description format.
-- Define a test case grammar, in which new test cases can be easily composed.
-- Create a test binary that can be run against an arbitary xDS server and output
-  its results.
-- Set an extensible framework that can be easily modified to handle complex
-  scenarios as they are discovered.
+In addition to the goals outlined in the SoW, our implementation is intended to achieve the following:
+- An extensible test case syntax behaviour that tests /behaviour/.
+- The ability to write new tests without writing new code.
+- A framework that is easy to contribute to.
+- A framework that is flexible enough to handle new requirements as discovered.
 ** Non-goals
-- Write a test case language.
-- Test envoy specific scenarios (the cases should be implementation-agnostic).
+- Write a complete test case language.
+- Include tests that cover envoy specific scenarios (the cases should be implementation-agnostic).
 - Write all known test cases.
 * Overview
 The test suite is a language-agnostic binary that runs against a specified
@@ -61,7 +61,6 @@ digraph {
 #+RESULTS:
 [[file:./assets/architecture.png]]
 
-
 ** Definitions
 All definitions in the Statement of Work carry over to this design document. In
 addition, there are these terms specific to our implementation.
@@ -69,7 +68,20 @@ addition, there are these terms specific to our implementation.
 - gherkin/cucumber :: A test case language intended for "behaviour driven
   development". What our tests are written in.
 - godog :: a go tool for structuring and running tests written in gherkin.
+** Approach
+*** TODO introduce BDD concepts as applied in test framework
 ** Test Case Format
+*** TODO talk about file structure/introducing new features with this format
+features folder
+step folder
+matchers
+expecting to have 60%(?) existing steps work.
+new steps can be either ot our library, if broad enough, or to a jumprope_step.go
+*steps is methods on a runner.*
+main.go sets up all the steps in our steps library.
+will give a godog log on screen, but the official output is a junit.xml file
+*** TODO talk about struct as related to state machine
+*** current
 Following the gherkin syntax, our tests are setup as "Scenarios" grouped
 together into a set of "Features" that, all together, describe xDS conformance.
 Each scenario is a self-contained series of steps outlined in this format:
@@ -146,11 +158,13 @@ the required state for each test to run cleanly, in isolation.
 As part of conformance, the target is expected to implement this api and provide
 a connection point to our runner. We do not care how it is implemented, as long
 as it follows our spec.
-
+*** Scope
 The adapter has two services =SetState= and =UpdateState=. =SetState= is used to
 clear out a target and set it to some new, clean state. Update is used when the
 scenario is stateful, e.g. when we need to track the chain of versions created
 across steps in one scenario.
+*** Spec
+talk about spec, with link to file, and they'd import the spec and implement before running our suite.
 * Considered Alternatives
 :LOG:
 Will need to visit this section with the team, and clarify what alternatives are
@@ -178,4 +192,7 @@ coming up based on specific parts of the implementation.
 This makes me realize this design doc, just yet, is perhaps not specific enough.
 It will be good to see from other team members what currently feels unanswered in
 what I laid out.
+
+
+o
 :END:
