@@ -6,7 +6,7 @@ Feature: Conformance ACK
     Given "adapter" is reachable via gRPC
     And "target" is reachable via gRPC
 
-  Scenario:
+  Scenario: A wildcard CDS request should return all cluster resources
     Given a Target setup with snapshot matching yaml:
     ```
     ---
@@ -36,7 +36,7 @@ Feature: Conformance ACK
     type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
     ```
 
-  Scenario:
+  Scenario: When resources change, server should message client subscribed to these resources.
     Given a Target setup with snapshot matching yaml:
     ```
     ---
@@ -85,7 +85,7 @@ Feature: Conformance ACK
     type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
     ```
 
-  Scenario:
+  Scenario: A client should only receive updates to the resources it's subscribed to.
     Given a Target setup with snapshot matching yaml:
     ```
     ---
