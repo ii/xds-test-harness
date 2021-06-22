@@ -1,0 +1,28 @@
+#+TITLE: Delta Tests
+
+* Introduction
+This org file documents the creation of new tests for the delta variant of the xDS protocol.
+This is a milestone for the 0.5 conformance suite,a s covered in the [[https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit][Statement of Work]].
+
+This is not intended to be all delta tests, or even the exemplary, ideal tests.
+This is to explore what a test wsould look like so that, with feedback, we can
+turn them into the exampleary, ideal tests that all our future delta tests
+spring from.
+
+In addition. I want to start doing some organization of the repo to more closely
+match the project structure outlined in our [[https://github.com/ii/xds-test-harness/pull/9][Design Document]]. So will be creating
+a new feature file and, potentially, adding the new steps for the runner in a =steps= directory.
+
+* Our Tests
+As we are already working on some subscription tests, I think it makes sense to
+do subscription features for Delta so that we can merge the SoTW and Delta
+subscription scenarios into a single feature file. It will also be easier to get
+help from the rest of the team if our head is in the same, general place.
+
+So some good FEatures would be:
+- [Delta] Subscribing to subset of resources, only getting that subset.
+- [Delta] Subscribing to an additional resource.
+- [Delta] When only 1 of that subset changes, getting the appropriatel scoped response.
+
+* Diary
+dev diary goes here!

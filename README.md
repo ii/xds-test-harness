@@ -15,3 +15,4 @@ more context for what I've written and why!
 - [Basic Test Harness](./org/basic-harness.org)
 - [Intermediate Test Harness](./org/intermediate-harness.org)
 - [Intermediate Test Harness, Part Two](./org/intermediate-harness-2.org)
+- [Delta Tests](./org/delta-tests.org)
