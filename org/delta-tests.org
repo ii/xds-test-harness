@@ -25,4 +25,71 @@ So some good FEatures would be:
 - [Delta] When only 1 of that subset changes, getting the appropriatel scoped response.
 
 * Diary
-dev diary goes here!
+** Research some delta
+#+begin_quote
+So, the four variants of the xDS transport protocol are:
+    State of the World (Basic xDS): SotW, separate gRPC stream for each resource type
+    Incremental xDS: incremental, separate gRPC stream for each resource type
+    Aggregated Discovery Service (ADS): SotW, aggregate stream for all resource types
+    Incremental ADS: incremental, aggregate stream for all resource types
+#+end_quote
+
+For this starting test, we can do Incremental xDS, and not worry agout the ADS just yet.
+
+#+begin_quote
+For the non-aggregated protocol variants, there is a separate RPC service for
+each resource type. Each of these RPC services can provide a method for each of
+the SotW and Incremental protocol variants. Here are the RPC services and
+methods for each resource type:
+
+Cluster: Cluster Discovery Service (CDS) - SotW: ClusterDiscoveryService.StreamClusters - Incremental: ClusterDiscoveryService.DeltaClusters
+#+end_quote
+
+using the go-control-plane as the target, we will not need to setup any sort of configuration beforehand, and can easily move from a SoTW test to a Delta test...we'd just switch the endpoint for our stream.
+
+#+begin_quote
+Each xDS stream begins with a DiscoveryRequest from the client, which specifies
+the list of resources to subscribe to, the type URL corresponding to the
+subscribed resources, the node identifier, and an optional resource type
+instance version indicating the most recent version of the resource type that
+the client has already seen (see ACK/NACK and resource type instance version for
+details).
+
+For all of the incremental methods, the request type is DeltaDiscoveryRequest
+and the response type is DeltaDiscoveryResponse.
+#+end_quote
+
+We'll initiate the stream like we've done with other tests: with a discovery request specified in yaml. It'll be be structured slightly differently, though, thus its different type.
+
+#+begin_quote
+xDS requests allow the client to specify a set of resource names as a hint to the server about which resources the client is interested in. In the SotW protocol variants, this is done via the resource_names specified in the DiscoveryRequest; in the incremental protocol variants, this is done via the resource_names_subscribe and resource_names_unsubscribe fields in the DeltaDiscoveryRequest.
+#+end_quote
+
+#+begin_quote
+In the incremental protocol variants, the server sends each resource in its own response. This means that if the server has previously sent 100 resources and only one of them has changed, it may send a response containing only the changed resource; it does not need to resend the 99 resources that have not changed, and the client must not delete the unchanged resources.
+#+end_quote
+
+So in one of our tests, we'll subscribe to 3 of 5 clusters:
+- *foo*
+- *bar*
+- *baz*
+- echo
+- fun
+
+Then, we'll change =foo='s connection timeout. The client should receive a
+discovery response that has just =foo=, but it /could also/ contain =bar= and
+=baz=. This means we will want our "then we should receive a response" to be
+flexible. The test would only fail if we got =echo= and =fun= in the response,
+as we never subscribed to them.
+
+We could have it say something like:
+: Then we receive a response containing only resources from this list: "foo", "bar", "baz"
+however, this wouldn't check whether we, for some reason, changed foo and got a response showing only bar and baz.
+
+I think we'd want something like:
+: Then we receive a respone containing "foo"
+: And the response does not contain "echo"  or "fun"
+
+This would be cleaned up to best use gherkin's features, but the key thing is we
+can't just match on ideal discovery response samples. We have to throw in a bit
+more logic in our parser.
