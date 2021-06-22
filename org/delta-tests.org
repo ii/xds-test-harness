@@ -1,4 +1,5 @@
 #+TITLE: Delta Tests
+#+PROPERTY: header-args :results output :noweb yes
 
 * Introduction
 This org file documents the creation of new tests for the delta variant of the xDS protocol.
@@ -93,3 +94,130 @@ I think we'd want something like:
 This would be cleaned up to best use gherkin's features, but the key thing is we
 can't just match on ideal discovery response samples. We have to throw in a bit
 more logic in our parser.
+** Setup Feature file
+All tests will go in our subscription feature file, and we will tag them with @delta.
+Then we can tell godog to /just/ do SoTW tests if an
+implementation does not yet have delta.
+
+#+NAME: Subscription Feature
+#+begin_src feature :tangle (ii/workdir+ "features/subscribe.feature")
+Feature: A client can subscribe and unsubcribe from an arbitary amount of resources, and receive updates for only the resources they're subscribed to
+  Background:
+    Given "adapter" is reachable via gRPC
+    And "target" is reachable via gRPC
+
+  <<Subscribe to subset of clusters>>
+#+end_src
+** Write "Subscribe to subset of clusters"
+I want to subscribe to 3 out of 5 clusters, but not have to describe the full discovery request i am sending.
+
+#+NAME: Subscribe to subset of clusters
+#+begin_src feature
+@delta
+Scenario: I can subscribe to a subset of resources
+  Given a target setup with the following resources:
+  ```
+  clusters:
+  - foo
+  - bar
+  - baz
+  - echo
+  - fun
+  ```
+  When I subscribe to CDS for these clusters:
+  ```
+  - foo
+  - bar
+  - baz
+  ```
+  Then I get a response containing these resources:
+  ```
+  clusters:
+  - foo
+  - bar
+  - baz
+  ```
+  And the response does not contain these resources:
+  ```
+  clusters:
+  - echo
+  - fun
+  ```
+#+end_src
+
+After tangling this file, I should be able to run godog for /just/ delta tests, and see some function signatures.
+
+#+begin_src shell :dir (ii/workdir+ "")
+godog --tags=@delta
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Feature: A client can subscribe and unsubcribe from an arbitary amount of resources, and receive updates for only the resources they're subscribed to
+
+  Background:
+    Given "adapter" is reachable via gRPC              # acknack_test.go:174 -> *Runner
+    And "target" is reachable via gRPC                 # acknack_test.go:174 -> *Runner
+
+  Scenario: I can subscribe to a subset of resources   # features/subscribe.feature:7
+    Given a target setup with the following resources:
+      ```
+      clusters:
+      - foo
+      - bar
+      - baz
+      - echo
+      - fun
+      ```
+    When I subscribe to CDS for these clusters:
+      ```
+      - foo
+      - bar
+      - baz
+      ```
+    Then I get a response containing these resources:
+      ```
+      clusters:
+      - foo
+      - bar
+      - baz
+      ```
+    And the response does not contain these resources:
+      ```
+      clusters:
+      - echo
+      - fun
+      ```
+
+1 scenarios (1 undefined)
+6 steps (2 passed, 4 undefined)
+4.427516ms
+
+You can implement step definitions for undefined steps with these snippets:
+
+func aTargetSetupWithTheFollowingResources(arg1 *messages.PickleStepArgument_PickleDocString) error {
+	return godog.ErrPending
+}
+
+func iGetAResponseContainingTheseResources(arg1 *messages.PickleStepArgument_PickleDocString) error {
+	return godog.ErrPending
+}
+
+func iSubscribeToCDSForTheseClusters(arg1 *messages.PickleStepArgument_PickleDocString) error {
+	return godog.ErrPending
+}
+
+func theResponseDoesNotContainTheseResources(arg1 *messages.PickleStepArgument_PickleDocString) error {
+	return godog.ErrPending
+}
+
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	ctx.Step(`^a target setup with the following resources:$`, aTargetSetupWithTheFollowingResources)
+	ctx.Step(`^I get a response containing these resources:$`, iGetAResponseContainingTheseResources)
+	ctx.Step(`^I subscribe to CDS for these clusters:$`, iSubscribeToCDSForTheseClusters)
+	ctx.Step(`^the response does not contain these resources:$`, theResponseDoesNotContainTheseResources)
+}
+
+#+end_example
+
+Sweet as! And now to implement this test.
