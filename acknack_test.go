@@ -35,10 +35,11 @@ type ClientConfig struct {
 }
 
 type Runner struct {
-	Adapter           *ClientConfig
-	Target            *ClientConfig
-	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
-	CDS               struct {
+	Adapter                    *ClientConfig
+	Target                     *ClientConfig
+	TargetSetupInitialSnapshot *parser.Snapshot
+	DiscoveryResponse          *envoy_service_discovery_v3.DiscoveryResponse
+	CDS                        struct {
 		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
 		Responses *envoy_service_discovery_v3.DiscoveryResponse
 	}
@@ -74,6 +75,11 @@ func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString)
 		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
 		return err
 	}
+	targetSetupInitialSnapshot, err := parser.YamlToTestHarnessSnapshot(snapYaml.Content)
+	if err != nil {
+		return err
+	}
+	r.TargetSetupInitialSnapshot = targetSetupInitialSnapshot
 	return nil
 }
 
@@ -230,6 +236,37 @@ func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocS
 	return nil
 }
 
+func (r *Runner) anEstablishedSubscriptionFromSendADiscoveryRequestMatchingYaml(dryaml *godog.DocString) error {
+	drdata, err := parser.ParseDiscoveryRequest(dryaml.Content)
+	if err != nil {
+		err = fmt.Errorf("error parsing discovery request: %v\n", err)
+		return err
+	}
+	dreq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: drdata.VersionInfo,
+		Node: &envoy_config_core_v3.Node{
+			Id: drdata.Node.ID,
+		},
+		ResourceNames: drdata.ResourceNames,
+		TypeUrl:       drdata.TypeURL,
+		ResponseNonce: drdata.ResponseNonce,
+	}
+	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
+	dres, err := c.FetchClusters(context.Background(), dreq)
+	if err != nil {
+		log.Printf("err fetching clusters: %v", err.Error())
+		return err
+	}
+	r.DiscoveryResponse = dres
+
+	expected := r.TargetSetupInitialSnapshot
+	actual, _ := parser.ParseDiscoveryResponse(r.DiscoveryResponse)
+	if !reflect.DeepEqual(expected.Resources.Clusters, *&actual.Resources) {
+		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expected, *actual)
+	}
+	return nil
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
 
@@ -243,4 +280,5 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the client receives a discovery response matching yaml:$`, runner.theClientReceivesADiscoveryResponseMatchingYaml)
 	ctx.Step(`^a CDS stream was initiated with a discovery request matching yaml:$`, runner.aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml)
 	ctx.Step(`^the stream was ACKed with a discovery request matching yaml:$`, runner.theStreamWasACKedWithADiscoveryRequestMatchingYaml)
+	ctx.Step(`^an established subscription from send a discovery request matching yaml:$`, runner.anEstablishedSubscriptionFromSendADiscoveryRequestMatchingYaml)
 }

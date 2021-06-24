@@ -140,7 +140,7 @@ Feature: Conformance ACK
         connect_timeout:
           seconds: 5
     ```
-    And I send a discovery request matching yaml:
+    And an established subscription from send a discovery request matching yaml:
     ```
     version_info:
     node: { id: test-id }
@@ -150,21 +150,6 @@ Feature: Conformance ACK
       - baz
     type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
     response_nonce:
-    ```
-    And I get a discovery response matching yaml:
-    ```
-    version_info: "1"
-    resources:
-      - name: foo
-        connect_timeout:
-          seconds: 5
-      - name: bar
-        connect_timeout:
-          seconds: 5
-      - name: baz
-        connect_timeout:
-          seconds: 5
-    type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
     ```
     When I send a discovery request matching yaml:
     ```
