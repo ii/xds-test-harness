@@ -30,8 +30,9 @@ var (
 )
 
 type ClientConfig struct {
-	Port string
-	Conn *grpc.ClientConn
+	Port   string
+	Conn   *grpc.ClientConn
+	NodeId string
 }
 
 type Runner struct {
@@ -39,8 +40,10 @@ type Runner struct {
 	Target            *ClientConfig
 	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
 	CDS               struct {
-		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
-		Responses *envoy_service_discovery_v3.DiscoveryResponse
+		Stream         cluster_service.ClusterDiscoveryService_StreamClustersClient
+		Responses      *envoy_service_discovery_v3.DiscoveryResponse
+		DeltaStream    cluster_service.ClusterDiscoveryService_DeltaClustersClient
+		DeltaResponses *envoy_service_discovery_v3.DeltaDiscoveryResponse
 	}
 }
 
@@ -102,6 +105,35 @@ func (r *Runner) aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml(arg1 *g
 	r.CDS.Stream.Send(dreq)
 	res, err := stream.Recv()
 	r.CDS.Responses = res
+	return nil
+}
+
+func (r *Runner) iSubscribeToDeltaCDSForTheseClusters(clustersYaml *godog.DocString) error {
+	clusters, err := parser.ParseClusters(clustersYaml.Content)
+	if err != nil {
+		err = fmt.Errorf("Error parsing clusters: %v", err)
+		return err
+	}
+	deltaReq := &envoy_service_discovery_v3.DeltaDiscoveryRequest{
+		Node:                    &envoy_config_core_v3.Node{Id: "test-id"},
+		ResourceNamesSubscribe:  clusters,
+		InitialResourceVersions: map[string]string{},
+		ResponseNonce:           "",
+	}
+	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
+	stream, err := c.DeltaClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting stream: %v\n", err)
+		return err
+	}
+	r.CDS.DeltaStream = stream
+	r.CDS.DeltaStream.Send(deltaReq)
+	res, err := stream.Recv()
+	if err != nil {
+		err = fmt.Errorf("error receiving clusters: %v\n", err)
+		return err
+	}
+	r.CDS.DeltaResponses = res
 	return nil
 }
 
@@ -185,6 +217,19 @@ func (r *Runner) isReachableViaGRPC(server string) error {
 	}
 }
 
+func (r *Runner) nodeidOfIs(server, nodeID string) error {
+	switch server {
+	case "target":
+		r.Target.NodeId = nodeID
+	case "adapter":
+		r.Adapter.NodeId = nodeID
+	default:
+		err := fmt.Errorf("unexecpected server name: %v", server)
+		return err
+	}
+	return nil
+}
+
 func (r *Runner) targetIsUpdatedToMatchYaml(yml *godog.DocString) error {
 	snapshot, err := parser.YamlToSnapshot(yml.Content)
 	if err != nil {
@@ -231,8 +276,9 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
 
 	ctx.BeforeScenario(runner.addPorts)
-
+	ctx.Step(`^node-id of "([^"]*)" is "([^"]*)"$`, runner.nodeidOfIs)
 	ctx.Step(`^a Target setup with snapshot matching yaml:$`, runner.aTargetSetupWithSnapshotMatchingYaml)
+	ctx.Step(`^I subscribe to delta CDS for these clusters:$`, runner.iSubscribeToDeltaCDSForTheseClusters)
 	ctx.Step(`^I get a discovery response matching yaml:$`, runner.iGetADiscoveryResponseMatchingYaml)
 	ctx.Step(`^I send a discovery request matching yaml:$`, runner.iSendADiscoveryRequestMatchingYaml)
 	ctx.Step(`^"([^"]*)" is reachable via gRPC$`, runner.isReachableViaGRPC)
