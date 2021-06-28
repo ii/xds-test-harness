@@ -115,16 +115,30 @@ I want to subscribe to 3 out of 5 clusters, but not have to describe the full di
 #+begin_src feature
 @delta
 Scenario: I can subscribe to a subset of resources
-  Given a target setup with the following resources:
+  Given a Target setup with snapshot matching yaml:
   ```
-  clusters:
-  - foo
-  - bar
-  - baz
-  - echo
-  - fun
+  ---
+  node: test-id
+  version: "1"
+  resources:
+    clusters:
+    - name: foo
+      connect_timeout:
+        seconds: 5
+    - name: bar
+      connect_timeout:
+        seconds: 5
+    - name: baz
+      connect_timeout:
+        seconds: 5
+    - name: echo
+      connect_timeout:
+        seconds: 5
+    - name: fun
+      connect_timeout:
+        seconds: 5
   ```
-  When I subscribe to CDS for these clusters:
+  When I subscribe to delta CDS for these clusters:
   ```
   - foo
   - bar
@@ -142,8 +156,13 @@ Scenario: I can subscribe to a subset of resources
   clusters:
   - echo
   - fun
+
   ```
 #+end_src
+
+I can reuse the target setup from our first set of tests. It feels a bit verbose
+having all the clusters outlined, but the code reuse is nice and I can see a
+situation where we do want to put in more details than just cluster timeout.
 
 After tangling this file, I should be able to run godog for /just/ delta tests, and see some function signatures.
 
@@ -156,18 +175,32 @@ godog --tags=@delta
 Feature: A client can subscribe and unsubcribe from an arbitary amount of resources, and receive updates for only the resources they're subscribed to
 
   Background:
-    Given "adapter" is reachable via gRPC              # acknack_test.go:174 -> *Runner
-    And "target" is reachable via gRPC                 # acknack_test.go:174 -> *Runner
+    Given "adapter" is reachable via gRPC              # acknack_test.go:175 -> *Runner
+    And "target" is reachable via gRPC                 # acknack_test.go:175 -> *Runner
 
   Scenario: I can subscribe to a subset of resources   # features/subscribe.feature:7
-    Given a target setup with the following resources:
+    Given a Target setup with snapshot matching yaml:  # acknack_test.go:65 -> *Runner
       ```
-      clusters:
-      - foo
-      - bar
-      - baz
-      - echo
-      - fun
+      ---
+      node: test-id
+      version: "1"
+      resources:
+        clusters:
+        - name: foo
+          connect_timeout:
+            seconds: 5
+        - name: bar
+          connect_timeout:
+            seconds: 5
+        - name: baz
+          connect_timeout:
+            seconds: 5
+        - name: echo
+          connect_timeout:
+            seconds: 5
+        - name: fun
+          connect_timeout:
+            seconds: 5
       ```
     When I subscribe to CDS for these clusters:
       ```
@@ -190,14 +223,10 @@ Feature: A client can subscribe and unsubcribe from an arbitary amount of resour
       ```
 
 1 scenarios (1 undefined)
-6 steps (2 passed, 4 undefined)
-4.427516ms
+6 steps (3 passed, 3 undefined)
+6.598642ms
 
 You can implement step definitions for undefined steps with these snippets:
-
-func aTargetSetupWithTheFollowingResources(arg1 *messages.PickleStepArgument_PickleDocString) error {
-	return godog.ErrPending
-}
 
 func iGetAResponseContainingTheseResources(arg1 *messages.PickleStepArgument_PickleDocString) error {
 	return godog.ErrPending
@@ -212,7 +241,6 @@ func theResponseDoesNotContainTheseResources(arg1 *messages.PickleStepArgument_P
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a target setup with the following resources:$`, aTargetSetupWithTheFollowingResources)
 	ctx.Step(`^I get a response containing these resources:$`, iGetAResponseContainingTheseResources)
 	ctx.Step(`^I subscribe to CDS for these clusters:$`, iSubscribeToCDSForTheseClusters)
 	ctx.Step(`^the response does not contain these resources:$`, theResponseDoesNotContainTheseResources)
@@ -221,3 +249,14 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 #+end_example
 
 Sweet as! And now to implement this test.
+** Write "I subscribe to delta CDS for these clusters"
+
+I wrote an initial function, but it is not giving the response i expect. I have
+a state for my config that I can verify through the envoy admin panel. I send a
+delta discovery request and then do a =stream.Recv()= but get an EOF error,
+meaning there are no responses to give. THis makes me think that I am not
+sending the request correctly, but cannot see where the issue would be. It might
+be due to some ignorance on how delta is meant to be set up. My assumption was
+since the cluster service had a delta method, i'd be able to just start a stream
+with that endpoint. But is there some initial configuration for delta I have to
+set for the entire service to get it all to work?
