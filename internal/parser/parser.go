@@ -109,6 +109,15 @@ func NewDiscoveryResponse() DiscoveryResponse {
 	return dr
 }
 
+func ParseClusters(yml string) ([]string, error) {
+	clusters := []string{}
+	err := yaml.Unmarshal([]byte(yml), &clusters)
+	if err != nil {
+		return nil, err
+	}
+	return clusters, nil
+}
+
 func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
 	request := NewDiscoveryRequest()
 	err := yaml.Unmarshal([]byte(yml), &request)
