@@ -236,7 +236,7 @@ func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocS
 	return nil
 }
 
-func (r *Runner) anEstablishedSubscriptionFromSendADiscoveryRequestMatchingYaml(dryaml *godog.DocString) error {
+func (r *Runner) establishASubscriptionThatIsACKdWithADiscoveryRequestMatchingYaml(dryaml *godog.DocString) error {
 	drdata, err := parser.ParseDiscoveryRequest(dryaml.Content)
 	if err != nil {
 		err = fmt.Errorf("error parsing discovery request: %v\n", err)
@@ -280,5 +280,5 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the client receives a discovery response matching yaml:$`, runner.theClientReceivesADiscoveryResponseMatchingYaml)
 	ctx.Step(`^a CDS stream was initiated with a discovery request matching yaml:$`, runner.aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml)
 	ctx.Step(`^the stream was ACKed with a discovery request matching yaml:$`, runner.theStreamWasACKedWithADiscoveryRequestMatchingYaml)
-	ctx.Step(`^an established subscription from send a discovery request matching yaml:$`, runner.anEstablishedSubscriptionFromSendADiscoveryRequestMatchingYaml)
+	ctx.Step(`^establish a subscription that is ACK'd with a discovery request matching yaml:$`, runner.establishASubscriptionThatIsACKdWithADiscoveryRequestMatchingYaml)
 }

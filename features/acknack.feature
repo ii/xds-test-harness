@@ -140,7 +140,7 @@ Feature: Conformance ACK
         connect_timeout:
           seconds: 5
     ```
-    And an established subscription from send a discovery request matching yaml:
+    And establish a subscription that is ACK'd with a discovery request matching yaml:
     ```
     version_info:
     node: { id: test-id }
