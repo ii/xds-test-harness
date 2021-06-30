@@ -147,7 +147,14 @@ func (r *Runner) iSendADiscoveryRequestMatchingYaml(dryaml *godog.DocString) err
 		ResponseNonce: drdata.ResponseNonce,
 	}
 	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
-	dres, err := c.FetchClusters(context.Background(), dreq)
+	stream, err := c.StreamClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting CDS stream: %v\n", err)
+		return err
+	}
+	r.CDS.Stream = stream
+	r.CDS.Stream.Send(dreq)
+	dres, err := r.CDS.Stream.Recv()
 	if err != nil {
 		log.Printf("err fetching clusters: %v", err.Error())
 		return err
@@ -252,17 +259,25 @@ func (r *Runner) establishASubscriptionThatIsACKdWithADiscoveryRequestMatchingYa
 		ResponseNonce: drdata.ResponseNonce,
 	}
 	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
-	dres, err := c.FetchClusters(context.Background(), dreq)
+	stream, err := c.StreamClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting CDS stream: %v\n", err)
+		return err
+	}
+	r.CDS.Stream = stream
+	r.CDS.Stream.Send(dreq)
+	dres, err := stream.Recv()
 	if err != nil {
 		log.Printf("err fetching clusters: %v", err.Error())
 		return err
 	}
 	r.DiscoveryResponse = dres
 
-	expected := r.TargetSetupInitialSnapshot
+	expectedClusters := r.TargetSetupInitialSnapshot.Resources.Clusters
 	actual, _ := parser.ParseDiscoveryResponse(r.DiscoveryResponse)
-	if !reflect.DeepEqual(expected.Resources.Clusters, *&actual.Resources) {
-		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expected, *actual)
+	actualClusters := *&actual.Resources
+	if !reflect.DeepEqual(expectedClusters, actualClusters) {
+		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expectedClusters, actualClusters)
 	}
 	return nil
 }
