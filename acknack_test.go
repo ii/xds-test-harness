@@ -35,10 +35,11 @@ type ClientConfig struct {
 }
 
 type Runner struct {
-	Adapter           *ClientConfig
-	Target            *ClientConfig
-	DiscoveryResponse *envoy_service_discovery_v3.DiscoveryResponse
-	CDS               struct {
+	Adapter                    *ClientConfig
+	Target                     *ClientConfig
+	TargetSetupInitialSnapshot *parser.Snapshot
+	DiscoveryResponse          *envoy_service_discovery_v3.DiscoveryResponse
+	CDS                        struct {
 		Stream    cluster_service.ClusterDiscoveryService_StreamClustersClient
 		Responses *envoy_service_discovery_v3.DiscoveryResponse
 	}
@@ -74,6 +75,11 @@ func (r *Runner) aTargetSetupWithSnapshotMatchingYaml(snapYaml *godog.DocString)
 		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
 		return err
 	}
+	targetSetupInitialSnapshot, err := parser.YamlToTestHarnessSnapshot(snapYaml.Content)
+	if err != nil {
+		return err
+	}
+	r.TargetSetupInitialSnapshot = targetSetupInitialSnapshot
 	return nil
 }
 
@@ -140,7 +146,14 @@ func (r *Runner) iSendADiscoveryRequestMatchingYaml(dryaml *godog.DocString) err
 		ResponseNonce: drdata.ResponseNonce,
 	}
 	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
-	dres, err := c.FetchClusters(context.Background(), dreq)
+	stream, err := c.StreamClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting CDS stream: %v\n", err)
+		return err
+	}
+	r.CDS.Stream = stream
+	r.CDS.Stream.Send(dreq)
+	dres, err := r.CDS.Stream.Recv()
 	if err != nil {
 		log.Printf("err fetching clusters: %v", err.Error())
 		return err
@@ -227,6 +240,45 @@ func (r *Runner) theClientReceivesADiscoveryResponseMatchingYaml(yml *godog.DocS
 	return nil
 }
 
+func (r *Runner) establishASubscriptionThatIsACKdWithADiscoveryRequestMatchingYaml(dryaml *godog.DocString) error {
+	drdata, err := parser.ParseDiscoveryRequest(dryaml.Content)
+	if err != nil {
+		err = fmt.Errorf("error parsing discovery request: %v\n", err)
+		return err
+	}
+	dreq := &envoy_service_discovery_v3.DiscoveryRequest{
+		VersionInfo: drdata.VersionInfo,
+		Node: &envoy_config_core_v3.Node{
+			Id: drdata.Node.ID,
+		},
+		ResourceNames: drdata.ResourceNames,
+		TypeUrl:       drdata.TypeURL,
+		ResponseNonce: drdata.ResponseNonce,
+	}
+	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
+	stream, err := c.StreamClusters(context.Background())
+	if err != nil {
+		err = fmt.Errorf("Error starting CDS stream: %v\n", err)
+		return err
+	}
+	r.CDS.Stream = stream
+	r.CDS.Stream.Send(dreq)
+	dres, err := stream.Recv()
+	if err != nil {
+		log.Printf("err fetching clusters: %v", err.Error())
+		return err
+	}
+	r.DiscoveryResponse = dres
+
+	expectedClusters := r.TargetSetupInitialSnapshot.Resources.Clusters
+	actual, _ := parser.ParseDiscoveryResponse(r.DiscoveryResponse)
+	actualClusters := *&actual.Resources
+	if !reflect.DeepEqual(expectedClusters, actualClusters) {
+		return fmt.Errorf("expected yaml does not match actual, %v vs. %v", expectedClusters, actualClusters)
+	}
+	return nil
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	runner := &Runner{}
 
@@ -240,4 +292,5 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the client receives a discovery response matching yaml:$`, runner.theClientReceivesADiscoveryResponseMatchingYaml)
 	ctx.Step(`^a CDS stream was initiated with a discovery request matching yaml:$`, runner.aCDSStreamWasInitiatedWithADiscoveryRequestMatchingYaml)
 	ctx.Step(`^the stream was ACKed with a discovery request matching yaml:$`, runner.theStreamWasACKedWithADiscoveryRequestMatchingYaml)
+	ctx.Step(`^establish a subscription that is ACK'd with a discovery request matching yaml:$`, runner.establishASubscriptionThatIsACKdWithADiscoveryRequestMatchingYaml)
 }

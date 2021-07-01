@@ -18,9 +18,14 @@ func ParseInitConfig(yml []byte) (*InitConfig, error) {
 	return &initConfig, err
 }
 
-func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
-	var s Snapshot
+func YamlToTestHarnessSnapshot(yml string) (*Snapshot, error) {
+	var s *Snapshot
 	err := yaml.Unmarshal([]byte(yml), &s)
+	return s, err
+}
+
+func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
+	s, err := YamlToTestHarnessSnapshot(yml)
 	if err != nil {
 		return nil, err
 	}

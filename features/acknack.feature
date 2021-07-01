@@ -121,3 +121,51 @@ Feature: Conformance ACK
           seconds: 5
     type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
     ```
+
+  Scenario:
+    Given a Target setup with snapshot matching yaml:
+    ```
+    ---
+    node: test-id
+    version: "1"
+    resources:
+      clusters:
+      - name: foo
+        connect_timeout:
+          seconds: 5
+      - name: bar
+        connect_timeout:
+          seconds: 5
+      - name: baz
+        connect_timeout:
+          seconds: 5
+    ```
+    And establish a subscription that is ACK'd with a discovery request matching yaml:
+    ```
+    version_info:
+    node: { id: test-id }
+    resource_names:
+      - foo
+      - bar
+      - baz
+    type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
+    response_nonce:
+    ```
+    When I send a discovery request matching yaml:
+    ```
+    version_info:
+    node: { id: test-id }
+    resource_names:
+      - foo
+    type_url: type.googleapis.com/envoy.config.cluster.v3.Cluster
+    response_nonce:
+    ```
+    Then I get a discovery response matching yaml:
+    ```
+    version_info: "1"
+    resources:
+      - name: foo
+        connect_timeout:
+          seconds: 5
+    type_url: "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+    ```
