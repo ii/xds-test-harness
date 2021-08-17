@@ -2,13 +2,15 @@ Feature: Fetching Resources
   For each guy i should be able to do stuff
 
   Scenario: A wildcard CDS request should return all cluster resources
-    Given a target setup with the following "resources":
+    Given a target setup with the following state:
     ```
-    clusters:
-    - name: A
-      version: 1
+    node: 'test-id'
+    version: 1
+    resources:
+      clusters:
+      - name: foo
     ```
-    When the Runner sends a CDS wildcard request
+    When the Runner sends its first CDS wildcard request to "test-id"
     Then the Runner receives the following "clusters":
     ```
     - name: A

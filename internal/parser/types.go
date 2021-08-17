@@ -55,19 +55,13 @@ type Snapshot struct {
 	Resources Resources `yaml:"resources"`
 }
 
-type InitConfig struct {
-	Adapter       string `yaml:"adapter"`
-	Target        string `yaml:"target"`
-	TargetAdapter string `yaml:"target_adapter"`
-}
-
-type TestDiscoveryRequest struct {
-	VersionInfo   string    `default:"" yaml:"version_info"`
-	ResourceNames []string  `yaml:"resource_names"`
-	TypeURL       string    `default:"" yaml:"type_url"`
-	ResponseNonce string    `default:"" yaml:"response_nonce"`
-	Node          EnvoyNode `yaml:"node"`
-}
+// type TestDiscoveryRequest struct {
+// 	VersionInfo   string    `default:"" yaml:"version_info"`
+// 	ResourceNames []string  `yaml:"resource_names"`
+// 	TypeURL       string    `default:"" yaml:"type_url"`
+// 	ResponseNonce string    `default:"" yaml:"response_nonce"`
+// 	Node          EnvoyNode `yaml:"node"`
+// }
 
 type DiscoveryResponse struct {
 	VersionInfo string    `default:"" yaml:"version_info"`
