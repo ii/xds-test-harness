@@ -11,6 +11,7 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/ii/xds-test-harness/internal/parser"
 	"google.golang.org/grpc"
+	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 )
 
 var (
@@ -26,21 +27,22 @@ type ClientConfig struct {
 	Conn *grpc.ClientConn
 }
 
-type Results struct {
+type Cache struct {
 	Response *discovery.DiscoveryResponse
+	Snapshot *pb.Snapshot
 }
 
 type Runner struct {
 	Adapter *ClientConfig
 	Target  *ClientConfig
-	Results *Results
+	Cache   *Cache
 }
 
 func NewRunner() *Runner {
 	return &Runner{
 		Adapter: &ClientConfig{},
 		Target:  &ClientConfig{},
-		Results: &Results{},
+		Cache: &Cache{},
 	}
 }
 

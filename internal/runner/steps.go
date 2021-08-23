@@ -12,13 +12,13 @@ import (
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 )
 
-
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
 	ctx.Step(`^the Runner receives the following clusters:$`, r.TheRunnerReceivesTheFollowingClusters)
 	ctx.Step(`^the Runner sends its first CDS wildcard request to "([^"]*)"$`, r.TheRunnerSendsItsFirstCDSWildcardRequestTo)
+	ctx.Step(`^cluster "([^"]*)" is updated to version "([^"]*)" after Runner subscribed to CDS$`, r.ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS)
+	ctx.Step(`^the Runner receives the following version and clusters:$`, r.TheRunnerReceivesTheFollowingVersionAndClusters)
 }
-
 
 func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error {
 	snapshot, err := parser.YamlToSnapshot(state.Content)
@@ -32,9 +32,9 @@ func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error
 		err = fmt.Errorf("Cannot Set Target with State: %v\n", err)
 		return err
 	}
+	r.Cache.Snapshot = snapshot
 	return err
 }
-
 
 func (r *Runner) TheRunnerSendsItsFirstCDSWildcardRequestTo(nodeID string) error {
 
@@ -50,12 +50,12 @@ func (r *Runner) TheRunnerSendsItsFirstCDSWildcardRequestTo(nodeID string) error
 
 	for {
 		select {
-		case res := <- responses:
+		case res := <-responses:
 			ackRequest, _ := NewCDSAckRequestFromResponse(nodeID, res)
 			requests <- ackRequest
-			r.Results.Response = res
+			r.Cache.Response = res
 			close(requests)
-		case err:= <-errors:
+		case err := <-errors:
 			err = fmt.Errorf("Error while receiving responses from CDS: %v", err)
 			close(requests)
 			return err
@@ -77,7 +77,7 @@ func (r *Runner) TheRunnerReceivesTheFollowingClusters(resources *godog.DocStrin
 		expectedClusters = append(expectedClusters, cluster.GetName())
 	}
 
-	response, err := parser.ParseDiscoveryResponse(r.Results.Response)
+	response, err := parser.ParseDiscoveryResponse(r.Cache.Response)
 	if err != nil {
 		fmt.Printf("Error parsing response: %v\n", err)
 	}
@@ -98,4 +98,52 @@ func (r *Runner) TheRunnerReceivesTheFollowingClusters(resources *godog.DocStrin
 		return err
 	}
 	return nil
+}
+
+func (r *Runner) ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS(cluster, version string) error {
+	requests := make(chan *discovery.DiscoveryRequest, 1)
+	responses := make(chan *discovery.DiscoveryResponse, 1)
+	errors := make(chan error, 1)
+	done := make(chan bool, 1)
+
+	go r.CDSAckAck(requests, responses, errors, done)
+
+	request := NewWildcardCDSRequest("test-id")
+	requests <- request
+
+	adapter := pb.NewAdapterClient(r.Adapter.Conn)
+
+	for {
+		select {
+		case res := <-responses:
+			fmt.Println("RESPONSE!", res)
+			ackRequest, _ := NewCDSAckRequestFromResponse("test-id", res)
+			requests <- ackRequest
+			r.Cache.Response = res
+			if res.VersionInfo == "1" {
+				fmt.Println("hi")
+				newState := *r.Cache.Snapshot
+				newState.Version = "2"
+				for _, cluster := range newState.Clusters.Items {
+					cluster.ConnectTimeout = map[string]int32{"seconds": 10}
+				}
+				_, err := adapter.SetState(context.Background(), &newState)
+				if err != nil {
+					fmt.Println("ERROR SETTING NEW STATE!")
+				}
+					// close(requests)
+			}
+		case err := <-errors:
+			err = fmt.Errorf("Error while receiving responses from CDS: %v", err)
+			close(requests)
+			return err
+		case <-done:
+			return godog.ErrPending
+		default:
+		}
+	}
+}
+
+func (r *Runner) TheRunnerReceivesTheFollowingVersionAndClusters(yaml *godog.DocString) error {
+	return godog.ErrPending
 }
