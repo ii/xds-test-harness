@@ -8,11 +8,13 @@ Feature: Fetching Resources
     version: 1
     resources:
       clusters:
-      - name: foo
+      - name: A
     ```
     When the Runner sends its first CDS wildcard request to "test-id"
-    Then the Runner receives the following "clusters":
+    Then the Runner receives the following clusters:
     ```
-    - name: A
-      version: 1
+    version: 1
+    resources:
+      clusters:
+      - name: A
     ```
