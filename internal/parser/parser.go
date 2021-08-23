@@ -1,10 +1,10 @@
 package parser
 
 import (
-	// "fmt"
-	// cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	// envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	// "github.com/golang/protobuf/ptypes"
+	"fmt"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/golang/protobuf/ptypes"
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 	"gopkg.in/yaml.v2"
 )
@@ -86,26 +86,26 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 	return snapshot, nil
 }
 
-// func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*DiscoveryResponse, error) {
-// 	response := DiscoveryResponse{
-// 		VersionInfo: dr.VersionInfo,
-// 		TypeURL:     dr.TypeUrl,
-// 	}
-// 	for i, _ := range dr.GetResources() {
-// 		var cpb cluster.Cluster
-// 		err := ptypes.UnmarshalAny(dr.GetResources()[i], &cpb)
-// 		if err != nil {
-// 			fmt.Printf("anypb error: %v\n", err)
-// 		}
-// 		// TODO: why is this necessary?
-// 		cc := Cluster{
-// 			Name: cpb.Name,
-// 			ConnectTimeout: ConnectTimeout{
-// 				Seconds: cpb.ConnectTimeout.Seconds,
-// 			},
-// 		}
+func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*DiscoveryResponse, error) {
+	response := DiscoveryResponse{
+		VersionInfo: dr.VersionInfo,
+		TypeURL:     dr.TypeUrl,
+	}
+	for i := range dr.GetResources() {
+		var cpb cluster.Cluster
+		err := ptypes.UnmarshalAny(dr.GetResources()[i], &cpb)
+		if err != nil {
+			fmt.Printf("anypb error: %v\n", err)
+		}
+		// TODO: why is this necessary?
+		cc := Cluster{
+			Name: cpb.Name,
+			ConnectTimeout: ConnectTimeout{
+				Seconds: cpb.ConnectTimeout.Seconds,
+			},
+		}
 
-// 		response.Resources = append(response.Resources, cc)
-// 	}
-// 	return &response, nil
-// }
+		response.Resources = append(response.Resources, cc)
+	}
+	return &response, nil
+}
