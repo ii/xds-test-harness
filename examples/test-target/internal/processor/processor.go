@@ -8,9 +8,8 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/sirupsen/logrus"
-
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/xdscache"
+	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/ii/xds-test-harness/examples/test-target/internal/xdscache"
 )
 
 type Processor struct {

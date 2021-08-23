@@ -7,7 +7,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/golang/protobuf/ptypes"
 
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 )
 
 type XDSCache struct {

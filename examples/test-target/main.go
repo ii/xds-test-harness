@@ -7,10 +7,9 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	serverv3 "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	logrus "github.com/sirupsen/logrus"
-
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/adapter"
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/processor"
-	"github.com/zachmandeville/tester-prototype/examples/test-target/internal/server"
+	"github.com/ii/xds-test-harness/examples/test-target/internal/adapter"
+	"github.com/ii/xds-test-harness/examples/test-target/internal/processor"
+	"github.com/ii/xds-test-harness/examples/test-target/internal/server"
 )
 
 var (
