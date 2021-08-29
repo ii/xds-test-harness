@@ -67,4 +67,5 @@ type DiscoveryResponse struct {
 	VersionInfo string    `default:"" yaml:"version_info"`
 	TypeURL     string    `yaml:"type_url"`
 	Resources   []Cluster `yaml:"resources"` //hack for now, should be any type of resource
+	Nonce       string    `default:"" yaml:"nonce"`
 }

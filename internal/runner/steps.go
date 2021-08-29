@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -14,14 +15,13 @@ import (
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
-	ctx.Step(`^the Runner receives the following clusters:$`, r.TheRunnerReceivesTheFollowingClusters)
-	ctx.Step(`^the Runner sends its first CDS wildcard request to "([^"]*)"$`, r.TheRunnerSendsItsFirstCDSWildcardRequestTo)
+	ctx.Step(`^the Client sends an initial CDS wildcard request$`, r.ClientSendsAnInitialCDSWildcardRequest)
+	ctx.Step(`^the Client receives the following version and clusters:$`, r.ClientReceivesTheFollowingVersionAndClusters)
 	ctx.Step(`^cluster "([^"]*)" is updated to version "([^"]*)" after Runner subscribed to CDS$`, r.ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS)
-	ctx.Step(`^the Runner receives the following version and clusters:$`, r.TheRunnerReceivesTheFollowingVersionAndClusters)
 }
 
 func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error {
-	snapshot, err := parser.YamlToSnapshot(state.Content)
+	snapshot, err := parser.YamlToSnapshot(r.NodeID, state.Content)
 	if err != nil {
 		err = errors.New("Could not parse given state to adapter snapshot")
 		return err
@@ -36,8 +36,7 @@ func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error
 	return err
 }
 
-func (r *Runner) TheRunnerSendsItsFirstCDSWildcardRequestTo(nodeID string) error {
-
+func (r *Runner) ClientSendsAnInitialCDSWildcardRequest() error {
 	requests := make(chan *discovery.DiscoveryRequest, 1)
 	responses := make(chan *discovery.DiscoveryResponse, 1)
 	errors := make(chan error, 1)
@@ -45,13 +44,13 @@ func (r *Runner) TheRunnerSendsItsFirstCDSWildcardRequestTo(nodeID string) error
 
 	go r.CDSAckAck(requests, responses, errors, done)
 
-	request := NewWildcardCDSRequest(nodeID)
+	request := NewWildcardCDSRequest(r.NodeID)
 	requests <- request
 
 	for {
 		select {
 		case res := <-responses:
-			ackRequest, _ := NewCDSAckRequestFromResponse(nodeID, res)
+			ackRequest, _ := NewCDSAckRequestFromResponse(r.NodeID, res)
 			requests <- ackRequest
 			r.Cache.Response = res
 			close(requests)
@@ -65,8 +64,9 @@ func (r *Runner) TheRunnerSendsItsFirstCDSWildcardRequestTo(nodeID string) error
 	}
 }
 
-func (r *Runner) TheRunnerReceivesTheFollowingClusters(resources *godog.DocString) error {
-	expected, err := parser.YamlToSnapshot(resources.Content)
+
+func (r *Runner) ClientReceivesTheFollowingVersionAndClusters(resources *godog.DocString) error {
+	expected, err := parser.YamlToSnapshot(r.NodeID, resources.Content)
 	if err != nil {
 		fmt.Printf("error parsing snapshot: %v", err)
 	}
@@ -116,12 +116,10 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS(cluster, ve
 	for {
 		select {
 		case res := <-responses:
-			fmt.Println("RESPONSE!", res)
 			ackRequest, _ := NewCDSAckRequestFromResponse("test-id", res)
 			requests <- ackRequest
 			r.Cache.Response = res
 			if res.VersionInfo == "1" {
-				fmt.Println("hi")
 				newState := *r.Cache.Snapshot
 				newState.Version = "2"
 				for _, cluster := range newState.Clusters.Items {
@@ -131,19 +129,16 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS(cluster, ve
 				if err != nil {
 					fmt.Println("ERROR SETTING NEW STATE!")
 				}
-					// close(requests)
+				time.Sleep(10*time.Second)
+				close(requests)
 			}
 		case err := <-errors:
 			err = fmt.Errorf("Error while receiving responses from CDS: %v", err)
-			close(requests)
+			// close(requests)
 			return err
 		case <-done:
-			return godog.ErrPending
+			return nil
 		default:
 		}
 	}
-}
-
-func (r *Runner) TheRunnerReceivesTheFollowingVersionAndClusters(yaml *godog.DocString) error {
-	return godog.ErrPending
 }

@@ -15,14 +15,14 @@ func YamlToDesiredState(yml string) (*Snapshot, error) {
 	return s, err
 }
 
-func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
+func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 	s, err := YamlToDesiredState(yml)
 	if err != nil {
 		return nil, err
 	}
 
 	snapshot := &pb.Snapshot{
-		Node:    s.Node,
+		Node:    nodeID,
 		Version: s.Version,
 	}
 	if s.Resources.Endpoints != nil {
@@ -88,8 +88,10 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 
 func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*DiscoveryResponse, error) {
 	response := DiscoveryResponse{
-		VersionInfo: dr.VersionInfo,
-		TypeURL:     dr.TypeUrl,
+		VersionInfo: dr.GetVersionInfo(),
+		TypeURL:     dr.GetTypeUrl(),
+		Resources:   []Cluster{},
+		Nonce:       dr.GetNonce(),
 	}
 	for i := range dr.GetResources() {
 		var cpb cluster.Cluster

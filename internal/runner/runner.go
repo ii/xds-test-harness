@@ -35,6 +35,7 @@ type Cache struct {
 type Runner struct {
 	Adapter *ClientConfig
 	Target  *ClientConfig
+	NodeID  string
 	Cache   *Cache
 }
 
@@ -43,6 +44,7 @@ func NewRunner() *Runner {
 		Adapter: &ClientConfig{},
 		Target:  &ClientConfig{},
 		Cache: &Cache{},
+		NodeID: "",
 	}
 }
 
@@ -67,7 +69,6 @@ func NewCDSAckRequestFromResponse(node string, res *discovery.DiscoveryResponse)
 	for _, cluster := range response.Resources {
 		clusters = append(clusters, cluster.Name)
 	}
-
 	request := &discovery.DiscoveryRequest{
 		VersionInfo: response.VersionInfo,
 		Node: &envoy_config_core_v3.Node{
@@ -75,6 +76,7 @@ func NewCDSAckRequestFromResponse(node string, res *discovery.DiscoveryResponse)
 		},
 		ResourceNames: clusters,
 		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+		ResponseNonce: response.Nonce,
 	}
 	return request, nil
 }
@@ -137,11 +139,12 @@ func (r *Runner) CDSAckAck(dreq <-chan *discovery.DiscoveryRequest, dres chan<- 
 				close(errors)
 				return
 			}
+			fmt.Printf("Got response:\n %v\n", in)
 			dres <- in
 		}
 	}()
 	for req := range dreq {
-		// fmt.Printf("sending request\n%v\n", req)
+		fmt.Printf("Sending request\n%v\n", req)
 		if err := stream.Send(req); err != nil {
 			fmt.Println("ERRORSENDING!!!", err)
 		}
