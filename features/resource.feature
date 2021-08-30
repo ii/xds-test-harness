@@ -1,6 +1,6 @@
 Feature: Fetching Resources
-  Client can subscribe and unsubcribe from resources, given a properly
-  structured request, and updates to their subscription as they happen.
+  Client can subscribe and unsubcribe from resources, and receive updates when
+  any subscribed resources change.
 
   Scenario: A wildcard CDS request should return all cluster resources
     Given a target setup with the following state:
