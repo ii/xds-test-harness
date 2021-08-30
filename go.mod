@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/cucumber/godog v0.11.0
-	github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0
+	github.com/envoyproxy/go-control-plane v0.9.9
 	github.com/golang/protobuf v1.5.0
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/pflag v1.0.5
