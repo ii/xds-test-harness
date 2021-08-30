@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
+	"reflect"
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -17,7 +17,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
 	ctx.Step(`^the Client sends an initial CDS wildcard request$`, r.ClientSendsAnInitialCDSWildcardRequest)
 	ctx.Step(`^the Client receives the following version and clusters:$`, r.ClientReceivesTheFollowingVersionAndClusters)
-	ctx.Step(`^cluster "([^"]*)" is updated to version "([^"]*)" after Runner subscribed to CDS$`, r.ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS)
+	ctx.Step(`^cluster "([^"]*)" is updated to version "([^"]*)" after Client subscribed to CDS$`, r.ClusterIsUpdatedToVersionAfterClientSubscribedToCDS)
 }
 
 func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error {
@@ -100,7 +100,7 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClusters(resources *godog.D
 	return nil
 }
 
-func (r *Runner) ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS(cluster, version string) error {
+func (r *Runner) ClusterIsUpdatedToVersionAfterClientSubscribedToCDS(cluster string, version string) error {
 	requests := make(chan *discovery.DiscoveryRequest, 1)
 	responses := make(chan *discovery.DiscoveryResponse, 1)
 	errors := make(chan error, 1)
@@ -129,12 +129,14 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterRunnerSubscribedToCDS(cluster, ve
 				if err != nil {
 					fmt.Println("ERROR SETTING NEW STATE!")
 				}
-				time.Sleep(10*time.Second)
+			}
+			if res.VersionInfo == "2" {
+				time.Sleep(2 * time.Second)
 				close(requests)
 			}
 		case err := <-errors:
 			err = fmt.Errorf("Error while receiving responses from CDS: %v", err)
-			// close(requests)
+			close(requests)
 			return err
 		case <-done:
 			return nil
