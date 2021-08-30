@@ -119,7 +119,7 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterClientSubscribedToCDS(cluster str
 			ackRequest, _ := NewCDSAckRequestFromResponse("test-id", res)
 			requests <- ackRequest
 			r.Cache.Response = res
-			if res.VersionInfo == "1" {
+			if res.VersionInfo != version {
 				newState := *r.Cache.Snapshot
 				newState.Version = "2"
 				for _, cluster := range newState.Clusters.Items {
@@ -130,7 +130,7 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterClientSubscribedToCDS(cluster str
 					fmt.Println("ERROR SETTING NEW STATE!")
 				}
 			}
-			if res.VersionInfo == "2" {
+			if res.VersionInfo == version {
 				time.Sleep(2 * time.Second)
 				close(requests)
 			}
