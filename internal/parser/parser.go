@@ -9,29 +9,20 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func ParseInitConfig(yml []byte) (*InitConfig, error) {
-	var initConfig InitConfig
-	err := yaml.Unmarshal(yml, &initConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &initConfig, err
-}
-
-func YamlToTestHarnessSnapshot(yml string) (*Snapshot, error) {
+func YamlToDesiredState(yml string) (*Snapshot, error) {
 	var s *Snapshot
 	err := yaml.Unmarshal([]byte(yml), &s)
 	return s, err
 }
 
-func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
-	s, err := YamlToTestHarnessSnapshot(yml)
+func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
+	s, err := YamlToDesiredState(yml)
 	if err != nil {
 		return nil, err
 	}
 
 	snapshot := &pb.Snapshot{
-		Node:    s.Node,
+		Node:    nodeID,
 		Version: s.Version,
 	}
 	if s.Resources.Endpoints != nil {
@@ -47,7 +38,7 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 		for _, c := range s.Resources.Clusters {
 			clusters.Items = append(clusters.Items, &pb.Clusters_Cluster{
 				Name:           c.Name,
-				ConnectTimeout: map[string]int32{"seconds": int32(c.ConnectTimeout.Seconds)},
+				ConnectTimeout: map[string]int32{"seconds": 5},
 			})
 		}
 		snapshot.Clusters = clusters
@@ -95,40 +86,14 @@ func YamlToSnapshot(yml string) (*pb.Snapshot, error) {
 	return snapshot, nil
 }
 
-func NewDiscoveryRequest() TestDiscoveryRequest {
-	dr := TestDiscoveryRequest{}
-	dr.VersionInfo = ""
-	dr.ResponseNonce = ""
-	dr.TypeURL = ""
-	dr.VersionInfo = ""
-	dr.Node.ID = ""
-	return dr
-}
-
-func NewDiscoveryResponse() DiscoveryResponse {
-	dr := DiscoveryResponse{
-		VersionInfo: "",
-		TypeURL:     "",
-		Resources:   []Cluster{},
-	}
-	return dr
-}
-
-func ParseDiscoveryRequest(yml string) (*TestDiscoveryRequest, error) {
-	request := NewDiscoveryRequest()
-	err := yaml.Unmarshal([]byte(yml), &request)
-	if err != nil {
-		return nil, err
-	}
-	return &request, nil
-}
-
 func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*DiscoveryResponse, error) {
 	response := DiscoveryResponse{
-		VersionInfo: dr.VersionInfo,
-		TypeURL:     dr.TypeUrl,
+		VersionInfo: dr.GetVersionInfo(),
+		TypeURL:     dr.GetTypeUrl(),
+		Resources:   []Cluster{},
+		Nonce:       dr.GetNonce(),
 	}
-	for i, _ := range dr.GetResources() {
+	for i := range dr.GetResources() {
 		var cpb cluster.Cluster
 		err := ptypes.UnmarshalAny(dr.GetResources()[i], &cpb)
 		if err != nil {
