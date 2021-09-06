@@ -9,11 +9,23 @@ import (
 	"os"
 )
 
-var godogOpts = godog.Options{Output: colors.Colored(os.Stdout)}
+var godogOpts = godog.Options{
+	ShowStepDefinitions: false,
+	Randomize:           0,
+	StopOnFailure:       false,
+	Strict:              false,
+	NoColors:            false,
+	// Tags:                "@ADS,@BDS",
+	Format:              "",
+	Concurrency:         0,
+	Paths:               []string{},
+	Output:              colors.Colored(os.Stdout),
+}
 var r *runner.Runner
 var adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 var targetAddress = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 var nodeID = pflag.StringP("nodeID", "N", "test-id", "node id of target")
+var ADS = pflag.StringP("ADS", "X", "on", "Whether to include ADS tests, or only run ADS tests. Can be: on, off, or only.")
 
 func init() {
 	godog.BindCommandLineFlags("godog.", &godogOpts)
@@ -42,6 +54,12 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 func main() {
 	pflag.Parse()
 	godogOpts.Paths = pflag.Args()
+	if *ADS == "off" {
+		godogOpts.Tags = "~@ADS"
+	}
+	if *ADS == "only" {
+		godogOpts.Tags = "@ADS"
+	}
 
 	status := godog.TestSuite{
 		Name:                 "xDS Test Suite",
