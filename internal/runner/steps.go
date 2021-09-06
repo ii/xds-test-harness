@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
-	"reflect"
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -13,11 +13,29 @@ import (
 	pb "github.com/zachmandeville/tester-prototype/api/adapter"
 )
 
+func sortCompare (a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sort.Strings(a)
+	sort.Strings(b)
+
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
+	ctx.Step(`^the Client subscribes to wildcard CDS$`, r.ClientSubscribesToWildcardCDS)
 	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
-	ctx.Step(`^the Client sends an initial CDS wildcard request$`, r.ClientSendsAnInitialCDSWildcardRequest)
-	ctx.Step(`^the Client receives the following version and clusters:$`, r.ClientReceivesTheFollowingVersionAndClusters)
+	ctx.Step(`^the Client receives the following version and clusters, along with a nonce:$`, r.ClientReceivesTheFollowingVersionAndClustersAlongWithNonce)
 	ctx.Step(`^cluster "([^"]*)" is updated to version "([^"]*)" after Client subscribed to CDS$`, r.ClusterIsUpdatedToVersionAfterClientSubscribedToCDS)
+	ctx.Step(`^the Client sends an ACK with the right version and nonce\.$`, r.ClientSendsAnACKWithTheRightVersionAndNonce)
 }
 
 func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error {
@@ -36,7 +54,7 @@ func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error
 	return err
 }
 
-func (r *Runner) ClientSendsAnInitialCDSWildcardRequest() error {
+func (r *Runner) ClientSubscribesToWildcardCDS() error {
 	requests := make(chan *discovery.DiscoveryRequest, 1)
 	responses := make(chan *discovery.DiscoveryResponse, 1)
 	errors := make(chan error, 1)
@@ -46,12 +64,9 @@ func (r *Runner) ClientSendsAnInitialCDSWildcardRequest() error {
 
 	request := NewWildcardCDSRequest(r.NodeID)
 	requests <- request
-
 	for {
 		select {
 		case res := <-responses:
-			ackRequest, _ := NewCDSAckRequestFromResponse(r.NodeID, res)
-			requests <- ackRequest
 			r.Cache.Response = res
 			close(requests)
 		case err := <-errors:
@@ -65,7 +80,7 @@ func (r *Runner) ClientSendsAnInitialCDSWildcardRequest() error {
 }
 
 
-func (r *Runner) ClientReceivesTheFollowingVersionAndClusters(resources *godog.DocString) error {
+func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(resources *godog.DocString) error {
 	expected, err := parser.YamlToSnapshot(r.NodeID, resources.Content)
 	if err != nil {
 		fmt.Printf("error parsing snapshot: %v", err)
@@ -92,7 +107,7 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClusters(resources *godog.D
 		actualClusters = append(actualClusters, cluster.Name)
 	}
 
-	clustersMatch := reflect.DeepEqual(expectedClusters, actualClusters)
+	clustersMatch := sortCompare(expectedClusters, actualClusters)
 	if !clustersMatch {
 		err := fmt.Errorf("Clusters don't match.\nexpected:%v\nactual:%v\n", expectedClusters, actualClusters)
 		return err
@@ -143,4 +158,20 @@ func (r *Runner) ClusterIsUpdatedToVersionAfterClientSubscribedToCDS(cluster str
 		default:
 		}
 	}
+}
+
+func (r *Runner) ClientSendsAnACKWithTheRightVersionAndNonce() error {
+	response, err := parser.ParseDiscoveryResponse(r.Cache.Response)
+	if err != nil {
+		err = fmt.Errorf("Error parsing discovery response for final ack: %v", err)
+	}
+	request := &discovery.DiscoveryRequest{
+		VersionInfo: response.VersionInfo,
+		ResourceNames: []string{},
+		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+		ResponseNonce: response.Nonce,
+	}
+	r.CDSCache.Stream.Send(request)
+	r.CDSCache.Stream.CloseSend()
+	return nil
 }

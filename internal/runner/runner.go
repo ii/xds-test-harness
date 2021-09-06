@@ -32,11 +32,18 @@ type Cache struct {
 	Snapshot *pb.Snapshot
 }
 
+type CDSCache struct {
+	Responses []*discovery.DiscoveryResponse
+	Stream cluster_service.ClusterDiscoveryService_StreamClustersClient
+}
+
+
 type Runner struct {
 	Adapter *ClientConfig
 	Target  *ClientConfig
 	NodeID  string
 	Cache   *Cache
+	CDSCache *CDSCache
 }
 
 func NewRunner() *Runner {
@@ -45,6 +52,7 @@ func NewRunner() *Runner {
 		Target:  &ClientConfig{},
 		Cache: &Cache{},
 		NodeID: "",
+		CDSCache: &CDSCache{},
 	}
 }
 
@@ -62,7 +70,7 @@ func NewWildcardCDSRequest (nodeID string) *discovery.DiscoveryRequest {
 func NewCDSAckRequestFromResponse(node string, res *discovery.DiscoveryResponse) (*discovery.DiscoveryRequest, error) {
 	response, err:= parser.ParseDiscoveryResponse(res)
 	if err != nil {
-		err := fmt.Errorf("error parsing dres for acking", err)
+		err := fmt.Errorf("error parsing dres for acking: %v", err)
 		return nil, err
 	}
 	clusters := []string{}
@@ -118,13 +126,14 @@ func (r *Runner) ConnectToAdapter(address string) error {
 func (r *Runner) CDSAckAck(dreq <-chan *discovery.DiscoveryRequest, dres chan<- *discovery.DiscoveryResponse, errors chan<- error, done chan<- bool) {
 	c := cluster_service.NewClusterDiscoveryServiceClient(r.Target.Conn)
 	stream, err := c.StreamClusters(context.Background())
+	r.CDSCache.Stream = stream
 	if err != nil {
 		errors <- err
 		return
 	}
 	go func() {
 		for {
-			in, err := stream.Recv()
+			in, err := r.CDSCache.Stream.Recv()
 			if err == io.EOF {
 				done <- true
 				close(dres)
@@ -133,21 +142,19 @@ func (r *Runner) CDSAckAck(dreq <-chan *discovery.DiscoveryRequest, dres chan<- 
 				return
 			}
 			if err != nil {
-				fmt.Printf("Error receiving from stream: %v\n", err)
+				err = fmt.Errorf("Error receiving from stream: %v\n", err)
 				errors <- err
 				close(dres)
 				close(errors)
 				return
 			}
-			fmt.Printf("Got response:\n %v\n", in)
 			dres <- in
 		}
 	}()
 	for req := range dreq {
-		fmt.Printf("Sending request\n%v\n", req)
 		if err := stream.Send(req); err != nil {
-			fmt.Println("ERRORSENDING!!!", err)
+			err = fmt.Errorf("Error sending discovery request: %v", err)
 		}
 	}
-	stream.CloseSend()
+	done <- true
 }
