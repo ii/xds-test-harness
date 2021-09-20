@@ -39,10 +39,10 @@ func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (resp
 	clusters := make(map[string]*cluster.Cluster)
 
 	// Parse Clusters
-	for _, c := range state.Clusters.Items {
-		seconds := time.Duration(c.ConnectTimeout["seconds"])
-		clusters[c.Name] = &cluster.Cluster{
-			Name: c.Name,
+	for _, clstr := range state.Clusters.Items {
+		seconds := time.Duration(clstr.ConnectTimeout["seconds"])
+		clusters[clstr.Name] = &cluster.Cluster{
+			Name: clstr.Name,
 			ConnectTimeout: ptypes.DurationProto(seconds * time.Second),
 		}
 	}
@@ -67,8 +67,19 @@ func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (resp
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
+	newSnapshot, err := c.GetSnapshot(state.Node)
+	fmt.Printf("new snapshot: \n%v\n\n", newSnapshot)
 	response = &pb.SetStateResponse{
 		Message: "Success",
+	}
+	return response, nil
+}
+
+func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
+	log.Printf("Clearing Cache")
+	c.ClearSnapshot(req.Node)
+	response := &pb.ClearResponse{
+		Response: "All Clear",
 	}
 	return response, nil
 }
