@@ -15,6 +15,12 @@ func YamlToDesiredState(yml string) (*Snapshot, error) {
 	return s, err
 }
 
+func ParseResourceList(resources string)  ([]string, error) {
+	var resourceList []string
+	err := yaml.Unmarshal([]byte(resources), &resourceList)
+	return resourceList, err
+}
+
 func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 	s, err := YamlToDesiredState(yml)
 	if err != nil {

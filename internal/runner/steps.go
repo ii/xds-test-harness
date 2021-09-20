@@ -98,13 +98,34 @@ func (r *Runner) ClientSubscribesToWildcardCDS() error {
 	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
 	r.CDS.Err = make(chan error, 1)
 	r.CDS.Done = make(chan bool, 1)
+	r.CDS.Cache.InitResource = []string{}
 
-	request := r.NewWildcardCDSRequest()
+	request := r.NewCDSRequest(r.CDS.Cache.InitResource)
 
 	go r.CDSStream()
 	go r.AckCDS(request)
 	return nil
 }
+
+func (r *Runner) TheClientSubscribesToTheFollowingResources(resources *godog.DocString) error {
+	resourceList, err := parser.ParseResourceList(resources.Content)
+	if err != nil {
+		log.Err(err).Msg("couldn't parse resource list")
+	}
+	r.CDS.Req = make(chan *discovery.DiscoveryRequest, 1)
+	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
+	r.CDS.Err = make(chan error, 1)
+	r.CDS.Done = make(chan bool, 1)
+	r.CDS.Cache.InitResource = resourceList
+
+	request := r.NewCDSRequest(r.CDS.Cache.InitResource)
+
+	go r.CDSStream()
+	go r.AckCDS(request)
+	return nil
+}
+
+
 
 func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(resources *godog.DocString) error {
 	expected, err := parser.YamlToSnapshot(r.NodeID, resources.Content)
@@ -160,6 +181,7 @@ func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
 	ctx.Step(`^the Client subscribes to wildcard CDS$`, r.ClientSubscribesToWildcardCDS)
+    ctx.Step(`^the Client subscribes to the following resources:$`, r.TheClientSubscribesToTheFollowingResources)
 	ctx.Step(`^the Client receives the following version and clusters, along with a nonce:$`, r.ClientReceivesTheFollowingVersionAndClustersAlongWithNonce)
 	ctx.Step(`^the Client sends an ACK to which the server does not respond$`, r.TheClientSendsAnACKToWhichTheServerDoesNotRespond)
     ctx.Step(`^the Target is updated to the following state:$`, r.TheTargetIsUpdatedToTheFollowingState)

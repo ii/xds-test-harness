@@ -45,6 +45,7 @@ type CDS struct {
 	Err   chan error
 	Done  chan bool
 	Cache struct {
+		InitResource []string
 		Requests  []*discovery.DiscoveryRequest
 		Responses []*discovery.DiscoveryResponse
 	}
@@ -78,20 +79,24 @@ func FreshRunner (current *Runner) *Runner {
 	}
 }
 
-func (r *Runner) NewWildcardCDSRequest() *discovery.DiscoveryRequest {
+func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
+	clusters := []string{}
+	for _, cluster := range resourceList {
+		clusters = append(clusters, cluster)
+	}
 	return &discovery.DiscoveryRequest{
 		VersionInfo: "",
 		Node: &core.Node{
 			Id: r.NodeID,
 		},
-		ResourceNames: []string{},
+		ResourceNames: clusters,
 		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
 	}
 }
 
 func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
 
-	log.Debug().Msg("Sending First Discovery Request")
+	log.Debug().Msgf("Sending First Discovery Request", initReq)
 	r.CDS.Req <- initReq
 	r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, initReq)
 
@@ -99,7 +104,7 @@ func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
 		select {
 		case res := <-r.CDS.Res:
 			r.CDS.Cache.Responses = append(r.CDS.Cache.Responses, res)
-			ack, err := NewCDSAckFromResponse(res)
+			ack, err := r.NewCDSAckFromResponse(res)
 			if err != nil {
 				log.Err(err).Msg("Error creating Ack Request")
 			}
@@ -115,7 +120,7 @@ func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
 	}
 }
 
-func NewCDSAckFromResponse(res *discovery.DiscoveryResponse) (*discovery.DiscoveryRequest, error) {
+func (r *Runner) NewCDSAckFromResponse(res *discovery.DiscoveryResponse) (*discovery.DiscoveryRequest, error) {
 	response, err := parser.ParseDiscoveryResponse(res)
 	if err != nil {
 		err := fmt.Errorf("error parsing dres for acking: %v", err)
@@ -125,6 +130,17 @@ func NewCDSAckFromResponse(res *discovery.DiscoveryResponse) (*discovery.Discove
 	for _, cluster := range response.Resources {
 		clusters = append(clusters, cluster.Name)
 	}
+	clusterMap := map[string]bool{}
+	for _, c := range clusters {
+		clusterMap[c] = true
+	}
+	for _, init := range r.CDS.Cache.InitResource {
+		if _, existing := clusterMap[init]; !existing {
+			clusterMap[init] = true
+			clusters = append(clusters, init)
+		}
+	}
+
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   response.VersionInfo,
 		ResourceNames: clusters,
