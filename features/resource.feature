@@ -34,7 +34,16 @@ Feature: Fetching Resources
       - name: E
       - name: F
     ```
-    And the Client subscribes to wildcard CDS
+    When the Client subscribes to wildcard CDS
+    Then the Client receives the following version and clusters, along with a nonce:
+    ```
+    version: 1
+    resources:
+      clusters:
+      - name: D
+      - name: E
+      - name: F
+    ```
     When the Target is updated to the following state:
     ```
     version: 2
