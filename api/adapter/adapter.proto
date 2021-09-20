@@ -62,6 +62,15 @@ message SetStateResponse {
   string message = 1;
 }
 
+message clearRequest {
+  string node = 1;
+}
+
+message clearResponse {
+  string response = 1;
+}
+
 service Adapter {
   rpc SetState(Snapshot) returns (SetStateResponse){}
+  rpc ClearState(clearRequest) returns (clearResponse) {}
 }

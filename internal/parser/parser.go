@@ -5,7 +5,7 @@ import (
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/golang/protobuf/ptypes"
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	"gopkg.in/yaml.v2"
 )
 
@@ -13,6 +13,12 @@ func YamlToDesiredState(yml string) (*Snapshot, error) {
 	var s *Snapshot
 	err := yaml.Unmarshal([]byte(yml), &s)
 	return s, err
+}
+
+func ParseResourceList(resources string)  ([]string, error) {
+	var resourceList []string
+	err := yaml.Unmarshal([]byte(resources), &resourceList)
+	return resourceList, err
 }
 
 func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
