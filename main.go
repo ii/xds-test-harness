@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/cucumber/godog"
@@ -70,6 +71,11 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
+	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+		r = runner.FreshRunner(r)
+		log.Debug().Msg("Fresh Runner!")
+		return ctx, nil
+	})
 	r.LoadSteps(ctx)
 }
 
