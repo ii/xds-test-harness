@@ -15,7 +15,7 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 
 	"github.com/ii/xds-test-harness/internal/parser"
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
 	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -103,7 +103,8 @@ func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
 			if err != nil {
 				log.Err(err).Msg("Error creating Ack Request")
 			}
-			log.Debug().Msgf("Got response, created ack: %v\n", ack)
+			log.Debug().
+				Msgf("Sending Ack: %v", ack)
 			r.CDS.Req <- ack
 	        r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, ack)
 		case <-r.CDS.Done:
@@ -185,7 +186,7 @@ func (r *Runner) CDSStream() error {
 			in, err := stream.Recv()
 			if err == io.EOF {
 				log.Debug().
-					Msg("No more discovery responses for CDS stream")
+					Msg("No more Discovery Responses from CDS stream")
 				close(r.CDS.Res)
 				return
 			}
@@ -200,14 +201,13 @@ func (r *Runner) CDSStream() error {
 	}()
 
 	for req := range r.CDS.Req {
-		log.Debug().
-			Msgf("Received req from channel: %v", req)
 		if err := stream.Send(req); err != nil {
-			log.Err(err)
+			log.Err(err).
+				Msg("Error sending discovery request")
 			r.CDS.Err <- err
 		}
 	}
 	stream.CloseSend()
 	wg.Wait()
-	return nil
+	return err
 }

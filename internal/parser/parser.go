@@ -5,7 +5,7 @@ import (
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/golang/protobuf/ptypes"
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	"gopkg.in/yaml.v2"
 )
 
