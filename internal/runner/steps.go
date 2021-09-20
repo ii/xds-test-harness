@@ -44,14 +44,32 @@ func clustersMatch(expected *pb.Snapshot, actual *parser.DiscoveryResponse) bool
 	return sortCompare(expectedClusters, actualClusters)
 }
 
-func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
-	ctx.Step(`^the Client subscribes to wildcard CDS$`, r.ClientSubscribesToWildcardCDS)
-	ctx.Step(`^the Client receives the following version and clusters, along with a nonce:$`, r.ClientReceivesTheFollowingVersionAndClustersAlongWithNonce)
-	ctx.Step(`^the Client sends an ACK to which the server does not respond$`, r.TheClientSendsAnACKToWhichTheServerDoesNotRespond)
-}
 
 func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error {
+	snapshot, err := parser.YamlToSnapshot(r.NodeID, state.Content)
+	if err != nil {
+		msg := "Could not parse given state to adapter snapshot"
+		log.Error().
+			Stack().
+			Err(err).
+			Msg(msg)
+		return errors.New(msg)
+	}
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	_, err = c.SetState(context.Background(), snapshot)
+	if err != nil {
+		msg := "Cannot set target with given state"
+		log.Error().
+			Stack().
+			Err(err).
+			Msg(msg)
+		return errors.New(msg)
+	}
+	r.Cache.StartState = snapshot
+	return err
+}
+
+func (r *Runner) TheTargetIsUpdatedToTheFollowingState(state *godog.DocString) error {
 	snapshot, err := parser.YamlToSnapshot(r.NodeID, state.Content)
 	if err != nil {
 		msg := "Could not parse given state to adapter snapshot"
@@ -127,6 +145,8 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
 	r.CDS.Done <- true
 	time.Sleep(3 * time.Second)
+	log.Debug().
+		Msgf("Request Count: %v\nResponse Count: %v\n", len(r.CDS.Cache.Requests), len(r.CDS.Cache.Responses))
 	if len(r.CDS.Cache.Requests) <= len(r.CDS.Cache.Responses) {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		log.Err(err).
@@ -134,4 +154,12 @@ func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
 		return err
 	}
 	return nil
+}
+
+func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
+	ctx.Step(`^a target setup with the following state:$`, r.ATargetSetupWithTheFollowingState)
+	ctx.Step(`^the Client subscribes to wildcard CDS$`, r.ClientSubscribesToWildcardCDS)
+	ctx.Step(`^the Client receives the following version and clusters, along with a nonce:$`, r.ClientReceivesTheFollowingVersionAndClustersAlongWithNonce)
+	ctx.Step(`^the Client sends an ACK to which the server does not respond$`, r.TheClientSendsAnACKToWhichTheServerDoesNotRespond)
+    ctx.Step(`^the Target is updated to the following state:$`, r.TheTargetIsUpdatedToTheFollowingState)
 }

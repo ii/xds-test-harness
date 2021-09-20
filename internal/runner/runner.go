@@ -68,6 +68,16 @@ func NewRunner() *Runner {
 	}
 }
 
+func FreshRunner (current *Runner) *Runner {
+	return &Runner{
+		Adapter: current.Adapter,
+		Target: current.Target,
+		NodeID: current.NodeID,
+		Cache: &Cache{},
+		CDS: &CDS{},
+	}
+}
+
 func (r *Runner) NewWildcardCDSRequest() *discovery.DiscoveryRequest {
 	return &discovery.DiscoveryRequest{
 		VersionInfo: "",
