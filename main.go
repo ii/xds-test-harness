@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	pb "github.com/ii/xds-test-harness/api/adapter"
+
 )
 
 var (
@@ -72,8 +74,22 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		r = runner.FreshRunner(r)
 		log.Debug().Msg("Fresh Runner!")
+		r = runner.FreshRunner(r)
+		return ctx, nil
+	})
+	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+		c := pb.NewAdapterClient(r.Adapter.Conn)
+		clearRequest := &pb.ClearRequest{
+			Node: r.NodeID,
+		}
+		clear, err := c.ClearState(context.Background(), clearRequest)
+		if err != nil {
+			log.Err(err).
+				Msg("Couldn't clear state")
+		}
+		log.Debug().
+			Msgf("Clearing state...%v", clear.Response)
 		return ctx, nil
 	})
 	r.LoadSteps(ctx)

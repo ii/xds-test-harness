@@ -10,7 +10,7 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	parser "github.com/ii/xds-test-harness/internal/parser"
 	"github.com/rs/zerolog/log"
-	pb "github.com/zachmandeville/tester-prototype/api/adapter"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 )
 
 func sortCompare(a, b []string) bool {
@@ -144,13 +144,14 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 
 func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
 	r.CDS.Done <- true
+	// give some time for the final messages to come through, if there's any lingering responses.
 	time.Sleep(3 * time.Second)
 	log.Debug().
-		Msgf("Request Count: %v\nResponse Count: %v\n", len(r.CDS.Cache.Requests), len(r.CDS.Cache.Responses))
+		Msgf("Request Count: %v Response Count: %v", len(r.CDS.Cache.Requests), len(r.CDS.Cache.Responses))
 	if len(r.CDS.Cache.Requests) <= len(r.CDS.Cache.Responses) {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		log.Err(err).
-			Msgf("Requests:%v\n, Responses: \v", r.CDS.Cache.Requests, r.CDS.Cache.Responses)
+			Msgf("Requests:%v, Responses: \v", r.CDS.Cache.Requests, r.CDS.Cache.Responses)
 		return err
 	}
 	return nil
