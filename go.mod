@@ -3,7 +3,7 @@ module github.com/ii/xds-test-harness
 go 1.16
 
 require (
-	github.com/cucumber/godog v0.11.0
+	github.com/cucumber/godog v0.12.1
 	github.com/envoyproxy/go-control-plane v0.9.9
 	github.com/golang/protobuf v1.5.0
 	github.com/rs/zerolog v1.25.0
