@@ -1,4 +1,4 @@
-## Diary
+#+TITLE: Diary
 
 I am recording my "journey of UNDERSTANDING" as a series of org file, to give
 better context into what I've written and why. These are definitely scratch
@@ -6,12 +6,10 @@ pads, and so any technical info should be taken with a grain of salt.
 
 Accurate, canonical documentation is held in our `docs` directory.
 
-## The Diary so Far
-
-- [Intermediate Test Harness, Part Two](./org/intermediate-harness-2.org)
-- [Intermediate Test Harness](./org/intermediate-harness.org)
-- [Basic Test Harness](./org/basic-harness.org)
-- [Test Cases for the xDS Transport Protocol](./org/test-cases-for-xds-transport.org)
-- [Streaming Request](./org/streaming-request.org)
-- [Initial Request](./org/initial-request.org)
-- [Setup](./docs/setup.org)
+** The Diary so Far
+- [[./intermediate-harness-2.org][Intermediate Test Harness, Part Two]]
+- [[./intermediate-harness.org][Intermediate Test Harness]]
+- [[./basic-harness.org][Basic Test Harness]]
+- [[./xds-transport-test-cases.org][Test Cases for the xDS Transport Protocol]]
+- [[./streaming-request-diary.org][Streaming Request]]
+- [[./initial-request.org][Initial Request]]
