@@ -13,3 +13,4 @@ Accurate, canonical documentation is held in our `docs` directory.
 - [[./xds-transport-test-cases.org][Test Cases for the xDS Transport Protocol]]
 - [[./streaming-request-diary.org][Streaming Request]]
 - [[./initial-request.org][Initial Request]]
+- [[./setup.org][setup]]
