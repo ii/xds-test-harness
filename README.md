@@ -7,26 +7,23 @@ learning experiments. We try to keep the two as separate and clear as possible.*
 
 # Run the example
 
-To see this in action, clone and navigate to this repo, and start a target server:
+To see this in action, clone and navigate to this repo and start a target server:
 
 ``` sh
 git clone https://github.com/ii/xds-test-harness
 cd xds-test-harness
 go run example/go-control-plane/main/main.go
 ```
+(This starts up a simple implementation of the [envoy proxy go control
+plane](https://github.com/envoyproxy/go-control-plane/), with the suite adapter integreated.)
 
-This starts up a simple implementation of the [envoy proxy go control
-plane](https://github.com/envoyproxy/go-control-plane/) with an adapter
-integration.
 
-In another terminal, navigate to this repo and run the suite:
+Run the suite in another terminal window:
 ``` sh
 cd xds-test-harness
 go run .
 ```
-
-You can also see detailed logging of the tests in action with
-
+To run the suite with detailed logging, you can run:
 ``` sh
 go run . --debug
 ```
@@ -48,7 +45,7 @@ doc](https://github.com/ii/xds-test-harness/blob/main/docs/design-doc.md)
   [runner.go](https://github.com/ii/xds-test-harness/blob/main/internal/runner/runner.go),
   which sets up the core mechanics and
   [steps.go](https://github.com/ii/xds-test-harness/blob/main/internal/runner/steps.go)
-  which implements all the gherkin steps into go code.
+  which implements our features into go code.
 - the adapter is outlined in
   [/api/adapter](https://github.com/ii/xds-test-harness/blob/main/api/adapter/adapter.proto).
   It is written as [protocol
@@ -63,7 +60,7 @@ doc](https://github.com/ii/xds-test-harness/blob/main/docs/design-doc.md)
 This work is based off [xds Conformance Suite Statement of
 Work](https://docs.google.com/document/d/17E3k4fGJedVISCudrW4Kgzf89gvIIhAdZnJmo6pMVlA/edit#heading=h.tqf1i1hfnem9)
 
-To learn more about the xDS protocol, you can read [it's documentation on
+To learn more about the xDS protocol, you can read [its documentation on
 envoyproxy.io](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol)
 or through the essay ["The Universal Data Plane
 API"](https://blog.envoyproxy.io/the-universal-data-plane-api-d15cec7a)
