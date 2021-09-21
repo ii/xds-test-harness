@@ -70,6 +70,8 @@ func (r *Runner) ATargetSetupWithTheFollowingState(state *godog.DocString) error
 }
 
 func (r *Runner) TheTargetIsUpdatedToTheFollowingState(state *godog.DocString) error {
+	log.Debug().
+		Msg("Updating target state")
 	snapshot, err := parser.YamlToSnapshot(r.NodeID, state.Content)
 	if err != nil {
 		msg := "Could not parse given state to adapter snapshot"
