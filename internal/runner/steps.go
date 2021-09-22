@@ -137,6 +137,7 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 			Msg(msg)
 		return errors.New(msg)
 	}
+
 	for {
 		select {
 		case <-time.After(6 * time.Second):
@@ -158,6 +159,11 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 						log.Debug().
 							Msgf("Found Expected Response.\nexpected:%v\nactual: %v\n", expected, actual)
 						return nil
+					} else {
+						err := errors.New("Expected Response does not match actual response.")
+					    log.Err(err).
+							Msgf("Expected: %v\nActual:%v", expected, actual)
+						return err
 					}
 				}
 			}
