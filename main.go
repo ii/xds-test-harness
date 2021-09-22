@@ -41,9 +41,6 @@ func init() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if *debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
 }
 
 func InitializeTestSuite(sc *godog.TestSuiteContext) {
@@ -95,6 +92,9 @@ func main() {
 	if *ADS == "only" {
 		godogOpts.Tags = "@ADS"
 	}
+	if *debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
 
 	status := godog.TestSuite{
 		Name:                 "xDS Test Suite",
@@ -102,6 +102,5 @@ func main() {
 		TestSuiteInitializer: InitializeTestSuite,
 		Options:              &godogOpts,
 	}.Run()
-
 	os.Exit(status)
 }
