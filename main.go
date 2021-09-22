@@ -37,16 +37,7 @@ var (
 )
 
 func init() {
-	pflag.Parse()
 	godog.BindCommandLineFlags("godog.", &godogOpts)
-	godogOpts.Paths = pflag.Args()
-	if *ADS == "off" {
-		godogOpts.Tags = "~@ADS"
-	}
-	if *ADS == "only" {
-		godogOpts.Tags = "@ADS"
-	}
-
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -96,11 +87,21 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 }
 
 func main() {
+	pflag.Parse()
+	godogOpts.Paths = pflag.Args()
+	if *ADS == "off" {
+		godogOpts.Tags = "~@ADS"
+	}
+	if *ADS == "only" {
+		godogOpts.Tags = "@ADS"
+	}
+
 	status := godog.TestSuite{
 		Name:                 "xDS Test Suite",
 		ScenarioInitializer:  InitializeScenario,
 		TestSuiteInitializer: InitializeTestSuite,
 		Options:              &godogOpts,
 	}.Run()
+
 	os.Exit(status)
 }
