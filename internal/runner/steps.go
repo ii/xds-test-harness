@@ -145,6 +145,9 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 			log.Err(err).
 				Msg("")
 			return err
+		case err := <- r.CDS.Err:
+			log.Err(err).Msg("From our step")
+			return errors.New("Could not find expected response within stream's context deadline")
 		default:
 			if len(r.CDS.Cache.Responses) > 0 {
 				for _, response := range r.CDS.Cache.Responses {
@@ -159,11 +162,6 @@ func (r *Runner) ClientReceivesTheFollowingVersionAndClustersAlongWithNonce(reso
 						log.Debug().
 							Msgf("Found Expected Response.\nexpected:%v\nactual: %v\n", expected, actual)
 						return nil
-					} else {
-						err := errors.New("Expected Response does not match actual response.")
-					    log.Err(err).
-							Msgf("Expected: %v\nActual:%v", expected, actual)
-						return err
 					}
 				}
 			}

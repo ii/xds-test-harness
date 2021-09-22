@@ -1,7 +1,6 @@
 package runner
 
 import (
-	// "context"
 	"context"
 	"errors"
 	"fmt"
@@ -17,7 +16,6 @@ import (
 	"github.com/ii/xds-test-harness/internal/parser"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
-	// "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,7 +23,7 @@ var (
 	opts []grpc.DialOption = []grpc.DialOption{
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
-		grpc.WithTimeout(time.Second * 5),
+		grpc.WithTimeout(time.Second * 10),
 	}
 )
 
@@ -79,77 +77,6 @@ func FreshRunner (current *Runner) *Runner {
 	}
 }
 
-func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
-	clusters := []string{}
-	for _, cluster := range resourceList {
-		clusters = append(clusters, cluster)
-	}
-	return &discovery.DiscoveryRequest{
-		VersionInfo: "",
-		Node: &core.Node{
-			Id: r.NodeID,
-		},
-		ResourceNames: clusters,
-		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-	}
-}
-
-func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
-
-	log.Debug().Msgf("Sending First Discovery Request", initReq)
-	r.CDS.Req <- initReq
-	r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, initReq)
-
-	for {
-		select {
-		case res := <-r.CDS.Res:
-			r.CDS.Cache.Responses = append(r.CDS.Cache.Responses, res)
-			ack, err := r.NewCDSAckFromResponse(res)
-			if err != nil {
-				log.Err(err).Msg("Error creating Ack Request")
-			}
-			log.Debug().
-				Msgf("Sending Ack: %v", ack)
-			r.CDS.Req <- ack
-	        r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, ack)
-		case <-r.CDS.Done:
-			log.Debug().Msg("Received Done signal, shutting down request channel")
-			close(r.CDS.Req)
-			return
-		}
-	}
-}
-
-func (r *Runner) NewCDSAckFromResponse(res *discovery.DiscoveryResponse) (*discovery.DiscoveryRequest, error) {
-	response, err := parser.ParseDiscoveryResponse(res)
-	if err != nil {
-		err := fmt.Errorf("error parsing dres for acking: %v", err)
-		return nil, err
-	}
-	clusters := []string{}
-	for _, cluster := range response.Resources {
-		clusters = append(clusters, cluster.Name)
-	}
-	clusterMap := map[string]bool{}
-	for _, c := range clusters {
-		clusterMap[c] = true
-	}
-	for _, init := range r.CDS.Cache.InitResource {
-		if _, existing := clusterMap[init]; !existing {
-			clusterMap[init] = true
-			clusters = append(clusters, init)
-		}
-	}
-
-	request := &discovery.DiscoveryRequest{
-		VersionInfo:   response.VersionInfo,
-		ResourceNames: clusters,
-		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-		ResponseNonce: response.Nonce,
-	}
-	return request, nil
-}
-
 func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn, err error) {
 	conn, err = grpc.Dial(client.Port, opts...)
 	if err != nil {
@@ -181,11 +108,69 @@ func (r *Runner) ConnectToAdapter(address string) error {
 	return nil
 }
 
+func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
+	clusters := []string{}
+	for _, cluster := range resourceList {
+		clusters = append(clusters, cluster)
+	}
+	return &discovery.DiscoveryRequest{
+		VersionInfo: "",
+		Node: &core.Node{
+			Id: r.NodeID,
+		},
+		ResourceNames: clusters,
+		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+	}
+}
+
+func (r *Runner) NewCDSAckFromResponse(res *discovery.DiscoveryResponse) (*discovery.DiscoveryRequest, error) {
+	response, err := parser.ParseDiscoveryResponse(res)
+	if err != nil {
+		err := fmt.Errorf("error parsing dres for acking: %v", err)
+		return nil, err
+	}
+
+	request := &discovery.DiscoveryRequest{
+		VersionInfo:   response.VersionInfo,
+		ResourceNames: r.CDS.Cache.InitResource,
+		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+		ResponseNonce: response.Nonce,
+	}
+	return request, nil
+}
+
+func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest) {
+
+	log.Debug().Msgf("Sending First Discovery Request", initReq)
+	r.CDS.Req <- initReq
+	r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, initReq)
+
+	for {
+		select {
+		case res := <-r.CDS.Res:
+			r.CDS.Cache.Responses = append(r.CDS.Cache.Responses, res)
+			ack, err := r.NewCDSAckFromResponse(res)
+			if err != nil {
+				log.Err(err).Msg("Error creating Ack Request")
+			}
+			log.Debug().
+				Msgf("Sending Ack: %v", ack)
+			r.CDS.Req <- ack
+	        r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, ack)
+		case <-r.CDS.Done:
+			log.Debug().Msg("Received Done signal, shutting down request channel")
+			close(r.CDS.Req)
+			return
+		}
+	}
+}
+
 func (r *Runner) CDSStream() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer close(r.CDS.Err)
+
 	client := cds.NewClusterDiscoveryServiceClient(r.Target.Conn)
 	stream, err := client.StreamClusters(ctx)
 	if err != nil {
