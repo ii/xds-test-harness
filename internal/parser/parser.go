@@ -2,12 +2,36 @@ package parser
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
+
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"gopkg.in/yaml.v2"
 )
+
+func randomAddress() string {
+	var (
+		consonants = []rune("bcdfklmnprstwyz")
+		vowels     = []rune("aou")
+		tld = []string{".biz",".com",".net",".org"}
+
+		domain     = ""
+	)
+	rand.Seed(time.Now().UnixNano())
+	length := 6 + rand.Intn(12)
+
+	for i := 0; i < length; i++ {
+		consonant := string(consonants[rand.Intn(len(consonants))])
+		vowel := string(vowels[rand.Intn(len(vowels))])
+
+		domain = domain + consonant + vowel
+	}
+	return domain + tld[rand.Intn(len(tld))]
+}
+
 
 func YamlToDesiredState(yml string) (*Snapshot, error) {
 	var s *Snapshot
@@ -38,7 +62,9 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 				Name: e.Name,
 			})
 		}
+		snapshot.Endpoints = endpoints
 	}
+
 	if s.Resources.Clusters != nil {
 		clusters := &pb.Clusters{}
 		for _, c := range s.Resources.Clusters {
@@ -49,6 +75,7 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 		}
 		snapshot.Clusters = clusters
 	}
+
 	if s.Resources.Routes != nil {
 		routes := &pb.Routes{}
 		for _, r := range s.Resources.Routes {
@@ -57,22 +84,19 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 			})
 		}
 	}
-	if s.Resources.Routes != nil {
-		routes := &pb.Routes{}
-		for _, r := range s.Resources.Routes {
-			routes.Items = append(routes.Items, &pb.Routes_Route{
-				Name: r.Name,
-			})
-		}
-	}
+
 	if s.Resources.Listeners != nil {
-		listener := &pb.Listeners{}
+		fmt.Println("snap listeners", s.Resources.Listeners)
+		listeners := &pb.Listeners{}
 		for _, l := range s.Resources.Listeners {
-			listener.Items = append(listener.Items, &pb.Listeners_Listener{
+			listeners.Items = append(listeners.Items, &pb.Listeners_Listener{
 				Name: l.Name,
+				Address: randomAddress(),
 			})
 		}
+		snapshot.Listeners = listeners
 	}
+
 	if s.Resources.Runtimes != nil {
 		runtime := &pb.Runtimes{}
 		for _, r := range s.Resources.Runtimes {
@@ -81,6 +105,7 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 			})
 		}
 	}
+
 	if s.Resources.Secrets != nil {
 		secret := &pb.Secrets{}
 		for _, s := range s.Resources.Secrets {
@@ -89,6 +114,7 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 			})
 		}
 	}
+
 	return snapshot, nil
 }
 
