@@ -1,3 +1,4 @@
+@old
 Feature: Fetching Resources
   Client can subscribe and unsubcribe from resources, and receive updates when
   any subscribed resources change.
@@ -69,7 +70,48 @@ Feature: Fetching Resources
     ```
     And the Client sends an ACK to which the server does not respond
 
+  # test case 3
+  Scenario: A client subscribed to a wildcard CDS should receive response when new resources are created
+    Given a target setup with the following state:
+    ```
+    version: 1
+    resources:
+      clusters:
+      - name: A
+      - name: B
+    ```
+    When the Client subscribes to wildcard CDS
+    Then the Client receives the following version and clusters, along with a nonce:
+    ```
+    version: 1
+    resources:
+      clusters:
+      - name: A
+      - name: B
+    ```
+    When the Target is updated to the following state:
+    ```
+    version: 2
+    resources:
+      clusters:
+      - name: A
+      - name: B
+      - name: C
+    ```
+
+    Then the Client receives the following version and clusters, along with a nonce:
+    ```
+    version: 2
+    resources:
+      clusters:
+      - name: A
+      - name: B
+      - name: C
+    ```
+    And the Client sends an ACK to which the server does not respond
+
   # test case 4
+  @wip
   Scenario:  When subscribing to specific CDS resources, receive only these resources
     Given a target setup with the following state:
     ```
@@ -174,48 +216,3 @@ Feature: Fetching Resources
     ```
     And the Client sends an ACK to which the server does not respond
 
-  # test case 3
-  # I am unable to get this one working at the moment, but seems related to an issue with the go-control-plane
-  # issues:
-  # => https://github.com/envoyproxy/go-control-plane/issues/463
-  # => https://github.com/envoyproxy/go-control-plane/issues/399
-  # it also seems to not like sending []{"*"} as the resource names.
-
-  # Scenario: A client subscribed to a wildcard CDS should receive response when new resources are created
-  #   Given a target setup with the following state:
-  #   ```
-  #   version: 1
-  #   resources:
-  #     clusters:
-  #     - name: A
-  #     - name: B
-  #   ```
-  #   When the Client subscribes to wildcard CDS
-  #   Then the Client receives the following version and clusters, along with a nonce:
-  #   ```
-  #   version: 1
-  #   resources:
-  #     clusters:
-  #     - name: A
-  #     - name: B
-  #   ```
-  #   When the Target is updated to the following state:
-  #   ```
-  #   version: 2
-  #   resources:
-  #     clusters:
-  #     - name: A
-  #     - name: B
-  #     - name: C
-  #   ```
-
-  #   Then the Client receives the following version and clusters, along with a nonce:
-  #   ```
-  #   version: 2
-  #   resources:
-  #     clusters:
-  #     - name: A
-  #     - name: B
-  #     - name: C
-  #   ```
-  #   And the Client sends an ACK to which the server does not respond
