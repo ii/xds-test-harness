@@ -128,16 +128,16 @@ func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryReques
 }
 
 func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.DiscoveryRequest {
-	clusters := []string{}
-	for _, cluster := range resourceList {
-		clusters = append(clusters, cluster)
+	resourceNames := []string{}
+	for _, name := range resourceList {
+		resourceNames = append(resourceNames, name)
 	}
 	return &discovery.DiscoveryRequest{
 		VersionInfo: "",
 		Node: &core.Node{
 			Id: r.NodeID,
 		},
-		ResourceNames: clusters,
+		ResourceNames: resourceNames,
 		TypeUrl:       typeURL,
 	}
 }
