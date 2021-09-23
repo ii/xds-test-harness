@@ -175,7 +175,7 @@ func (r *Runner) CDSStream() error {
 	stream, err := client.StreamClusters(ctx)
 	if err != nil {
 		err = errors.New(fmt.Sprintf("Cannot start CDS stream %v. error: %v", stream, err))
-		log.Debug().
+		log.Error().
 			Err(err).
 			Msg("")
 		r.CDS.Err <- err
