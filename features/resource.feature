@@ -111,7 +111,6 @@ Feature: Fetching Resources
     And the Client sends an ACK to which the server does not respond
 
   # test case 4
-  @wip
   Scenario:  When subscribing to specific CDS resources, receive only these resources
     Given a target setup with the following state:
     ```
