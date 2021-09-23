@@ -194,6 +194,7 @@ func (r *Runner) CDSStream() error {
 			if err != nil {
 				log.Err(err).Msg("error receiving responses on CDS stream")
 				r.CDS.Err <- err
+				return
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
