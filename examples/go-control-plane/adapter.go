@@ -51,11 +51,13 @@ func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (resp
 
 	// Parse Clusters
 	clusters := make(map[string]*cluster.Cluster)
-	for _, c := range state.Clusters.Items {
-		seconds := time.Duration(c.ConnectTimeout["seconds"])
-		clusters[c.Name] = &cluster.Cluster{
-			Name: c.Name,
-			ConnectTimeout: ptypes.DurationProto(seconds * time.Second),
+	if state.Clusters != nil {
+		for _, c := range state.Clusters.Items {
+			seconds := time.Duration(c.ConnectTimeout["seconds"])
+			clusters[c.Name] = &cluster.Cluster{
+				Name: c.Name,
+				ConnectTimeout: ptypes.DurationProto(seconds * time.Second),
+			}
 		}
 	}
 
