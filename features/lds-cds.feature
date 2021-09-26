@@ -1,4 +1,3 @@
-@wip
 Feature: Fetching Resources with LDS and CDS
   Client can do wildcard subscriptions or normal subscriptions
   and receive updates when any subscribed resources change.
@@ -21,3 +20,23 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "D,E,F"            |
       | "LDS"   | "1"              | "D,E,F"   | "F,A,I,L"          |
       | "LDS"   | "1"              | "D,E,F"   | "F,D,E"            |
+
+
+  @wip
+  Scenario Outline: The service should send updates to the client
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client does a wildcard subscription to <service>
+    Then the client receives the <expected resources> and <starting version> for <service>
+    When <chosen resource> is updated to <next version>
+    Then the Client receives the <expected resources> and <next version> for <service>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      # Steps 3 and 5 should fail
+      | service | starting version | next version | resources | expected resources | chosen resource |
+      | "CDS"   | "1"              | "2"          | "A,B,C"   | "A,B,C"            | "A"             |
+      | "CDS"   | "1"              | "2"          | "A,B,C"   | "C,A,B"            | "A"             |
+      | "CDS"   | "1"              | "2"          | "A,B,C"   | "B,A,D"            | "A"             |
+      | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
+      | "LDS"   | "1"              | "2"          | "D,E,F"   | "F,A,I,L"          | "D"             |
+      | "LDS"   | "1"              | "2"          | "D,E,F"   | "F,D,E"            | "D"             |

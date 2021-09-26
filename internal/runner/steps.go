@@ -189,10 +189,22 @@ func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) err
 	return nil
 }
 
+func (r *Runner) IsUpdatedTo(arg1, arg2 string) error {
+        return godog.ErrPending
+}
+
+func (r *Runner) TheClientReceivesTheAndFor(arg1, arg2, arg3 string) error {
+        return godog.ErrPending
+}
+
+
+
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
     ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
+	ctx.Step(`^"([^"]*)" is updated to "([^"]*)"$`, r.IsUpdatedTo)
+	ctx.Step(`^the client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesTheAndFor)
 }
