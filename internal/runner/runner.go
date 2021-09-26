@@ -35,6 +35,7 @@ type ClientConfig struct {
 
 type Cache struct {
 	StartState *pb.Snapshot
+	StateSnapshots []*pb.Snapshot
 	FinalResponse *discovery.DiscoveryResponse
 }
 
