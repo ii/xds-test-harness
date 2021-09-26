@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdapterClient interface {
 	SetState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*SetStateResponse, error)
+	UpdateState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*UpdateStateResponse, error)
 	ClearState(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error)
 }
 
@@ -39,6 +40,15 @@ func (c *adapterClient) SetState(ctx context.Context, in *Snapshot, opts ...grpc
 	return out, nil
 }
 
+func (c *adapterClient) UpdateState(ctx context.Context, in *Snapshot, opts ...grpc.CallOption) (*UpdateStateResponse, error) {
+	out := new(UpdateStateResponse)
+	err := c.cc.Invoke(ctx, "/adapter.Adapter/UpdateState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adapterClient) ClearState(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error) {
 	out := new(ClearResponse)
 	err := c.cc.Invoke(ctx, "/adapter.Adapter/ClearState", in, out, opts...)
@@ -53,6 +63,7 @@ func (c *adapterClient) ClearState(ctx context.Context, in *ClearRequest, opts .
 // for forward compatibility
 type AdapterServer interface {
 	SetState(context.Context, *Snapshot) (*SetStateResponse, error)
+	UpdateState(context.Context, *Snapshot) (*UpdateStateResponse, error)
 	ClearState(context.Context, *ClearRequest) (*ClearResponse, error)
 	mustEmbedUnimplementedAdapterServer()
 }
@@ -63,6 +74,9 @@ type UnimplementedAdapterServer struct {
 
 func (UnimplementedAdapterServer) SetState(context.Context, *Snapshot) (*SetStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetState not implemented")
+}
+func (UnimplementedAdapterServer) UpdateState(context.Context, *Snapshot) (*UpdateStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateState not implemented")
 }
 func (UnimplementedAdapterServer) ClearState(context.Context, *ClearRequest) (*ClearResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClearState not implemented")
@@ -98,6 +112,24 @@ func _Adapter_SetState_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Adapter_UpdateState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Snapshot)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdapterServer).UpdateState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/adapter.Adapter/UpdateState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdapterServer).UpdateState(ctx, req.(*Snapshot))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Adapter_ClearState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClearRequest)
 	if err := dec(in); err != nil {
@@ -126,6 +158,10 @@ var Adapter_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetState",
 			Handler:    _Adapter_SetState_Handler,
+		},
+		{
+			MethodName: "UpdateState",
+			Handler:    _Adapter_UpdateState_Handler,
 		},
 		{
 			MethodName: "ClearState",
