@@ -12,7 +12,7 @@ To see this in action, clone and navigate to this repo and start a target server
 ``` sh
 git clone https://github.com/ii/xds-test-harness
 cd xds-test-harness
-go run example/go-control-plane/main/main.go
+go run examples/go-control-plane/main/main.go
 ```
 (This starts up a simple implementation of the [envoy proxy go control
 plane](https://github.com/envoyproxy/go-control-plane/), with the suite adapter integreated.)
