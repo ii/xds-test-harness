@@ -1,4 +1,3 @@
-  @wip
 Feature: Fetching Resources with LDS and CDS
   Client can do wildcard subscriptions or normal subscriptions
   and receive updates when any subscribed resources change.
@@ -61,6 +60,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "I"          | "D,E,F,I"          | "2"          |
 
 
+  @wip
   Scenario:  When subscribing to specific CDS resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
