@@ -123,13 +123,46 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 }
 
 func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) error {
+	resources := []string{}
 	if service == "CDS" {
-		r.ClientSubscribesToWildcardCDS()
+		r.ClientSubscribesToCDS(resources)
 	}
 	if service == "LDS" {
-		r.ClientSubscribesToWildcardLDS()
+		r.ClientSubscribesToLDS(resources)
 	}
 	return nil
+}
+
+func(r *Runner) ClientSubscribesToCDS (resources []string) error {
+	r.CDS.Req = make(chan *discovery.DiscoveryRequest, 1)
+	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
+	r.CDS.Err = make(chan error, 1)
+	r.CDS.Done = make(chan bool, 1)
+	r.CDS.Cache.InitResource = resources
+
+	typeURL := "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+	request := r.NewRequest(r.CDS.Cache.InitResource, typeURL)
+
+	go r.CDSStream()
+	go r.Ack(request, r.CDS)
+	return nil
+
+}
+
+func (r *Runner) ClientSubscribesToLDS (resources []string) error {
+	r.LDS.Req = make(chan *discovery.DiscoveryRequest, 1)
+	r.LDS.Res = make(chan *discovery.DiscoveryResponse, 1)
+	r.LDS.Err = make(chan error, 1)
+	r.LDS.Done = make(chan bool, 1)
+	r.LDS.Cache.InitResource = resources
+
+	typeURL := "type.googleapis.com/envoy.config.listener.v3.Listener"
+	request := r.NewRequest(r.LDS.Cache.InitResource, typeURL)
+
+	go r.LDSStream()
+	go r.Ack(request, r.LDS)
+	return nil
+
 }
 
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources, version, service string) error {
@@ -275,11 +308,21 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	return nil
 }
 
-
+func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
+	resources := strings.Split(subset, ",")
+	if service == "CDS" {
+		r.ClientSubscribesToCDS(resources)
+	}
+	if service == "LDS" {
+		r.ClientSubscribesToLDS(resources)
+	}
+	return nil
+}
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
+    ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
     ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
     ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
