@@ -5,6 +5,7 @@ Feature: Fetching Resources with LDS and CDS
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
+
   Scenario Outline: The service should send all resources on a wildcard request.
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
@@ -60,6 +61,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "I"          | "D,E,F,I"          | "2"          |
 
 
+
   Scenario:  When subscribing to specific CDS resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -75,6 +77,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               |
       | "LDS"   | "1"              | "B,L,G,"    | "L, H"              |
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             |
+
 
   @wip
   Scenario: When subscribing to specific resources, receive response when those resources change
