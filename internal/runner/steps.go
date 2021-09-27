@@ -231,6 +231,52 @@ func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, v
 	return nil
 }
 
+
+func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
+	log.Debug().
+		Msgf("Adding %v to %v service", resource, service)
+
+	snapshot := r.Cache.StartState
+	snapshot.Version = version
+
+	if service == "LDS" {
+		listeners := snapshot.GetListeners()
+		newListener := &pb.Listeners_Listener{
+			Name:    resource,
+			Address: parser.RandomAddress(),
+		}
+		listeners.Items = append(listeners.Items, newListener)
+		snapshot.Listeners = listeners
+	}
+
+	if service == "CDS" {
+		clusters := snapshot.GetClusters()
+		newCluster := &pb.Clusters_Cluster{
+			Name:           resource,
+			ConnectTimeout: map[string]int32{"seconds": 5},
+		}
+		clusters.Items = append(clusters.Items, newCluster)
+		snapshot.Clusters = clusters
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+
+	_, err := c.UpdateState(context.Background(), snapshot)
+	if err != nil {
+		msg := "Cannot update target with given state"
+		log.Error().
+			Err(err).
+			Msg(msg)
+		return errors.New(msg)
+	}
+
+	r.Cache.StateSnapshots = append(r.Cache.StateSnapshots, snapshot)
+
+	return nil
+}
+
+
+
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
@@ -238,4 +284,5 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
     ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^the client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
+    ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 }

@@ -39,3 +39,21 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "F,D,E"            | "D"             |
+
+  @wip
+  Scenario Outline: Wildcard subscriptions receive updates when new resources are added
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client does a wildcard subscription to <service>
+    Then the client receives the <resources> and <starting version> for <service>
+    When a <new resource> is added to the <service> with <next version>
+    Then the Client receives the <expected resources> and <next version> for <service>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources | new resource | expected resources | next version |
+      | "CDS"   | "1"              | "A,B,C"   | "D"          | "A,B,C,D"          | "2"          |
+      | "CDS"   | "1"              | "A,B,C"   | "E"          | "A,B,C,E"          | "2"          |
+      | "CDS"   | "1"              | "A,B,C"   | "F"          | "A,B,C,F"          | "2"          |
+      | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
+      | "LDS"   | "1"              | "D,E,F"   | "H"          | "D,E,F,H"          | "2"          |
+      | "LDS"   | "1"              | "D,E,F"   | "I"          | "D,E,F,I"          | "2"          |
