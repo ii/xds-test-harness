@@ -32,7 +32,6 @@ Feature: Fetching Resources with LDS and CDS
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
-      # Steps 3 and 5 should fail
       | service | starting version | next version | resources | expected resources | chosen resource |
       | "CDS"   | "1"              | "2"          | "A,B,C"   | "A,B,C"            | "A"             |
       | "CDS"   | "1"              | "2"          | "A,B,C"   | "C,A,B"            | "A"             |
