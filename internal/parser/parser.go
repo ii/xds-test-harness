@@ -3,9 +3,11 @@ package parser
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/golang/protobuf/ptypes"
 	pb "github.com/ii/xds-test-harness/api/adapter"
@@ -32,6 +34,31 @@ func randomAddress() string {
 	return domain + tld[rand.Intn(len(tld))]
 }
 
+func ToClusters(resources string) *pb.Clusters {
+	resourceNames := strings.Split(resources, ",")
+	clusters := &pb.Clusters{}
+
+	for _, name := range resourceNames {
+		clusters.Items = append(clusters.Items, &pb.Clusters_Cluster{
+			Name: name,
+			ConnectTimeout: map[string]int32{"seconds": 5},
+		})
+	}
+	return clusters
+}
+
+func ToListeners (resources string) *pb.Listeners {
+	resourceNames := strings.Split(resources, ",")
+	listeners := &pb.Listeners{}
+
+	for _, name := range resourceNames {
+		listeners.Items = append(listeners.Items, &pb.Listeners_Listener{
+			Name: name,
+			Address: randomAddress(),
+		})
+	}
+	return listeners
+}
 
 func YamlToDesiredState(yml string) (*Snapshot, error) {
 	var s *Snapshot
@@ -142,4 +169,34 @@ func ParseDiscoveryResponse(dr *envoy_service_discovery_v3.DiscoveryResponse) (*
 		response.Resources = append(response.Resources, cc)
 	}
 	return &response, nil
+}
+
+func ParseDiscoveryResponseV2 (res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
+	simpRes := &SimpleResponse{}
+
+	simpRes.Version = res.VersionInfo
+	simpRes.Nonce = res.Nonce
+	simpRes.Resources = []string{}
+
+	if res.TypeUrl == "type.googleapis.com/envoy.config.listener.v3.Listener" {
+		for _, resource := range res.GetResources() {
+		    listener := &listener.Listener{}
+			if err := resource.UnmarshalTo(listener); err != nil {
+				fmt.Printf("ERORROROROR: %v", err)
+				return nil, err
+			}
+			simpRes.Resources = append(simpRes.Resources, listener.Name)
+		}
+	}
+	if res.TypeUrl == "type.googleapis.com/envoy.config.cluster.v3.Cluster" {
+		for _, resource := range res.GetResources() {
+		    cluster := &cluster.Cluster{}
+			if err := resource.UnmarshalTo(cluster); err != nil {
+				fmt.Printf("ERORROROROR: %v", err)
+				return nil, err
+			}
+			simpRes.Resources = append(simpRes.Resources, cluster.Name)
+		}
+	}
+	return simpRes, nil
 }

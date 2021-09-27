@@ -61,3 +61,10 @@ type DiscoveryResponse struct {
 	Resources   []Cluster `yaml:"resources"` //hack for now, should be any type of resource
 	Nonce       string    `default:"" yaml:"nonce"`
 }
+
+type SimpleResponse struct {
+	// Only the info used for validating our tests
+	Version string
+	Resources []string
+	Nonce string
+}
