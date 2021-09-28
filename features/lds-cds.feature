@@ -60,7 +60,6 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "I"          | "D,E,F,I"          | "2"          |
 
 
-  @wip
   Scenario:  When subscribing to specific CDS resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -76,3 +75,21 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               |
       | "LDS"   | "1"              | "B,L,G,"    | "L, H"              |
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             |
+
+  @wip
+  Scenario: When subscribing to specific resources, receive response when those resources change
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the client receives the <subset of resources> and <starting version> for <service>
+    When a <subscribed resource> of the <service> is updated to the <next version>
+    Then the Client receives the <subset of resources> and <next version> for <service>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | subscribed resource | next version |
+      | "CDS"   | "1"              | "A,B,C,D"   | "B,D"               | "B"                 | "2"          |
+      | "CDS"   | "1"              | "B,C,A,"    | "C"                 | "C"                 | "2"          |
+      | "CDS"   | "1"              | "F,A,B,C,D" | "A,C,D"             | "C"                 | "2"          |
+      | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                 | "2"          |
+      | "LDS"   | "1"              | "B,L,G,"    | "L,G"               | "G"                 | "2"          |
+      | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             | "D"                 | "2"          |
