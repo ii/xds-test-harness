@@ -108,6 +108,18 @@ func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (resp
 	return response, nil
 }
 
+func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*pb.UpdateStateResponse, error) {
+	response, err := a.SetState(ctx, state)
+	if err != nil {
+		fmt.Printf("Error setting state: %v", err)
+		return nil, err
+	}
+    updateResponse := &pb.UpdateStateResponse{
+    	Message: response.Message,
+    }
+	return updateResponse, err
+}
+
 func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
 	log.Printf("Clearing Cache")
 	xdsCache.ClearSnapshot(req.Node)

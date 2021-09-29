@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func randomAddress() string {
+func RandomAddress() string {
 	var (
 		consonants = []rune("bcdfklmnprstwyz")
 		vowels     = []rune("aou")
@@ -54,7 +54,7 @@ func ToListeners (resources string) *pb.Listeners {
 	for _, name := range resourceNames {
 		listeners.Items = append(listeners.Items, &pb.Listeners_Listener{
 			Name: name,
-			Address: randomAddress(),
+			Address: RandomAddress(),
 		})
 	}
 	return listeners
@@ -118,7 +118,7 @@ func YamlToSnapshot(nodeID string, yml string) (*pb.Snapshot, error) {
 		for _, l := range s.Resources.Listeners {
 			listeners.Items = append(listeners.Items, &pb.Listeners_Listener{
 				Name: l.Name,
-				Address: randomAddress(),
+				Address: RandomAddress(),
 			})
 		}
 		snapshot.Listeners = listeners

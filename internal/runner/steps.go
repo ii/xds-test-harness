@@ -189,10 +189,54 @@ func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) err
 	return nil
 }
 
+func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, version string) error {
+	log.Debug().
+		Msgf("Updating target state for %v resource %v", service, resource)
+
+	snapshot := r.Cache.StartState
+	snapshot.Version = version
+
+	if service == "LDS" {
+		listeners := snapshot.GetListeners()
+		for _, listener := range listeners.Items {
+			if listener.Name == resource {
+				listener.Address = parser.RandomAddress()
+			}
+		}
+		snapshot.Listeners = listeners
+	}
+
+	if service == "CDS" {
+		clusters := snapshot.GetClusters()
+		for _, cluster := range clusters.Items {
+			if cluster.Name == resource {
+				cluster.ConnectTimeout = map[string]int32{"seconds": 10}
+			}
+		}
+		snapshot.Clusters = clusters
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+
+	_, err := c.UpdateState(context.Background(), snapshot)
+	if err != nil {
+		msg := "Cannot update target with given state"
+		log.Error().
+			Err(err).
+			Msg(msg)
+		return errors.New(msg)
+	}
+
+	r.Cache.StateSnapshots = append(r.Cache.StateSnapshots, snapshot)
+
+	return nil
+}
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
     ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
+    ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
+	ctx.Step(`^the client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
 }

@@ -1,8 +1,5 @@
 package parser
 
-// type EnvoyNode struct {
-// 	ID string `yaml:"id"`
-// }
 type ConnectTimeout struct {
 	Seconds int64 `yaml:"seconds"`
 }
