@@ -22,7 +22,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "F,D,E"            |
 
 
-  @wip
+
   Scenario Outline: The service should send updates to the client
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
@@ -39,6 +39,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "F,D,E"            | "D"             |
+
 
   @wip
   Scenario Outline: Wildcard subscriptions receive updates when new resources are added
