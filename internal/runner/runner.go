@@ -192,6 +192,9 @@ func (r *Runner) NewAckFromResponse(res *discovery.DiscoveryResponse, initReq *d
 		return nil, err
 	}
 
+	// Only the first request should need the node ID,
+	// so we do not include it in the followups.  If this
+	// causes an error, it's a non-conformant error.
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   response.Version,
 		ResourceNames: initReq.ResourceNames,
