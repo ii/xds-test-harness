@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -15,35 +14,30 @@ import (
 	pb "github.com/ii/xds-test-harness/api/adapter"
 )
 
-func sortCompare(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+func itemInSlice(item string, slice []string) bool {
+	for _, sliceItem := range slice {
+		if item == sliceItem {
+			return true
+		}
 	}
-	sort.Strings(a)
-	sort.Strings(b)
+	return false
+}
 
-	for i, str := range a {
-		if str != b[i] {
+func versionsMatch(expected string, actual string) bool {
+	return expected == actual
+}
+
+func resourcesMatch(expected []string, actual []string) bool {
+	// Compare the resources in a discovery response to the ones we expect.
+	// It is valid for the response to give more resources than subscribed to,
+	// which is why we are not checking the equality of the two slices, only that
+	// all of expected is contained in actual.
+	for _, ec := range expected {
+		if match := itemInSlice(ec, actual); match == false  {
 			return false
 		}
 	}
 	return true
-}
-
-func versionsMatch(expected *pb.Snapshot, actual *parser.DiscoveryResponse) bool {
-	return expected.GetVersion() == actual.VersionInfo
-}
-
-func clustersMatch(expected *pb.Snapshot, actual *parser.DiscoveryResponse) bool {
-	expectedClusters := []string{}
-	for _, ec := range expected.Clusters.Items {
-		expectedClusters = append(expectedClusters, ec.GetName())
-	}
-	actualClusters := []string{}
-	for _, ac := range actual.Resources {
-		actualClusters = append(actualClusters, ac.Name)
-	}
-	return sortCompare(expectedClusters, actualClusters)
 }
 
 func (r *Runner) ClientSubscribesToWildcardCDS() error {
@@ -82,6 +76,11 @@ func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
 	time.Sleep(3 * time.Second)
 	log.Debug().
 		Msgf("Request Count: %v Response Count: %v", len(r.CDS.Cache.Requests), len(r.CDS.Cache.Responses))
+	// We initiate a subscription with a request, and the testing client is set
+	// to ACK every response. Because of this, here should always be one more
+	// request than response, being that first subscribing request. If there are
+	// more responses than requests, it strongly indicates the server responded
+	// to every ack, including the last one, which is not conformant.
 	if len(r.CDS.Cache.Requests) <= len(r.CDS.Cache.Responses) {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		log.Err(err).
@@ -152,12 +151,12 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
-				    actual, err := parser.ParseDiscoveryResponseV2(response)
+					actual, err := parser.ParseDiscoveryResponseV2(response)
 					if err != nil {
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if actual.Version == version && sortCompare(expectedResources, actual.Resources) {
+					if versionsMatch(version, actual.Version) && resourcesMatch(expectedResources, actual.Resources) {
 						return nil
 					}
 				}
