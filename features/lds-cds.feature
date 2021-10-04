@@ -21,6 +21,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "F,A,I,L"          |
       | "LDS"   | "1"              | "D,E,F"   | "F,D,E"            |
 
+
   @wip
   Scenario Outline: The service should send updates to the client
     Given a target setup with <service>, <resources>, and <starting version>
