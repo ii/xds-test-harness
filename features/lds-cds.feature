@@ -1,3 +1,4 @@
+
 Feature: Fetching Resources with LDS and CDS
   Client can do wildcard subscriptions or normal subscriptions
   and receive updates when any subscribed resources change.
@@ -79,7 +80,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             |
 
 
-  @wip
+
   Scenario: When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -96,3 +97,22 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                 | "2"          |
       | "LDS"   | "1"              | "B,L,G,"    | "L,G"               | "G"                 | "2"          |
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             | "D"                 | "2"          |
+
+
+  @wip
+  Scenario: When subscribing to resources that don't exist, receive response when they are created
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the client receives the <existing subset> and <starting version> for <service>
+    When a <chosen resource> is added to the <service> with <next version>
+    Then the Client receives the <subset of resources> and <next version> for <service>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | existing subset | chosen resource | next version |
+      | "CDS"   | "1"              | "A,B,C,D"   | "A,Z"               | "A"             | "Z"             | "2"          |
+      | "CDS"   | "1"              | "B,C,A,"    | "C,Y"               | "C"             | "Y"             | "2"          |
+      | "CDS"   | "1"              | "F,A,B,C,D" | "A,C,D,X"           | "A,C,D"         | "X"             | "2"          |
+      | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
+      | "LDS"   | "1"              | "B,L,G,"    | "L,G,Y"             | "G,L"           | "Y"             | "2"          |
+      | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D,Z"           | "D,G,L"         | "Z"             | "2"          |
