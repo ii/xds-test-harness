@@ -319,6 +319,33 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 	return nil
 }
 
+func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service,version string) error {
+	var stream *Service
+	var typeURL string
+
+	if service == "LDS" {
+		typeURL = "type.googleapis.com/envoy.config.listener.v3.Listener"
+		stream = r.LDS
+	}
+
+	if service == "CDS" {
+		typeURL = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+		stream = r.CDS
+	}
+
+	request := &discovery.DiscoveryRequest{
+		VersionInfo:   version,
+		ResourceNames: []string{resource},
+		TypeUrl:       typeURL,
+	}
+	time.Sleep(3 * time.Second)
+	log.Debug().Msgf("Sending Request: %v", request)
+	stream.Req <- request
+	time.Sleep(3 * time.Second)
+	return nil
+}
+
+
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
@@ -328,4 +355,5 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^the client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
     ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+    ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 }

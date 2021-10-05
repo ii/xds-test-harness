@@ -120,6 +120,9 @@ Feature: Fetching Resources with LDS and CDS
 
   @wip
   Scenario: Client can unsubcribe from some resources
+    # This test does not check if the final results are only the subscribed resources
+    # it is valid(though not desired) for a server to send more than is requested.
+    # So the test will pass if client subscribes to A,B,C, unsubscribes from B,C and gets A,B,C back.
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the client receives the <subset of resources> and <starting version> for <service>
