@@ -365,6 +365,7 @@ func (r *Runner) ClientUnsubcribesFromAllResourcesForService(service string) err
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
+		ResourceNames: []string{""},
 		TypeUrl:       typeURL,
 	}
 	time.Sleep(3 * time.Second)
