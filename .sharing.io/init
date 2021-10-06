@@ -8,21 +8,21 @@ cd $GIT_ROOT
 (
     set -x
     cd $HOME
-    go get google.golang.org/protobuf/cmd/protoc-gen-go \
-        google.golang.org/grpc/cmd/protoc-gen-go-grpc
-
-    go get github.com/cucumber/godog/cmd/godog@v0.11.0
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1 \
+        google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 \
+        github.com/cucumber/godog/cmd/godog@v0.11.0
 
     cd $(mktemp -d)
     curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
     sudo unzip -n protoc-3.15.8-linux-x86_64.zip -x readme.txt -d /usr/local
+    sudo chmod 755 /usr/local/bin/protoc
 
     sudo apt-wait
     sudo apt update
-    sudo apt install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
-    curl -sL 'https://getenvoy.io/gpg' | sudo apt-key add -
-    apt-key fingerprint 6FF974DB | grep "5270 CEAC"
-    yes '\n' | sudo add-apt-repository "deb [arch=amd64] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable"
+    sudo apt install apt-transport-https gnupg2 curl lsb-release
+    curl -sL 'https://deb.dl.getenvoy.io/public/gpg.8115BA8E629CC074.key' | sudo gpg --dearmor -o /usr/share/keyrings/getenvoy-keyring.gpg
+    echo a077cb587a1b622e03aa4bf2f3689de14658a9497a9af2c427bba5f4cc3c4723 /usr/share/keyrings/getenvoy-keyring.gpg | sha256sum --check
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/getenvoy-keyring.gpg] https://deb.dl.getenvoy.io/public/deb/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/getenvoy.list
     sudo apt update
     sudo apt install -y getenvoy-envoy
 )
