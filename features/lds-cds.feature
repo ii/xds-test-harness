@@ -99,7 +99,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D"             | "D"                 | "2"          |
 
 
-  @wip
+
   Scenario: When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -116,3 +116,40 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
       | "LDS"   | "1"              | "B,L,G,"    | "L,G,Y"             | "G,L"           | "Y"             | "2"          |
       | "LDS"   | "1"              | "F,G,B,L,D" | "G,L,D,Z"           | "D,G,L"         | "Z"             | "2"          |
+
+
+  @wip
+  Scenario: Client can unsubcribe from some resources
+    # This test does not check if the final results are only the subscribed resources
+    # it is valid(though not desired) for a server to send more than is requested.
+    # So the test will pass if client subscribes to A,B,C, unsubscribes from B,C and gets A,B,C back.
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the client receives the <subset of resources> and <starting version> for <service>
+    When the Client updates subscription to a <resource from subset> of <service> with <starting version>
+    And a <resource from subset> of the <service> is updated to the <next version>
+    Then the Client receives the <resource from subset> and <next version> for <service>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | resource from subset |   next version  |
+      | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "A"                  |   "2"           |
+      | "CDS"   | "1"              | "F,A,B,C,D" | "C,A,B"             | "A,C"                |   "2"           |
+      | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
+      | "LDS"   | "1"              | "B,L,A,G,"  | "L,G,B"             | "L,G"                |   "2"           |
+
+
+  @wip
+  Scenario: Client can unsubcribe from all resources
+    # This is not working currently, the unsusbcribe is not registered,
+    # neither as an unsubscribe nor a new wildcard request
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the client receives the <subset of resources> and <starting version> for <service>
+    When the Client unsubcribes from all resources for <service>
+    And a <subset of resources> of the <service> is updated to the <next version>
+    Then the Client does not receive any message from <service>
+
+    Examples:
+      | service | starting version | resources   | subset of resources | next version |
+      | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
