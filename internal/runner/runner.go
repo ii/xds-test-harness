@@ -60,27 +60,6 @@ type Runner struct {
 	LDS     *Service
 }
 
-// func NewRunner() *Runner {
-// 	return &Runner{
-// 		Adapter: &ClientConfig{},
-// 		Target:  &ClientConfig{},
-// 		NodeID:  "",
-// 		Cache:   &Cache{},
-// 		CDS:     &Service{},
-// 		LDS:     &Service{},
-// 	}
-// }
-
-// func FreshRunner (current ...*Runner) *Runner {
-// 	return &Runner{
-// 		Adapter: current.Adapter,
-// 		Target: current.Target,
-// 		NodeID: current.NodeID,
-// 		Cache: &Cache{},
-// 		CDS: &Service{},
-// 		LDS: &Service{},
-// 	}
-// }
 
 func FreshRunner (current ...*Runner) *Runner {
 	var (
