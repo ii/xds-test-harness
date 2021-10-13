@@ -60,7 +60,6 @@ type Runner struct {
 	LDS     *Service
 }
 
-
 func FreshRunner (current ...*Runner) *Runner {
 	var (
 	 adapter = &ClientConfig{}
@@ -96,40 +95,37 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 	return conn, nil
 }
 
-func (r *Runner) ConnectToTarget(address string) error {
-	r.Target.Port = address
-	conn, err := connectViaGRPC(r.Target, "target")
+func (r *Runner) ConnectClient(server, address string) error {
+	var client *ClientConfig
+	if server == "target" {
+		client = r.Target
+	}
+	if server == "adapter" {
+		client = r.Adapter
+	}
+	client.Port = address
+	conn, err := connectViaGRPC(client, server)
 	if err != nil {
 		return err
 	}
-	r.Target.Conn = conn
+	client.Conn = conn
 	return nil
 }
 
-func (r *Runner) ConnectToAdapter(address string) error {
-	r.Adapter.Port = address
-	conn, err := connectViaGRPC(r.Adapter, "adapter")
-	if err != nil {
-		return err
-	}
-	r.Adapter.Conn = conn
-	return nil
-}
-
-func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
-	clusters := []string{}
-	for _, cluster := range resourceList {
-		clusters = append(clusters, cluster)
-	}
-	return &discovery.DiscoveryRequest{
-		VersionInfo: "",
-		Node: &core.Node{
-			Id: r.NodeID,
-		},
-		ResourceNames: clusters,
-		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-	}
-}
+// func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
+// 	clusters := []string{}
+// 	for _, cluster := range resourceList {
+// 		clusters = append(clusters, cluster)
+// 	}
+// 	return &discovery.DiscoveryRequest{
+// 		VersionInfo: "",
+// 		Node: &core.Node{
+// 			Id: r.NodeID,
+// 		},
+// 		ResourceNames: clusters,
+// 		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+// 	}
+// }
 
 func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.DiscoveryRequest {
 	resourceNames := []string{}
