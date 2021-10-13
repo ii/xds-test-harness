@@ -45,7 +45,7 @@ func init() {
 
 func InitializeTestSuite(sc *godog.TestSuiteContext) {
 	sc.BeforeSuite(func() {
-		r = runner.NewRunner()
+		r = runner.FreshRunner()
 		if err := r.ConnectToTarget(*targetAddress); err != nil {
 			log.Fatal().
 				Msgf("error connecting to target: %v", err)
