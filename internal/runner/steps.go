@@ -128,7 +128,7 @@ func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) err
 		r.ClientSubscribesToCDS(resources)
 	}
 	if service == "LDS" {
-		r.ClientSubscribesToLDS(resources)
+		r.ClientSubscribesToServiceForResources(service, resources)
 	}
 	return nil
 }
@@ -136,13 +136,27 @@ func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) err
 func (r *Runner) ClientSubscribesToServiceForResources (srv string, resources []string) error {
 	builder := getBuilder(srv)
 	builder.openChannels()
-	builder.setStreamFn()
 	builder.setInitResources(resources)
-	// service := builder.getService()
-	// request := r.NewRequest(service.Cache.InitResource, service.TypeURL)
+	err := builder.setStream(r.Target.Conn)
+	if err != nil {
+		return err
+	}
+	service := builder.getService()
+	r.LDS = &Service{
+		Req: service.Channels.Req,
+		Res: service.Channels.Res,
+		Err: service.Channels.Err,
+		Done: service.Channels.Done,
+	}
+	r.LDS.Cache.InitResource = service.Cache.InitResource
+	r.LDS.Cache.Requests = service.Cache.Requests
+	r.LDS.Cache.Responses = service.Cache.Responses
 
-	// go r.Stream(service)
-	// go r.Ack(request, service)
+	request := r.NewRequest(service.Cache.InitResource, service.TypeURL)
+
+	go r.Stream(service)
+	go r.Zack(request, service)
+
 	return nil
 }
 

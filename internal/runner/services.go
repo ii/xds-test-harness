@@ -2,7 +2,8 @@ package runner
 
 import (
 	// "fmt"
-	// "context"
+	"context"
+	"time"
 	// core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	// cds "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
@@ -29,10 +30,15 @@ type ServiceCache struct {
 	Responses []*discovery.DiscoveryResponse
 }
 
+type Stream interface {
+	Send(*discovery.DiscoveryRequest) error
+	Recv() (*discovery.DiscoveryResponse, error)
+	CloseSend() error
+}
 
 type serviceBuilder interface {
 	openChannels()
-	setStreamFn()
+	setStream(conn *grpc.ClientConn) error
 	setInitResources([]string)
 	getService() *xDSService
 
@@ -43,7 +49,7 @@ type xDSService struct {
 	TypeURL string
 	Channels *Channels
 	Cache *ServiceCache
-	Startfn func(*grpc.ClientConn) (interface{})
+	Stream Stream
 }
 
 type LDSBuilder struct {
@@ -51,7 +57,7 @@ type LDSBuilder struct {
 	TypeURL string
 	Channels *Channels
 	Cache *ServiceCache
-	Startfn func(*grpc.ClientConn) (interface{})
+	Stream Stream
 }
 
 func (b *LDSBuilder) openChannels () {
@@ -64,14 +70,19 @@ func (b *LDSBuilder) openChannels () {
 }
 
 
-func (b *LDSBuilder) setStreamFn() {
-	b.Startfn = func(conn *grpc.ClientConn) interface{}{
-	  client := lds.NewListenerDiscoveryServiceClient(conn)
-		return client.StreamListeners
+func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
+	client := lds.NewListenerDiscoveryServiceClient(conn)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	stream, err := client.StreamListeners(ctx)
+	if err != nil {
+		return err
 	}
+	b.Stream = stream
+	return nil
 }
 
 func (b *LDSBuilder) setInitResources (res []string) {
+	b.Cache = &ServiceCache{}
 	b.Cache.InitResource = res
 }
 
@@ -81,40 +92,9 @@ func (b *LDSBuilder) getService () *xDSService {
 		TypeURL:  TypeUrlLDS,
 		Channels: b.Channels,
 		Cache: b.Cache,
-		Startfn: b.Startfn,
+		Stream: b.Stream,
 	}
 }
-
-// type CDSBuilder struct {
-// 	Name string
-// 	TypeURL string
-// 	Channels *Channels
-// 	Cache *Cache
-// }
-
-// func (b *CDSBuilder) openChannels () {
-// 	b.Channels = &Channels{
-// 		Req:  make(chan *discovery.DiscoveryRequest),
-// 		Res:  make(chan *discovery.DiscoveryResponse),
-// 		Err:  make(chan error),
-// 		Done: make(chan bool),
-// 	}
-// }
-
-// func (b *CDSBuilder) startStream (ctx context.Context, conn *grpc.ClientConn)  (interface{}, error) {
-// 	client := cds.NewClusterDiscoveryServiceClient(conn)
-// 	stream, err := client.StreamClusters(ctx)
-// 	return stream, err
-// }
-
-// func (b *CDSBuilder) getService () *xDSService {
-// 	return &xDSService{
-// 		Name:     "CDS",
-// 		TypeURL:  TypeUrlCDS,
-// 		Channels: &Channels{},
-// 		Cache:    &Cache{},
-// 	}
-// }
 
 func getBuilder(builderType string) serviceBuilder {
 	if builderType == "LDS" {

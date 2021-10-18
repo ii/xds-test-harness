@@ -171,43 +171,65 @@ func (r *Runner) Ack (initReq *discovery.DiscoveryRequest, service *Service) {
 	}
 }
 
+func (r *Runner) Zack (initReq *discovery.DiscoveryRequest, service *xDSService) {
+	service.Channels.Req <- initReq
+	service.Cache.Requests = append(service.Cache.Requests, initReq)
+	for {
+		select {
+		case res := <- service.Channels.Res:
+			service.Cache.Responses = append(service.Cache.Responses, res)
+			ack, err := r.NewAckFromResponse(res, initReq)
+			if err != nil {
+				service.Channels.Err <- err
+				return
+			}
+			log.Debug().
+				Msgf("Sending Ack: %v", ack)
+			service.Channels.Req <- ack
+	        service.Cache.Requests = append(service.Cache.Requests, ack)
+		case <- service.Channels.Done:
+			log.Debug().Msg("Received Done signal, shutting down request channel")
+			close(service.Channels.Req)
+			return
+		}
+	}
+}
+
 func (r *Runner) LDSStream() error {
-	var stream interface{}
-	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer close(r.LDS.Err)
 
-	client := lds.NewListenerDiscoveryServiceClient(r.Target.Conn)
-	stream, err = client.StreamListeners(ctx)
-	if err != nil {
-		err = errors.New(fmt.Sprintf("Cannot start LDS stream %v. error: %v", stream, err))
-		log.Debug().
-			Err(err).
-			Msg("")
-		r.LDS.Err <- err
-	}
-	var wg sync.WaitGroup
-	go func() {
-		for {
-			wg.Add(1)
-			in, err := stream.Recv()
-			if err == io.EOF {
-				log.Debug().
-					Msg("No more Discovery Responses from LDS stream")
-				close(r.LDS.Res)
-				return
-			}
-			if err != nil {
-				log.Err(err).Msg("error receiving responses on LDS stream")
-				r.LDS.Err <- err
-				return
-			}
+		client := lds.NewListenerDiscoveryServiceClient(r.Target.Conn)
+		stream, err := client.StreamListeners(ctx)
+		if err != nil {
+			err = errors.New(fmt.Sprintf("Cannot start LDS stream %v. error: %v", stream, err))
 			log.Debug().
-				Msgf("Received discovery response: %v", in)
-			r.LDS.Res <- in
+				Err(err).
+				Msg("")
+			r.LDS.Err <- err
 		}
-	}()
+		var wg sync.WaitGroup
+		go func() {
+			for {
+				wg.Add(1)
+				in, err := stream.Recv()
+				if err == io.EOF {
+					log.Debug().
+						Msg("No more Discovery Responses from LDS stream")
+					close(r.LDS.Res)
+					return
+				}
+				if err != nil {
+					log.Err(err).Msg("error receiving responses on LDS stream")
+					r.LDS.Err <- err
+					return
+				}
+				log.Debug().
+					Msgf("Received discovery response: %v", in)
+				r.LDS.Res <- in
+			}
+		}()
 
 	for req := range r.LDS.Req {
 		if err := stream.Send(req); err != nil {
@@ -222,51 +244,40 @@ func (r *Runner) LDSStream() error {
 }
 
 func (r *Runner) Stream(service *xDSService) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	defer close(service.Channels.Err)
 
-	client := lds.NewListenerDiscoveryServiceClient(r.Target.Conn)
-	stream, err := client.StreamListeners(ctx)
-	if err != nil {
-		err = errors.New(fmt.Sprintf("Cannot start LDS stream %v. error: %v", stream, err))
-		log.Debug().
-			Err(err).
-			Msg("")
-		r.LDS.Err <- err
-	}
 	var wg sync.WaitGroup
 	go func() {
 		for {
 			wg.Add(1)
-			in, err := stream.Recv()
+			in, err := service.Stream.Recv()
 			if err == io.EOF {
 				log.Debug().
 					Msg("No more Discovery Responses from LDS stream")
-				close(r.LDS.Res)
+				close(service.Channels.Res)
 				return
 			}
 			if err != nil {
 				log.Err(err).Msg("error receiving responses on LDS stream")
-				r.LDS.Err <- err
+				service.Channels.Err <- err
 				return
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
-			r.LDS.Res <- in
+			service.Channels.Res <- in
 		}
 	}()
 
-	for req := range r.LDS.Req {
-		if err := stream.Send(req); err != nil {
+	for req := range service.Channels.Req {
+		if err := service.Stream.Send(req); err != nil {
 			log.Err(err).
 				Msg("Error sending discovery request")
-			r.LDS.Err <- err
+			service.Channels.Err <- err
 		}
 	}
-	stream.CloseSend()
+	service.Stream.CloseSend()
 	wg.Wait()
-	return err
+	return nil
 }
 
 
