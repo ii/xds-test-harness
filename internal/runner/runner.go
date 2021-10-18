@@ -112,21 +112,6 @@ func (r *Runner) ConnectClient(server, address string) error {
 	return nil
 }
 
-// func (r *Runner) NewCDSRequest(resourceList []string) *discovery.DiscoveryRequest {
-// 	clusters := []string{}
-// 	for _, cluster := range resourceList {
-// 		clusters = append(clusters, cluster)
-// 	}
-// 	return &discovery.DiscoveryRequest{
-// 		VersionInfo: "",
-// 		Node: &core.Node{
-// 			Id: r.NodeID,
-// 		},
-// 		ResourceNames: clusters,
-// 		TypeUrl:       "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-// 	}
-// }
-
 func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.DiscoveryRequest {
 	resourceNames := []string{}
 	for _, name := range resourceList {
@@ -139,48 +124,6 @@ func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.Di
 		},
 		ResourceNames: resourceNames,
 		TypeUrl:       typeURL,
-	}
-}
-
-func (r *Runner) NewCDSAckFromResponse(res *discovery.DiscoveryResponse, typeURL string) (*discovery.DiscoveryRequest, error) {
-	response, err := parser.ParseDiscoveryResponse(res)
-	if err != nil {
-		err := fmt.Errorf("error parsing dres for acking: %v", err)
-		return nil, err
-	}
-
-	request := &discovery.DiscoveryRequest{
-		VersionInfo:   response.VersionInfo,
-		ResourceNames: r.CDS.Cache.InitResource,
-		TypeUrl:       typeURL,
-		ResponseNonce: response.Nonce,
-	}
-	return request, nil
-}
-
-func (r *Runner) AckCDS(initReq *discovery.DiscoveryRequest, typeURL string) {
-
-	log.Debug().Msgf("Sending First Discovery Request", initReq)
-	r.CDS.Req <- initReq
-	r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, initReq)
-
-	for {
-		select {
-		case res := <-r.CDS.Res:
-			r.CDS.Cache.Responses = append(r.CDS.Cache.Responses, res)
-			ack, err := r.NewCDSAckFromResponse(res, initReq.TypeUrl)
-			if err != nil {
-				log.Err(err).Msg("Error creating Ack Request")
-			}
-			log.Debug().
-				Msgf("Sending Ack: %v", ack)
-			r.CDS.Req <- ack
-	        r.CDS.Cache.Requests = append(r.CDS.Cache.Requests, ack)
-		case <-r.CDS.Done:
-			log.Debug().Msg("Received Done signal, shutting down request channel")
-			close(r.CDS.Req)
-			return
-		}
 	}
 }
 
@@ -229,9 +172,59 @@ func (r *Runner) Ack (initReq *discovery.DiscoveryRequest, service *Service) {
 }
 
 func (r *Runner) LDSStream() error {
+	var stream interface{}
+	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	defer close(r.LDS.Err)
+
+	client := lds.NewListenerDiscoveryServiceClient(r.Target.Conn)
+	stream, err = client.StreamListeners(ctx)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("Cannot start LDS stream %v. error: %v", stream, err))
+		log.Debug().
+			Err(err).
+			Msg("")
+		r.LDS.Err <- err
+	}
+	var wg sync.WaitGroup
+	go func() {
+		for {
+			wg.Add(1)
+			in, err := stream.Recv()
+			if err == io.EOF {
+				log.Debug().
+					Msg("No more Discovery Responses from LDS stream")
+				close(r.LDS.Res)
+				return
+			}
+			if err != nil {
+				log.Err(err).Msg("error receiving responses on LDS stream")
+				r.LDS.Err <- err
+				return
+			}
+			log.Debug().
+				Msgf("Received discovery response: %v", in)
+			r.LDS.Res <- in
+		}
+	}()
+
+	for req := range r.LDS.Req {
+		if err := stream.Send(req); err != nil {
+			log.Err(err).
+				Msg("Error sending discovery request")
+			r.LDS.Err <- err
+		}
+	}
+	stream.CloseSend()
+	wg.Wait()
+	return err
+}
+
+func (r *Runner) Stream(service *xDSService) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	defer close(service.Channels.Err)
 
 	client := lds.NewListenerDiscoveryServiceClient(r.Target.Conn)
 	stream, err := client.StreamListeners(ctx)
@@ -275,6 +268,7 @@ func (r *Runner) LDSStream() error {
 	wg.Wait()
 	return err
 }
+
 
 func (r *Runner) CDSStream() error {
 

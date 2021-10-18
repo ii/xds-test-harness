@@ -133,6 +133,19 @@ func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) err
 	return nil
 }
 
+func (r *Runner) ClientSubscribesToServiceForResources (srv string, resources []string) error {
+	builder := getBuilder(srv)
+	builder.openChannels()
+	builder.setStreamFn()
+	builder.setInitResources(resources)
+	// service := builder.getService()
+	// request := r.NewRequest(service.Cache.InitResource, service.TypeURL)
+
+	// go r.Stream(service)
+	// go r.Ack(request, service)
+	return nil
+}
+
 func(r *Runner) ClientSubscribesToCDS (resources []string) error {
 	r.CDS.Req = make(chan *discovery.DiscoveryRequest, 1)
 	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
