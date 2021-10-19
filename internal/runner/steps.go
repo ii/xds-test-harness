@@ -40,57 +40,6 @@ func resourcesMatch(expected []string, actual []string) bool {
 	return true
 }
 
-func (r *Runner) ClientSubscribesToWildcardCDS() error {
-	r.CDS.Req = make(chan *discovery.DiscoveryRequest, 1)
-	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
-	r.CDS.Err = make(chan error, 1)
-	r.CDS.Done = make(chan bool, 1)
-	r.CDS.Cache.InitResource = []string{}
-
-	typeURL := "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-	request := r.NewRequest(r.CDS.Cache.InitResource, typeURL)
-
-	go r.CDSStream()
-	go r.Ack(request, r.CDS)
-	return nil
-}
-
-func (r *Runner) ClientSubscribesToWildcardLDS() {
-	r.LDS.Req = make(chan *discovery.DiscoveryRequest, 1)
-	r.LDS.Res = make(chan *discovery.DiscoveryResponse, 1)
-	r.LDS.Err = make(chan error, 1)
-	r.LDS.Done = make(chan bool, 1)
-	r.LDS.Cache.InitResource = []string{}
-
-	typeURL := "type.googleapis.com/envoy.config.listener.v3.Listener"
-
-	request := r.NewRequest(r.LDS.Cache.InitResource, typeURL)
-
-	go r.LDSStream()
-	go r.Ack(request, r.LDS)
-}
-
-func (r *Runner) TheClientSendsAnACKToWhichTheServerDoesNotRespond() error {
-	r.CDS.Done <- true
-	// give some time for the final messages to come through, if there's any lingering responses.
-	time.Sleep(3 * time.Second)
-	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", len(r.CDS.Cache.Requests), len(r.CDS.Cache.Responses))
-	// We initiate a subscription with a request, and the testing client is set
-	// to ACK every response. Because of this, here should always be one more
-	// request than response, being that first subscribing request. If there are
-	// more responses than requests, it strongly indicates the server responded
-	// to every ack, including the last one, which is not conformant.
-	if len(r.CDS.Cache.Requests) <= len(r.CDS.Cache.Responses) {
-		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
-		log.Err(err).
-			Msgf("Requests:%v, Responses: \v", r.CDS.Cache.Requests, r.CDS.Cache.Responses)
-		return err
-	}
-	return nil
-}
-
-
 func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, version string) error {
 	snapshot := &pb.Snapshot{
 		Node:      r.NodeID,
@@ -124,12 +73,13 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 
 func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) error {
 	resources := []string{}
-	if service == "CDS" {
-		r.ClientSubscribesToCDS(resources)
-	}
-	if service == "LDS" {
-		r.ClientSubscribesToServiceForResources(service, resources)
-	}
+	r.ClientSubscribesToServiceForResources(service, resources)
+	return nil
+}
+
+func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
+	resources := strings.Split(subset, ",")
+	r.ClientSubscribesToServiceForResources(service,resources)
 	return nil
 }
 
@@ -141,80 +91,57 @@ func (r *Runner) ClientSubscribesToServiceForResources (srv string, resources []
 	if err != nil {
 		return err
 	}
-	service := builder.getService()
-	r.LDS = &Service{
-		Req: service.Channels.Req,
-		Res: service.Channels.Res,
-		Err: service.Channels.Err,
-		Done: service.Channels.Done,
-	}
-	r.LDS.Cache.InitResource = service.Cache.InitResource
-	r.LDS.Cache.Requests = service.Cache.Requests
-	r.LDS.Cache.Responses = service.Cache.Responses
+	r.Service = builder.getService()
 
-	request := r.NewRequest(service.Cache.InitResource, service.TypeURL)
-
-	go r.Stream(service)
-	go r.Zack(request, service)
-
-	return nil
-}
-
-func(r *Runner) ClientSubscribesToCDS (resources []string) error {
-	r.CDS.Req = make(chan *discovery.DiscoveryRequest, 1)
-	r.CDS.Res = make(chan *discovery.DiscoveryResponse, 1)
-	r.CDS.Err = make(chan error, 1)
-	r.CDS.Done = make(chan bool, 1)
-	r.CDS.Cache.InitResource = resources
-
-	typeURL := "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-	request := r.NewRequest(r.CDS.Cache.InitResource, typeURL)
+	request := r.NewRequest(r.Service.Cache.InitResource, r.Service.TypeURL)
 
 	log.Debug().
 		Msgf("Sending subscribing request: %v\n", request)
-	go r.CDSStream()
-	go r.Ack(request, r.CDS)
+	go r.Stream(r.Service)
+	go r.Ack(request, r.Service)
 	return nil
-
-}
-
-func (r *Runner) ClientSubscribesToLDS (resources []string) error {
-	r.LDS.Req = make(chan *discovery.DiscoveryRequest, 1)
-	r.LDS.Res = make(chan *discovery.DiscoveryResponse, 1)
-	r.LDS.Err = make(chan error, 1)
-	r.LDS.Done = make(chan bool, 1)
-	r.LDS.Cache.InitResource = resources
-
-	typeURL := "type.googleapis.com/envoy.config.listener.v3.Listener"
-	request := r.NewRequest(r.LDS.Cache.InitResource, typeURL)
-
-	log.Debug().
-		Msgf("Sending subscribing request: %v\n", request)
-	go r.LDSStream()
-	go r.Ack(request, r.LDS)
-	return nil
-
 }
 
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources, version, service string) error {
-	var stream *Service
 	expectedResources := strings.Split(resources, ",")
-
-	if service == "CDS" {
-		stream = r.CDS
-	}
-	if service == "LDS" {
-		stream = r.LDS
-	}
+	stream := r.Service
 
 	for {
 		select {
-		case err := <- stream.Err:
+		case err := <- stream.Channels.Err:
 			log.Err(err).Msg("From our step")
 			return errors.New("Could not find expected response within grace period of 10 seconds.")
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
+					log.Debug().Msgf("Response: %v", response)
+					actual, err := parser.ParseDiscoveryResponseV2(response)
+					if err != nil {
+						log.Error().Err(err).Msg("can't parse discovery response ")
+						return err
+					}
+					if versionsMatch(version, actual.Version) && resourcesMatch(expectedResources, actual.Resources) {
+						return nil
+					}
+				}
+			}
+		}
+	}
+}
+
+func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
+	expectedResources := strings.Split(resources, ",")
+	stream := r.Service
+
+	for {
+		select {
+		case err := <- stream.Channels.Err:
+			log.Err(err).Msg("From our step")
+			return errors.New("Could not find expected response within grace period of 10 seconds.")
+		default:
+			if len(stream.Cache.Responses) > 0 {
+				for _, response := range stream.Cache.Responses {
+					log.Debug().Msgf("Response: %v", response)
 					actual, err := parser.ParseDiscoveryResponseV2(response)
 					if err != nil {
 						log.Error().Err(err).Msg("can't parse discovery response ")
@@ -230,14 +157,8 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources
 }
 
 func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) error {
-	var stream *Service
-	if service == "CDS" {
-		stream = r.CDS
-	}
-	if service == "LDS" {
-		stream = r.LDS
-	}
-	stream.Done <- true
+	stream := r.Service
+	stream.Channels.Done <- true
 
 	// give some time for the final messages to come through, if there's any lingering responses.
 	time.Sleep(3 * time.Second)
@@ -339,94 +260,54 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	return nil
 }
 
-func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
-	resources := strings.Split(subset, ",")
-	if service == "CDS" {
-		r.ClientSubscribesToCDS(resources)
-	}
-	if service == "LDS" {
-		r.ClientSubscribesToLDS(resources)
-	}
-	return nil
-}
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service,version string) error {
-	var stream *Service
-	var typeURL string
-
-	if service == "LDS" {
-		typeURL = "type.googleapis.com/envoy.config.listener.v3.Listener"
-		stream = r.LDS
-	}
-
-	if service == "CDS" {
-		typeURL = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-		stream = r.CDS
-	}
-
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{resource},
-		TypeUrl:       typeURL,
+		TypeUrl:       r.Service.TypeURL,
 	}
-	log.Debug().Msgf("Sending Request: %v", request)
-	stream.Req <- request
+	log.Debug().
+		Msgf("Sending Request: %v", request)
+	r.Service.Channels.Req <- request
 	return nil
 }
 
-func (r *Runner) ClientUnsubcribesFromAllResourcesForService(service string) error {
-	var stream *Service
-	var typeURL string
-
-	if service == "LDS" {
-		typeURL = "type.googleapis.com/envoy.config.listener.v3.Listener"
-		stream = r.LDS
-	}
-
-	if service == "CDS" {
-		typeURL = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-		stream = r.CDS
-	}
-
+func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	version := r.Cache.StartState.Version
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{""},
-		TypeUrl:       typeURL,
+		TypeUrl:       r.Service.TypeURL,
 	}
 	time.Sleep(3 * time.Second)
-	log.Debug().Msgf("Sending unsubscribe request: %v", request)
-	stream.Req <- request
+	log.Debug().
+		Msgf("Sending unsubscribe request: %v", request)
+	r.Service.Channels.Req <- request
 	time.Sleep(3 * time.Second)
 	return nil
 }
 
 func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
-	var stream *Service
-
-	if service == "CDS" {
-		stream = r.CDS
-	}
-	if service == "LDS" {
-		stream = r.LDS
-	}
-
 	for {
 		select {
-		case err := <- stream.Err:
+		case err := <- r.Service.Channels.Err:
 			log.Err(err).Msg("From our step")
 			return err
 		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
+			if len(r.Service.Cache.Responses) > 0 {
+				for _, response := range r.Service.Cache.Responses {
 					actual, err := parser.ParseDiscoveryResponseV2(response)
 					if err != nil {
-						log.Error().Err(err).Msg("can't parse discovery response ")
+						log.Error().
+							Err(err).
+							Msg("can't parse discovery response ")
 						return err
 					}
 					err = errors.New("Received a response when we expected no response")
-					log.Err(err).Msgf("Response: %v",actual)
+					log.Err(err).
+						Msgf("Response: %v",actual)
 					return err
 				}
 			}
@@ -439,12 +320,11 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
     ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
     ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-    ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
+    ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
+	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
     ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
-	ctx.Step(`^the client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersionForService)
     ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
     ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
-	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
-	ctx.Step(`^the Client unsubcribes from all resources for "([^"]*)"$`, r.ClientUnsubcribesFromAllResourcesForService)
+	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 }
