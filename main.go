@@ -45,12 +45,12 @@ func init() {
 
 func InitializeTestSuite(sc *godog.TestSuiteContext) {
 	sc.BeforeSuite(func() {
-		r = runner.NewRunner()
-		if err := r.ConnectToTarget(*targetAddress); err != nil {
+		r = runner.FreshRunner()
+		if err := r.ConnectClient("target", *targetAddress); err != nil {
 			log.Fatal().
 				Msgf("error connecting to target: %v", err)
 		}
-		if err := r.ConnectToAdapter(*adapterAddress); err != nil {
+		if err := r.ConnectClient("adapter",*adapterAddress); err != nil {
 			log.Fatal().
 				Msgf("error connecting to adapter: %v", err)
 		}
