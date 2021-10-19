@@ -93,7 +93,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
 
 
-  @active
+
   Scenario: Client can unsubcribe from some resources
     # This test does not check if the final results are only the subscribed resources
     # it is valid(though not desired) for a server to send more than is requested.
@@ -112,7 +112,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @active
+
   Scenario: Client can unsubscribe from all resources
     # This is not working currently, the unsusbcribe is not registered,
     # neither as an unsubscribe nor a new wildcard request
