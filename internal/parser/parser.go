@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -32,10 +31,20 @@ func RandomAddress() string {
 	return domain + tld[rand.Intn(len(tld))]
 }
 
-func ToClusters(resources string) *pb.Clusters {
-	resourceNames := strings.Split(resources, ",")
-	clusters := &pb.Clusters{}
+func ToEndpoints(resourceNames []string) *pb.Endpoints {
+	endpoints := &pb.Endpoints{}
+	for _, name := range resourceNames {
+		endpoints.Items = append(endpoints.Items, &pb.Endpoint{
+			Name: name,
+			Cluster: name,
+			Address: RandomAddress(),
+		})
+	}
+	return endpoints
+}
 
+func ToClusters(resourceNames []string) *pb.Clusters {
+	clusters := &pb.Clusters{}
 	for _, name := range resourceNames {
 		clusters.Items = append(clusters.Items, &pb.Cluster{
 			Name: name,
@@ -45,10 +54,18 @@ func ToClusters(resources string) *pb.Clusters {
 	return clusters
 }
 
-func ToListeners (resources string) *pb.Listeners {
-	resourceNames := strings.Split(resources, ",")
-	listeners := &pb.Listeners{}
+func ToRoutes(resourceNames []string) *pb.Routes {
+	routes := &pb.Routes{}
+	for _, name := range resourceNames {
+		routes.Items = append(routes.Items, &pb.Route{
+			Name: name,
+		})
+	}
+	return routes
+}
 
+func ToListeners (resourceNames []string) *pb.Listeners {
+	listeners := &pb.Listeners{}
 	for _, name := range resourceNames {
 		listeners.Items = append(listeners.Items, &pb.Listener{
 			Name: name,
@@ -56,6 +73,26 @@ func ToListeners (resources string) *pb.Listeners {
 		})
 	}
 	return listeners
+}
+
+func ToRuntimes (resourceNames []string) *pb.Runtimes {
+	runtimes := &pb.Runtimes{}
+	for _, name := range resourceNames {
+		runtimes.Items = append(runtimes.Items, &pb.Runtime{
+			Name: name,
+		})
+	}
+	return runtimes
+}
+
+func ToSecrets (resourceNames []string) *pb.Secrets {
+	secrets := &pb.Secrets{}
+	for _, name := range resourceNames {
+		secrets.Items = append(secrets.Items, &pb.Secret{
+			Name: name,
+		})
+	}
+	return secrets
 }
 
 func ParseDiscoveryResponseV2 (res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {

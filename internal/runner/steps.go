@@ -44,17 +44,29 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 	snapshot := &pb.Snapshot{
 		Node:      r.NodeID,
 		Version:   fmt.Sprint(version),
-		Clusters: &pb.Clusters{},
 	}
+	resourceNames := strings.Split(resources, ",")
 
-	if service == "LDS" {
-		listeners := parser.ToListeners(resources)
-		snapshot.Listeners = listeners
-	}
-	if service == "CDS" {
-		clusters := parser.ToClusters(resources)
-		snapshot.Clusters = clusters
-	}
+	//Set endpoints
+	endpoints := parser.ToEndpoints(resourceNames)
+	snapshot.Endpoints = endpoints
+
+	//Set clusters
+	clusters := parser.ToClusters(resourceNames)
+	snapshot.Clusters = clusters
+
+    //Set Routes
+	routes := parser.ToRoutes(resourceNames)
+	snapshot.Routes = routes
+
+	//Set listeners
+	listeners := parser.ToListeners(resourceNames)
+	snapshot.Listeners = listeners
+
+	//Set runtimes
+	runtimes := parser.ToRuntimes(resourceNames)
+	snapshot.Runtimes = runtimes
+
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 
@@ -224,25 +236,44 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	snapshot := r.Cache.StartState
 	snapshot.Version = version
 
-	if service == "LDS" {
-		listeners := snapshot.GetListeners()
-		newListener := &pb.Listeners_Listener{
-			Name:    resource,
-			Address: parser.RandomAddress(),
-		}
-		listeners.Items = append(listeners.Items, newListener)
-		snapshot.Listeners = listeners
-	}
 
-	if service == "CDS" {
-		clusters := snapshot.GetClusters()
-		newCluster := &pb.Clusters_Cluster{
-			Name:           resource,
-			ConnectTimeout: map[string]int32{"seconds": 5},
-		}
-		clusters.Items = append(clusters.Items, newCluster)
-		snapshot.Clusters = clusters
-	}
+	//Set endpoints
+	endpoints := snapshot.GetEndpoints()
+	endpoints.Items = append(endpoints.Items, &pb.Endpoint{
+		Name: resource,
+		Cluster: resource,
+		Address: parser.RandomAddress(),
+	})
+	snapshot.Endpoints = endpoints
+
+	//Set clusters
+	clusters := snapshot.GetClusters()
+	clusters.Items = append(clusters.Items, &pb.Cluster{
+		Name: resource,
+		ConnectTimeout: map[string]int32{"seconds": 5},
+	})
+	snapshot.Clusters = clusters
+
+    //Set Routes
+	routes := snapshot.GetRoutes()
+	routes.Items = append(routes.Items, &pb.Route{
+		Name: resource,
+	})
+	snapshot.Routes = routes
+
+	//Set listeners
+	listeners := snapshot.GetListeners()
+	listeners.Items = append(listeners.Items, &pb.Listener{
+		Name: resource,
+		Address: parser.RandomAddress(),
+	})
+
+	//Set runtimes
+	runtimes := snapshot.GetRuntimes()
+	runtimes.Items = append(runtimes.Items, &pb.Runtime{
+		Name: resource,
+	})
+	snapshot.Runtimes = runtimes
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 

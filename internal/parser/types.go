@@ -6,8 +6,8 @@ type ConnectTimeout struct {
 
 type Endpoint struct {
 	Name    string `yaml:"name"`
+	Cluster string `yaml:"cluster"`
 	Address string `yaml:"address"`
-	Port    uint32 `yaml:"port"`
 }
 
 type Cluster struct {
