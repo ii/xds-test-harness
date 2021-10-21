@@ -36,7 +36,17 @@ Success will be able to run a simple RDS test.
 - When updating state, we only care about the version changing, not the contents of the update.
 * Process
 ** Rewrite adapter types so all services represented
+I will base the setup on the integration tests in the go-control-plane. I can
+start by defining it with all the details in those tests, reducing as we can to
+just the bare essentials.
+
+For most of the types i still can keep just the name, but sometimes need to specify the address.
+The routes and listeners both have random addresses assigned.
 ** Rewrite our Given Step
-** Write RDS test
-** Test the given statement works
-** Test everything else works.
+I updated the adapter in tegration into the go control plane by using functions already defined in GCP integration tests.
+Modelling our adapter off these tests let me set up the state successfully and all current tests that /should/ pass /do/ pass.
+** TODO Write RDS test
+** TODO Test the given statement works
+** TODO Test everything else works.
+* Questions
+1. Should there be a connection between the route socket address and the listener socket address? Does it matter?
