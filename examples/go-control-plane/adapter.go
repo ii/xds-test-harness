@@ -209,43 +209,31 @@ func MakeRuntime(runtimeName string) *runtime.Runtime {
 
 func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (response *pb.SetStateResponse, err error) {
 
-	numClusters := len(state.Clusters.Items)
-	clusters := make([]types.Resource, numClusters)
-	for i := 0; i < numClusters; i++ {
-		cluster := state.Clusters.Items[i]
+	clusters := make([]types.Resource, len(state.Clusters.Items))
+	for i, cluster := range state.Clusters.Items {
 		clusters[i] = MakeCluster(cluster.Name, state.Node)
-
 	}
 
-	numEndpoints := len(state.Endpoints.Items)
-	endpoints := make([]types.Resource, numEndpoints)
-	for i := 0; i < numEndpoints; i++ {
-		endpoint := state.Endpoints.Items[i]
+	endpoints := make([]types.Resource, len(state.Endpoints.Items))
+	for i, endpoint := range state.Endpoints.Items {
 		endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
 	}
 
-	numRoutes := len(state.Routes.Items)
-	routes := make([]types.Resource, numRoutes)
-	// TODO grab the cluster from the route itself, by updating api?
-	for i := 0; i < numRoutes; i++ {
-		route := state.Routes.Items[i]
+	routes := make([]types.Resource, len(state.Routes.Items))
+	for i, route := range state.Routes.Items {
 		cluster := state.Clusters.Items[i]
 		routes[i] = MakeRoute(route.Name, cluster.Name)
 	}
 
-	numListeners := len(state.Listeners.Items)
-	listeners := make([]types.Resource, numListeners)
-	for i := 0; i < numListeners; i++ {
-		listener := state.Listeners.Items[i]
+	listeners := make([]types.Resource, len(state.Listeners.Items))
+	for i, listener := range state.Listeners.Items {
 		port := uint32(11000 + i)
 		route := state.Routes.Items[i]
 		listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
 	}
 
-	numRuntimes := len(state.Runtimes.Items)
-	runtimes := make([]types.Resource, numRuntimes)
-	for i := 0; i < numRuntimes; i++ {
-		runtime := state.Runtimes.Items[i]
+	runtimes := make([]types.Resource, len(state.Runtimes.Items))
+	for i, runtime := range state.Runtimes.Items {
 		runtimes[i] = MakeRuntime(runtime.Name)
 	}
 
