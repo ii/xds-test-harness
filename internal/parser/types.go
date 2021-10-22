@@ -61,7 +61,7 @@ type DiscoveryResponse struct {
 
 type SimpleResponse struct {
 	// Only the info used for validating our tests
-	Version string
+	Version   string
 	Resources []string
-	Nonce string
+	Nonce     string
 }

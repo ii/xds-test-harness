@@ -2,34 +2,34 @@ package example
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"encoding/json"
+	"fmt"
+	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	runtime "github.com/envoyproxy/go-control-plane/envoy/service/runtime/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+	"github.com/golang/protobuf/ptypes"
+	pstruct "github.com/golang/protobuf/ptypes/struct"
+	pb "github.com/ii/xds-test-harness/api/adapter"
+	"google.golang.org/grpc"
+	"log"
 	"net"
 	"os"
 	"time"
-	"google.golang.org/grpc"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	pstruct "github.com/golang/protobuf/ptypes/struct"
-	"github.com/golang/protobuf/ptypes"
-	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	runtime "github.com/envoyproxy/go-control-plane/envoy/service/runtime/v3"
-	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
-	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
-	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	pb "github.com/ii/xds-test-harness/api/adapter"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 )
 
 var (
-	xdsCache cache.SnapshotCache
+	xdsCache  cache.SnapshotCache
 	localhost = "127.0.0.1"
 )
 
-type Clusters  map[string]*cluster.Cluster
+type Clusters map[string]*cluster.Cluster
 type Listeners map[string]*listener.Listener
 type Endpoints map[string]*endpoint.ClusterLoadAssignment
 
@@ -40,10 +40,11 @@ type adapterServer struct {
 func listenerContents(listeners Listeners) []types.Resource {
 	var r []types.Resource
 	for _, l := range listeners {
-		r = append(r,l)
+		r = append(r, l)
 	}
 	return r
 }
+
 // MakeEndpoint creates a localhost endpoint on a given port.
 func MakeEndpoint(clusterName string, address string, port uint32) *endpoint.ClusterLoadAssignment {
 	return &endpoint.ClusterLoadAssignment{
@@ -111,18 +112,18 @@ func MakeRoute(routeName, clusterName string) *route.RouteConfiguration {
 func configSource(clusterName string) *core.ConfigSource {
 	source := &core.ConfigSource{}
 	source.ResourceApiVersion = core.ApiVersion_V3
-		source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
-			ApiConfigSource: &core.ApiConfigSource{
-				TransportApiVersion:       core.ApiVersion_V3,
-				ApiType:                   core.ApiConfigSource_GRPC,
-				SetNodeOnFirstMessageOnly: true,
-				GrpcServices: []*core.GrpcService{{
-					TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
-						EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: clusterName},
-					},
-				}},
-			},
-		}
+	source.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
+		ApiConfigSource: &core.ApiConfigSource{
+			TransportApiVersion:       core.ApiVersion_V3,
+			ApiType:                   core.ApiConfigSource_GRPC,
+			SetNodeOnFirstMessageOnly: true,
+			GrpcServices: []*core.GrpcService{{
+				TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
+					EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: clusterName},
+				},
+			}},
+		},
+	}
 	return source
 }
 
@@ -206,7 +207,7 @@ func MakeRuntime(runtimeName string) *runtime.Runtime {
 	}
 }
 
-func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (response *pb.SetStateResponse, err error) {
+func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (response *pb.SetStateResponse, err error) {
 
 	numClusters := len(state.Clusters.Items)
 	clusters := make([]types.Resource, numClusters)
@@ -219,7 +220,7 @@ func (a *adapterServer) SetState (ctx context.Context, state *pb.Snapshot) (resp
 	numEndpoints := len(state.Endpoints.Items)
 	endpoints := make([]types.Resource, numEndpoints)
 	for i := 0; i < numEndpoints; i++ {
-  	    endpoint:= state.Endpoints.Items[i]
+		endpoint := state.Endpoints.Items[i]
 		endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
 	}
 
@@ -282,9 +283,9 @@ func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*p
 		fmt.Printf("Error setting state: %v", err)
 		return nil, err
 	}
-    updateResponse := &pb.UpdateStateResponse{
-    	Message: response.Message,
-    }
+	updateResponse := &pb.UpdateStateResponse{
+		Message: response.Message,
+	}
 	return updateResponse, err
 }
 

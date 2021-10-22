@@ -15,9 +15,9 @@ func RandomAddress() string {
 	var (
 		consonants = []rune("bcdfklmnprstwyz")
 		vowels     = []rune("aou")
-		tld = []string{".biz",".com",".net",".org"}
+		tld        = []string{".biz", ".com", ".net", ".org"}
 
-		domain     = ""
+		domain = ""
 	)
 	rand.Seed(time.Now().UnixNano())
 	length := 6 + rand.Intn(12)
@@ -35,7 +35,7 @@ func ToEndpoints(resourceNames []string) *pb.Endpoints {
 	endpoints := &pb.Endpoints{}
 	for _, name := range resourceNames {
 		endpoints.Items = append(endpoints.Items, &pb.Endpoint{
-			Name: name,
+			Name:    name,
 			Cluster: name,
 			Address: RandomAddress(),
 		})
@@ -47,7 +47,7 @@ func ToClusters(resourceNames []string) *pb.Clusters {
 	clusters := &pb.Clusters{}
 	for _, name := range resourceNames {
 		clusters.Items = append(clusters.Items, &pb.Cluster{
-			Name: name,
+			Name:           name,
 			ConnectTimeout: map[string]int32{"seconds": 5},
 		})
 	}
@@ -64,18 +64,18 @@ func ToRoutes(resourceNames []string) *pb.Routes {
 	return routes
 }
 
-func ToListeners (resourceNames []string) *pb.Listeners {
+func ToListeners(resourceNames []string) *pb.Listeners {
 	listeners := &pb.Listeners{}
 	for _, name := range resourceNames {
 		listeners.Items = append(listeners.Items, &pb.Listener{
-			Name: name,
+			Name:    name,
 			Address: RandomAddress(),
 		})
 	}
 	return listeners
 }
 
-func ToRuntimes (resourceNames []string) *pb.Runtimes {
+func ToRuntimes(resourceNames []string) *pb.Runtimes {
 	runtimes := &pb.Runtimes{}
 	for _, name := range resourceNames {
 		runtimes.Items = append(runtimes.Items, &pb.Runtime{
@@ -85,7 +85,7 @@ func ToRuntimes (resourceNames []string) *pb.Runtimes {
 	return runtimes
 }
 
-func ToSecrets (resourceNames []string) *pb.Secrets {
+func ToSecrets(resourceNames []string) *pb.Secrets {
 	secrets := &pb.Secrets{}
 	for _, name := range resourceNames {
 		secrets.Items = append(secrets.Items, &pb.Secret{
@@ -95,7 +95,7 @@ func ToSecrets (resourceNames []string) *pb.Secrets {
 	return secrets
 }
 
-func ParseDiscoveryResponseV2 (res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
+func ParseDiscoveryResponseV2(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
 	simpRes := &SimpleResponse{}
 
 	simpRes.Version = res.VersionInfo
@@ -104,7 +104,7 @@ func ParseDiscoveryResponseV2 (res *envoy_service_discovery_v3.DiscoveryResponse
 
 	if res.TypeUrl == "type.googleapis.com/envoy.config.listener.v3.Listener" {
 		for _, resource := range res.GetResources() {
-		    listener := &listener.Listener{}
+			listener := &listener.Listener{}
 			if err := resource.UnmarshalTo(listener); err != nil {
 				fmt.Printf("ERORROROROR: %v", err)
 				return nil, err
@@ -114,7 +114,7 @@ func ParseDiscoveryResponseV2 (res *envoy_service_discovery_v3.DiscoveryResponse
 	}
 	if res.TypeUrl == "type.googleapis.com/envoy.config.cluster.v3.Cluster" {
 		for _, resource := range res.GetResources() {
-		    cluster := &cluster.Cluster{}
+			cluster := &cluster.Cluster{}
 			if err := resource.UnmarshalTo(cluster); err != nil {
 				fmt.Printf("ERORROROROR: %v", err)
 				return nil, err

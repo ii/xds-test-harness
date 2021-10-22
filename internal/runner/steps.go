@@ -9,9 +9,9 @@ import (
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	parser "github.com/ii/xds-test-harness/internal/parser"
 	"github.com/rs/zerolog/log"
-	pb "github.com/ii/xds-test-harness/api/adapter"
 )
 
 func itemInSlice(item string, slice []string) bool {
@@ -33,7 +33,7 @@ func resourcesMatch(expected []string, actual []string) bool {
 	// which is why we are not checking the equality of the two slices, only that
 	// all of expected is contained in actual.
 	for _, ec := range expected {
-		if match := itemInSlice(ec, actual); match == false  {
+		if match := itemInSlice(ec, actual); match == false {
 			return false
 		}
 	}
@@ -42,8 +42,8 @@ func resourcesMatch(expected []string, actual []string) bool {
 
 func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, version string) error {
 	snapshot := &pb.Snapshot{
-		Node:      r.NodeID,
-		Version:   fmt.Sprint(version),
+		Node:    r.NodeID,
+		Version: fmt.Sprint(version),
 	}
 	resourceNames := strings.Split(resources, ",")
 
@@ -55,7 +55,7 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 	clusters := parser.ToClusters(resourceNames)
 	snapshot.Clusters = clusters
 
-    //Set Routes
+	//Set Routes
 	routes := parser.ToRoutes(resourceNames)
 	snapshot.Routes = routes
 
@@ -66,7 +66,6 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 	//Set runtimes
 	runtimes := parser.ToRuntimes(resourceNames)
 	snapshot.Runtimes = runtimes
-
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 
@@ -91,11 +90,11 @@ func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) err
 
 func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
 	resources := strings.Split(subset, ",")
-	r.ClientSubscribesToServiceForResources(service,resources)
+	r.ClientSubscribesToServiceForResources(service, resources)
 	return nil
 }
 
-func (r *Runner) ClientSubscribesToServiceForResources (srv string, resources []string) error {
+func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
 	builder := getBuilder(srv)
 	builder.openChannels()
 	builder.setInitResources(resources)
@@ -120,7 +119,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources
 
 	for {
 		select {
-		case err := <- stream.Channels.Err:
+		case err := <-stream.Channels.Err:
 			log.Err(err).Msg("From our step")
 			return errors.New("Could not find expected response within grace period of 10 seconds.")
 		default:
@@ -147,7 +146,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 
 	for {
 		select {
-		case err := <- stream.Channels.Err:
+		case err := <-stream.Channels.Err:
 			log.Err(err).Msg("From our step")
 			return errors.New("Could not find expected response within grace period of 10 seconds.")
 		default:
@@ -228,7 +227,6 @@ func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, v
 	return nil
 }
 
-
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
 	log.Debug().
 		Msgf("Adding %v to %v service", resource, service)
@@ -236,11 +234,10 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	snapshot := r.Cache.StartState
 	snapshot.Version = version
 
-
 	//Set endpoints
 	endpoints := snapshot.GetEndpoints()
 	endpoints.Items = append(endpoints.Items, &pb.Endpoint{
-		Name: resource,
+		Name:    resource,
 		Cluster: resource,
 		Address: parser.RandomAddress(),
 	})
@@ -249,12 +246,12 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	//Set clusters
 	clusters := snapshot.GetClusters()
 	clusters.Items = append(clusters.Items, &pb.Cluster{
-		Name: resource,
+		Name:           resource,
 		ConnectTimeout: map[string]int32{"seconds": 5},
 	})
 	snapshot.Clusters = clusters
 
-    //Set Routes
+	//Set Routes
 	routes := snapshot.GetRoutes()
 	routes.Items = append(routes.Items, &pb.Route{
 		Name: resource,
@@ -264,7 +261,7 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	//Set listeners
 	listeners := snapshot.GetListeners()
 	listeners.Items = append(listeners.Items, &pb.Listener{
-		Name: resource,
+		Name:    resource,
 		Address: parser.RandomAddress(),
 	})
 
@@ -291,8 +288,7 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	return nil
 }
 
-
-func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service,version string) error {
+func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{resource},
@@ -323,7 +319,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
 	for {
 		select {
-		case err := <- r.Service.Channels.Err:
+		case err := <-r.Service.Channels.Err:
 			log.Err(err).Msg("From our step")
 			return err
 		default:
@@ -338,7 +334,7 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 					}
 					err = errors.New("Received a response when we expected no response")
 					log.Err(err).
-						Msgf("Response: %v",actual)
+						Msgf("Response: %v", actual)
 					return err
 				}
 			}
@@ -346,16 +342,15 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 	}
 }
 
-
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
-    ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
+	ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
-    ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-    ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
+	ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
-    ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
-    ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-    ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+	ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
+	ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 }
