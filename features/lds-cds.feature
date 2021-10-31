@@ -50,17 +50,18 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
 
 
-
-  Scenario:  When subscribing to specific CDS resources, receive only these resources
+  @active
+  Scenario:  When subscribing to specific resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <subset of resources> and <starting version>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
-      | service | starting version | resources   | subset of resources |
-      | "CDS"   | "1"              | "A,B,C,D"   | "B,D"               |
-      | "LDS"   | "1"              | "G,B,L,D"   | "L,G"               |
+      | service | starting version | resources | subset of resources |
+      | "CDS"   | "1"              | "A,B,C,D" | "B,D"               |
+      | "LDS"   | "1"              | "G,B,L,D" | "L,G"               |
+      | "RDS"   | "1"              | "A,B,C,D" | "A,B"               |
 
 
 

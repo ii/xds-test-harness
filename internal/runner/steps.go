@@ -143,6 +143,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersionForService(resources
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
 	expectedResources := strings.Split(resources, ",")
 	stream := r.Service
+	actualResources := []string{}
 
 	for {
 		select {
@@ -158,8 +159,15 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if versionsMatch(version, actual.Version) && resourcesMatch(expectedResources, actual.Resources) {
-						return nil
+					if versionsMatch(version, actual.Version) {
+						if stream.Name == "RDS" {
+							actualResources = append(actualResources, actual.Resources...)
+						} else {
+							actualResources = actual.Resources
+						}
+						if resourcesMatch(expectedResources, actualResources) {
+							return nil
+						}
 					}
 				}
 			}
