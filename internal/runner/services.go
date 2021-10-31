@@ -6,33 +6,33 @@ import (
 	"time"
 	// core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	cds "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
-	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	"google.golang.org/grpc"
 )
 
 const (
-	TypeUrlLDS= "type.googleapis.com/envoy.config.listener.v3.Listener"
+	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
 	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
 	// TYPEURL_RDS = ""
 )
 
 type Channels struct {
-	Req   chan *discovery.DiscoveryRequest
-	Res   chan *discovery.DiscoveryResponse
-	Err   chan error
-	Done  chan bool
+	Req  chan *discovery.DiscoveryRequest
+	Res  chan *discovery.DiscoveryResponse
+	Err  chan error
+	Done chan bool
 }
 
 type ServiceCache struct {
 	InitResource []string
-	Requests  []*discovery.DiscoveryRequest
-	Responses []*discovery.DiscoveryResponse
+	Requests     []*discovery.DiscoveryRequest
+	Responses    []*discovery.DiscoveryResponse
 }
 
 type Context struct {
 	context context.Context
-	cancel context.CancelFunc
+	cancel  context.CancelFunc
 }
 
 type Stream interface {
@@ -41,14 +41,13 @@ type Stream interface {
 	CloseSend() error
 }
 
-
 type XDSService struct {
-	Name string
-	TypeURL string
+	Name     string
+	TypeURL  string
 	Channels *Channels
-	Cache *ServiceCache
-	Stream Stream
-	Context Context
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
 }
 
 type serviceBuilder interface {
@@ -56,19 +55,18 @@ type serviceBuilder interface {
 	setStream(conn *grpc.ClientConn) error
 	setInitResources([]string)
 	getService() *XDSService
-
 }
 
 type LDSBuilder struct {
-	Name string
-	TypeURL string
+	Name     string
+	TypeURL  string
 	Channels *Channels
-	Cache *ServiceCache
-	Stream Stream
-	Context Context
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
 }
 
-func (b *LDSBuilder) openChannels () {
+func (b *LDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
@@ -76,7 +74,6 @@ func (b *LDSBuilder) openChannels () {
 		Done: make(chan bool),
 	}
 }
-
 
 func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := lds.NewListenerDiscoveryServiceClient(conn)
@@ -92,31 +89,31 @@ func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *LDSBuilder) setInitResources (res []string) {
+func (b *LDSBuilder) setInitResources(res []string) {
 	b.Cache = &ServiceCache{}
 	b.Cache.InitResource = res
 }
 
-func (b *LDSBuilder) getService () *XDSService {
+func (b *LDSBuilder) getService() *XDSService {
 	return &XDSService{
 		Name:     "LDS",
 		TypeURL:  TypeUrlLDS,
 		Channels: b.Channels,
-		Cache: b.Cache,
-		Stream: b.Stream,
+		Cache:    b.Cache,
+		Stream:   b.Stream,
 	}
 }
 
 type CDSBuilder struct {
-	Name string
-	TypeURL string
+	Name     string
+	TypeURL  string
 	Channels *Channels
-	Cache *ServiceCache
-	Stream Stream
-	Context Context
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
 }
 
-func (b *CDSBuilder) openChannels () {
+func (b *CDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
@@ -124,7 +121,6 @@ func (b *CDSBuilder) openChannels () {
 		Done: make(chan bool),
 	}
 }
-
 
 func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := cds.NewClusterDiscoveryServiceClient(conn)
@@ -140,18 +136,18 @@ func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *CDSBuilder) setInitResources (res []string) {
+func (b *CDSBuilder) setInitResources(res []string) {
 	b.Cache = &ServiceCache{}
 	b.Cache.InitResource = res
 }
 
-func (b *CDSBuilder) getService () *XDSService {
+func (b *CDSBuilder) getService() *XDSService {
 	return &XDSService{
 		Name:     "CDS",
 		TypeURL:  TypeUrlCDS,
 		Channels: b.Channels,
-		Cache: b.Cache,
-		Stream: b.Stream,
+		Cache:    b.Cache,
+		Stream:   b.Stream,
 	}
 }
 

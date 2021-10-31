@@ -3,16 +3,16 @@ package runner
 import (
 	"fmt"
 	"io"
-	"time"
 	"sync"
+	"time"
 
-	"github.com/ii/xds-test-harness/internal/parser"
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/ii/xds-test-harness/internal/parser"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	"google.golang.org/grpc"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -29,9 +29,9 @@ type ClientConfig struct {
 }
 
 type Cache struct {
-	StartState *pb.Snapshot
+	StartState     *pb.Snapshot
 	StateSnapshots []*pb.Snapshot
-	FinalResponse *discovery.DiscoveryResponse
+	FinalResponse  *discovery.DiscoveryResponse
 }
 
 type Runner struct {
@@ -42,11 +42,11 @@ type Runner struct {
 	Service *XDSService
 }
 
-func FreshRunner (current ...*Runner) *Runner {
+func FreshRunner(current ...*Runner) *Runner {
 	var (
-	 adapter = &ClientConfig{}
-	 target = &ClientConfig{}
-	 nodeID = ""
+		adapter = &ClientConfig{}
+		target  = &ClientConfig{}
+		nodeID  = ""
 	)
 
 	if len(current) > 0 {
@@ -58,9 +58,9 @@ func FreshRunner (current ...*Runner) *Runner {
 
 	return &Runner{
 		Adapter: adapter,
-		Target: target,
-		NodeID: nodeID,
-		Cache: &Cache{},
+		Target:  target,
+		NodeID:  nodeID,
+		Cache:   &Cache{},
 		Service: &XDSService{},
 	}
 }
@@ -128,12 +128,12 @@ func (r *Runner) NewAckFromResponse(res *discovery.DiscoveryResponse, initReq *d
 	return request, nil
 }
 
-func (r *Runner) Ack (initReq *discovery.DiscoveryRequest, service *XDSService) {
+func (r *Runner) Ack(initReq *discovery.DiscoveryRequest, service *XDSService) {
 	service.Channels.Req <- initReq
 	service.Cache.Requests = append(service.Cache.Requests, initReq)
 	for {
 		select {
-		case res := <- service.Channels.Res:
+		case res := <-service.Channels.Res:
 			service.Cache.Responses = append(service.Cache.Responses, res)
 			ack, err := r.NewAckFromResponse(res, initReq)
 			if err != nil {
@@ -143,8 +143,8 @@ func (r *Runner) Ack (initReq *discovery.DiscoveryRequest, service *XDSService) 
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
-	        service.Cache.Requests = append(service.Cache.Requests, ack)
-		case <- service.Channels.Done:
+			service.Cache.Requests = append(service.Cache.Requests, ack)
+		case <-service.Channels.Done:
 			log.Debug().Msg("Received Done signal, shutting down request channel")
 			close(service.Channels.Req)
 			return

@@ -4,47 +4,52 @@ option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter"
 
 package adapter;
 
+message Endpoint {
+  string name    = 1;
+  string cluster = 2;
+  string address = 3;
+}
+
+message Cluster {
+  string name                       = 1;
+  map<string,int32> connect_timeout = 2;
+}
+message Route {
+  string name = 1;
+}
+message Listener {
+  string name    = 1;
+  string address = 2;
+}
+message Runtime {
+  string name = 1;
+}
+
+message Secret {
+  string name = 1;
+}
+
 message Endpoints {
-  message Endpoint {
-    string name = 1;
-  }
   repeated Endpoint items = 1;
 }
 
 message Clusters {
-  message Cluster {
-    string name = 1;
-    map<string,int32> connect_timeout = 2;
-  }
   repeated Cluster items = 1;
 }
 
 message Routes {
-  message Route {
-    string name = 1;
-  }
   repeated Route items = 1;
 }
 
 message Listeners {
-  message Listener {
-    string name = 1;
-    string address = 2;
-  }
   repeated Listener items = 1;
 }
 
 message Runtimes {
-  message Runtime {
-    string name = 1;
-  }
   repeated Runtime items = 1;
 }
 
 message Secrets {
-  message Secret {
-    string name = 1;
-  }
   repeated Secret items = 1;
 }
 

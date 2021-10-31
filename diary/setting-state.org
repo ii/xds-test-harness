@@ -1,0 +1,52 @@
+#+TITLE: Setting State
+
+* Context and Goal
+
+All our tests begin with some specified state, meaning a configuration of an
+envoy instance that our test target can communicate with. While each test only
+cares about a single service, and so only cares about a single aspect of the
+configuration, it is becoming apparent that we need to set up the whole config
+during the initial setting of state.
+
+While we could do LDS and CDS tests by only adding listeners and clusters in our
+state, RDS and EDS require routes and endpoints that are tightly integrated with
+the rest of the system. It seems impossible to test RDS without setting up
+listeners and cluster first, for example.
+
+This diary tracks the reasoning and work for making our harness better set up
+for RDS and EDS and, in the future, secrets and runtimes.
+
+Success will be able to run a simple RDS test.
+
+*  Set some ground rules/assumptions
+- These rules are for SOTW. ADS will be handled differently.
+- We do not care about the content of our target. We are testing the transport
+  of info, not the info itself.
+- Our test harness should be opinionated about this.
+- A test only specifies resource names and a service.
+- The harness sets up 1 resource in each service for each given name.
+- The services are namespaced by typeurl, and so can have duplicate names. for example:
+  + The test calls for testing "RDS" with resources "[a,b,c]"
+  + Initial state has endpoints a,b,c; clusters a,b,c; listeners a,b,c; routes a,b,c; etc.
+  + Validation is only done for the RDS resources.
+- Each service resource has only enough info to be a valid configuration, with
+  the details handled by the harness.
+  + Clusters have a connect timeout set, but it's always 5 seconds.
+  + Listeners have an address set, but it's always a socket address with a name given by the harness.
+- When updating state, we only care about the version changing, not the contents of the update.
+* Process
+** Rewrite adapter types so all services represented
+I will base the setup on the integration tests in the go-control-plane. I can
+start by defining it with all the details in those tests, reducing as we can to
+just the bare essentials.
+
+For most of the types i still can keep just the name, but sometimes need to specify the address.
+The routes and listeners both have random addresses assigned.
+** Rewrite our Given Step
+I updated the adapter in tegration into the go control plane by using functions already defined in GCP integration tests.
+Modelling our adapter off these tests let me set up the state successfully and all current tests that /should/ pass /do/ pass.
+** TODO Write RDS test
+** TODO Test the given statement works
+** TODO Test everything else works.
+* Questions
+1. Should there be a connection between the route socket address and the listener socket address? Does it matter?

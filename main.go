@@ -6,20 +6,19 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/runner"
-	"github.com/spf13/pflag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	pb "github.com/ii/xds-test-harness/api/adapter"
-
+	"github.com/spf13/pflag"
 )
 
 var (
-	debug  = pflag.BoolP("debug", "D", false, "sets log level to debug")
-	adapterAddress  = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
+	debug          = pflag.BoolP("debug", "D", false, "sets log level to debug")
+	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
-	nodeID  = pflag.StringP("nodeID", "N", "test-id", "node id of target")
-    ADS = pflag.StringP("ADS", "X", "on", "Whether to include ADS tests, or only run ADS tests. Can be: on, off, or only.")
+	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
+	ADS            = pflag.StringP("ADS", "X", "on", "Whether to include ADS tests, or only run ADS tests. Can be: on, off, or only.")
 
 	godogOpts = godog.Options{
 		ShowStepDefinitions: false,
@@ -50,7 +49,7 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 			log.Fatal().
 				Msgf("error connecting to target: %v", err)
 		}
-		if err := r.ConnectClient("adapter",*adapterAddress); err != nil {
+		if err := r.ConnectClient("adapter", *adapterAddress); err != nil {
 			log.Fatal().
 				Msgf("error connecting to adapter: %v", err)
 		}
