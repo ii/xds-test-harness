@@ -8,13 +8,14 @@ import (
 	cds "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
+	rds "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
 	"google.golang.org/grpc"
 )
 
 const (
 	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
 	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-	// TYPEURL_RDS = ""
+	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 )
 
 type Channels struct {
@@ -151,12 +152,62 @@ func (b *CDSBuilder) getService() *XDSService {
 	}
 }
 
+type RDSBuilder struct {
+	Name     string
+	TypeURL  string
+	Channels *Channels
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
+}
+
+func (b *RDSBuilder) openChannels() {
+	b.Channels = &Channels{
+		Req:  make(chan *discovery.DiscoveryRequest, 2),
+		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Err:  make(chan error, 2),
+		Done: make(chan bool),
+	}
+}
+
+func (b *RDSBuilder) setStream(conn *grpc.ClientConn) error {
+	client := rds.NewRouteDiscoveryServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	stream, err := client.StreamRoutes(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
+	b.Context.context = ctx
+	b.Context.cancel = cancel
+	b.Stream = stream
+	return nil
+}
+
+func (b *RDSBuilder) setInitResources(res []string) {
+	b.Cache = &ServiceCache{}
+	b.Cache.InitResource = res
+}
+
+func (b *RDSBuilder) getService() *XDSService {
+	return &XDSService{
+		Name:     "RDS",
+		TypeURL:  TypeUrlRDS,
+		Channels: b.Channels,
+		Cache:    b.Cache,
+		Stream:   b.Stream,
+	}
+}
+
 func getBuilder(builderType string) serviceBuilder {
 	if builderType == "LDS" {
 		return &LDSBuilder{}
 	}
 	if builderType == "CDS" {
 		return &CDSBuilder{}
+	}
+	if builderType == "RDS" {
+		return &RDSBuilder{}
 	}
 	return nil
 }

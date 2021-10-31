@@ -6,9 +6,11 @@ import (
 	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/rs/zerolog/log"
 )
 
 func RandomAddress() string {
@@ -120,6 +122,17 @@ func ParseDiscoveryResponseV2(res *envoy_service_discovery_v3.DiscoveryResponse)
 				return nil, err
 			}
 			simpRes.Resources = append(simpRes.Resources, cluster.Name)
+		}
+	}
+	if res.TypeUrl == "type.googleapis.com/envoy.config.route.v3.RouteConfiguration" {
+		for _, resource := range res.GetResources() {
+			log.Debug().Msgf("resource:%v", resource)
+			routeConfig := &route.RouteConfiguration{}
+			if err := resource.UnmarshalTo(routeConfig); err != nil {
+				fmt.Printf("ERORROROROR: %v", err)
+				return nil, err
+			}
+			simpRes.Resources = append(simpRes.Resources, routeConfig.Name)
 		}
 	}
 	return simpRes, nil
