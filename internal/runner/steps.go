@@ -9,6 +9,7 @@ import (
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/ii/xds-test-harness/api/adapter"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	parser "github.com/ii/xds-test-harness/internal/parser"
 	"github.com/rs/zerolog/log"
@@ -193,11 +194,23 @@ func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) err
 }
 
 func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, version string) error {
+	snapshot := &adapter.Snapshot{
+		Version: version,
+	}
+	startState := r.Cache.StartState
 	log.Debug().
 		Msgf("Updating target state for %v resource %v", service, resource)
+	log.Debug().Msgf("Our cache start state version: %v", r.Cache.StartState.Version)
+	snapshot.Node = startState.Node
+	snapshot.Endpoints = startState.Endpoints
+	snapshot.Clusters = startState.Clusters
+	snapshot.Routes = startState.Routes
+	snapshot.Listeners = startState.Listeners
+	snapshot.Runtimes = startState.Runtimes
+	snapshot.Secrets = startState.Secrets
+	log.Debug().Msgf("Our cache start state version after copy: %v", r.Cache.StartState.Version)
+	log.Debug().Msgf("Our snapshot version: %v", snapshot.Version)
 
-	snapshot := r.Cache.StartState
-	snapshot.Version = version
 
 	if service == "LDS" {
 		listeners := snapshot.GetListeners()
