@@ -171,6 +171,6 @@ Feature: Fetching Resources with LDS and CDS
 
     Examples:
       | service | starting version | resources   | subset of resources | next version |
-      # | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
-      # | "LDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
+      | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
+      | "LDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "RDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
