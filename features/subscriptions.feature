@@ -50,20 +50,21 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
 
 
-
-  Scenario:  When subscribing to specific CDS resources, receive only these resources
+  @active
+  Scenario:  When subscribing to specific resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <subset of resources> and <starting version>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
-      | service | starting version | resources   | subset of resources |
-      | "CDS"   | "1"              | "A,B,C,D"   | "B,D"               |
-      | "LDS"   | "1"              | "G,B,L,D"   | "L,G"               |
+      | service | starting version | resources | subset of resources |
+      | "CDS"   | "1"              | "A,B,C,D" | "B,D"               |
+      | "LDS"   | "1"              | "G,B,L,D" | "L,G"               |
+      | "RDS"   | "1"              | "A,B"     | "A,B"               |
 
 
-
+  @CDS @LDS
   Scenario: When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -79,6 +80,20 @@ Feature: Fetching Resources with LDS and CDS
 
 
 
+  Scenario: When subscribing to specific resources, receive response when those resources change
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the Client receives the <subset of resources> and <starting version>
+    When a <subscribed resource> of the <service> is updated to the <next version>
+    Then the Client receives the <subscribed resource> and <next version>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | subscribed resource | next version |
+      | "RDS"   | "1"              | "A,B,C,D"   | "B,D"               | "B"                 | "2"          |
+
+
+  @CDS @LDS
   Scenario: When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -94,6 +109,20 @@ Feature: Fetching Resources with LDS and CDS
 
 
 
+  Scenario: When subscribing to resources that don't exist, receive response when they are created
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the Client receives the <existing subset> and <starting version>
+    When a <chosen resource> is added to the <service> with <next version>
+    Then the Client receives the <chosen resource> and <next version>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | existing subset | chosen resource | next version |
+      | "RDS"   | "1"              | "A,B,C,D"   | "A,Z"               | "A"             | "Z"             | "2"          |
+
+
+  @CDS @LDS
   Scenario: Client can unsubcribe from some resources
     # This test does not check if the final results are only the subscribed resources
     # it is valid(though not desired) for a server to send more than is requested.
@@ -113,6 +142,23 @@ Feature: Fetching Resources with LDS and CDS
 
 
 
+  Scenario: Client can unsubcribe from some resources
+    # difference from test above is use of the word ONLY in the final THEN step
+    # This currently does not pass for go-control-plane
+    Given a target setup with <service>, <resources>, and <starting version>
+    When the Client subscribes to a <subset of resources> for <service>
+    Then the Client receives the <subset of resources> and <starting version>
+    When the Client updates subscription to a <resource from subset> of <service> with <starting version>
+    And a <resource from subset> of the <service> is updated to the <next version>
+    Then the Client receives only the <resource from subset> and <next version>
+    And the Client sends an ACK to which the <service> does not respond
+
+    Examples:
+      | service | starting version | resources   | subset of resources | resource from subset |   next version  |
+      | "RDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
+
+
+
   Scenario: Client can unsubscribe from all resources
     # This is not working currently, the unsusbcribe is not registered,
     # neither as an unsubscribe nor a new wildcard request
@@ -127,3 +173,4 @@ Feature: Fetching Resources with LDS and CDS
       | service | starting version | resources   | subset of resources | next version |
       | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "LDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
+      | "RDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
