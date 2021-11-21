@@ -128,7 +128,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponseV2(response)
+					actual, err := parser.ParseDiscoveryResponse(response)
 					if err != nil {
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
@@ -136,7 +136,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 					if !versionsMatch(version, actual.Version) {
 						continue
 					}
-					if stream.Name == "RDS" {
+					if stream.Name == "RDS" { // this is because RDS resources can come from multiple responses.
 						actualResources = append(actualResources, actual.Resources...)
 					} else {
 						actualResources = actual.Resources
@@ -163,7 +163,7 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponseV2(response)
+					actual, err := parser.ParseDiscoveryResponse(response)
 					if err != nil {
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
@@ -210,9 +210,6 @@ func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, v
 		Version: version,
 	}
 	startState := r.Cache.StartState
-	log.Debug().
-		Msgf("Updating target state for %v resource %v", service, resource)
-	log.Debug().Msgf("Our cache start state version: %v", r.Cache.StartState.Version)
 	snapshot.Node = startState.Node
 	snapshot.Endpoints = startState.Endpoints
 	snapshot.Clusters = startState.Clusters
@@ -220,10 +217,11 @@ func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, v
 	snapshot.Listeners = startState.Listeners
 	snapshot.Runtimes = startState.Runtimes
 	snapshot.Secrets = startState.Secrets
-	log.Debug().Msgf("Our cache start state version after copy: %v", r.Cache.StartState.Version)
-	log.Debug().Msgf("Our snapshot version: %v", snapshot.Version)
 
-
+	// TODO I am uncertain if we need to update the contents of any
+	// resource? Is updating just the version enough to trigger
+	// a subscription update? If so, we can remove the majority of this
+	// function body.
 	if service == "LDS" {
 		listeners := snapshot.GetListeners()
 		for _, listener := range listeners.Items {
@@ -360,7 +358,7 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 		default:
 			if len(r.Service.Cache.Responses) > 0 {
 				for _, response := range r.Service.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponseV2(response)
+					actual, err := parser.ParseDiscoveryResponse(response)
 					if err != nil {
 						log.Error().
 							Err(err).

@@ -96,7 +96,7 @@ func ToSecrets(resourceNames []string) *pb.Secrets {
 	return secrets
 }
 
-func ParseDiscoveryResponseV2(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
+func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
 	simpRes := &SimpleResponse{}
 
 	simpRes.Version = res.VersionInfo

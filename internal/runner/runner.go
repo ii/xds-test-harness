@@ -109,7 +109,7 @@ func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.Di
 }
 
 func (r *Runner) NewAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) (*discovery.DiscoveryRequest, error) {
-	response, err := parser.ParseDiscoveryResponseV2(res)
+	response, err := parser.ParseDiscoveryResponse(res)
 	if err != nil {
 		err := fmt.Errorf("error parsing dres for acking: %v", err)
 		return nil, err
