@@ -7,33 +7,76 @@ learning experiments. We try to keep the two as separate and clear as possible.*
 
 # Run the example
 
-To see this in action, clone and navigate to this repo and start a target server:
+You can run the test suite against our example server: an implementation of the go-control-plane that is integrated with our adapter.
+
+To do this, you will **1** generate the api then **2** start the server and then **3** start the test suite
+
+## Generate the API
+
+The api uses [protocol
+buffers](https://developers.google.com/protocol-buffers/), and so first you need
+to install protoc:
+
+[install instructions for protoc](https://grpc.io/docs/protoc-installation/).
+
+You should be able to run this command and get a similar response:
+
+``` sh
+protoc --version
+#=> returns libprotc 3.17.3+
+```
+
+Once installed, clone and navigate to this repo:
 
 ``` sh
 git clone https://github.com/ii/xds-test-harness
 cd xds-test-harness
+```
+
+and generate the api:
+
+``` sh
+protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    api/adapter/adapter.proto
+```
+
+## Start the target server
+
+In your terminal window, from this repo, run:
+
+``` sh
 go run examples/go-control-plane/main/main.go
 ```
-(This starts up a simple implementation of the [envoy proxy go control
-plane](https://github.com/envoyproxy/go-control-plane/), with the suite adapter integreated.)
 
+## Run the suite
 
-Run the suite in another terminal window:
+In a new terminal window, navigate to the harness and start it up:
 ``` sh
 cd xds-test-harness
 go run .
 ```
-To run the suite with detailed logging, you can run:
+
+To run it with detailed logging, add the --debug flag:
 ``` sh
 go run . --debug
 ```
 
+
+If you add a tag to the topline of a test in the feature file([example](https://github.com/ii/xds-test-harness/blob/update-gcp/features/subscriptions.feature#L125)), 
+you can run the harness for just this tag with the -t flag:
+
+``` sh
+go run -t "@mytest"
+```
+
 # Design
 
-The suite is made up of tests, a main program to run these tests against a
-target server, and an adapter for setting the server to the correct state for
-each test. The adapter is meant to be integrated into the target, and so in this
-repo is just the API. The full design can be read in our [design
+The suite is made of tests, a test runner, and an adapter api that target
+servers can implement to work with the runner.
+
+The adapter is meant to be integrated into the target, and so this
+repo only holds the API spec. The full design can be read in our [design
 doc](https://github.com/ii/xds-test-harness/blob/main/docs/design-doc.md)
 
 # Navigating the repo

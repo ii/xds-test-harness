@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
+	"os"
+	"time"
+
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
@@ -13,15 +18,12 @@ import (
 	runtime "github.com/envoyproxy/go-control-plane/envoy/service/runtime/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
-	"log"
-	"net"
-	"os"
-	"time"
 )
 
 var (
@@ -237,22 +239,27 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 		runtimes[i] = MakeRuntime(runtime.Name)
 	}
 
-	snapshot := cache.NewSnapshot(
+	snapshot, err := cache.NewSnapshot(
 		state.Version,
-		endpoints,
-		clusters,
-		routes,
-		listeners,
-		runtimes,
-		[]types.Resource{}, // secrets
+		map[resource.Type][]types.Resource{
+			resource.EndpointType: endpoints,
+			resource.ClusterType: clusters,
+			resource.RouteType: routes,
+			resource.ListenerType: listeners,
+			resource.RuntimeType: runtimes,
+			resource.SecretType: []types.Resource{},
+		},
 	)
+	if err != nil {
+		log.Printf("Error creating snapshot: %v", err)
+	}
 	if err = snapshot.Consistent(); err != nil {
 		log.Printf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
 		os.Exit(1)
 	}
 
 	// // Add the snapshot to the cache
-	if err := xdsCache.SetSnapshot(state.Node, snapshot); err != nil {
+	if err := xdsCache.SetSnapshot(context.Background(), state.Node, snapshot); err != nil {
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
