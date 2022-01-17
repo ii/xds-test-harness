@@ -136,7 +136,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 					if !versionsMatch(version, actual.Version) {
 						continue
 					}
-					if stream.Name == "RDS" { // this is because RDS resources can come from multiple responses.
+					if stream.Name == "RDS" || stream.Name == "EDS" { // this is because RDS resources can come from multiple responses.
 						actualResources = append(actualResources, actual.Resources...)
 					} else {
 						actualResources = actual.Resources

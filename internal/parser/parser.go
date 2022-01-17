@@ -8,6 +8,7 @@ import (
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 )
@@ -97,13 +98,19 @@ func ToSecrets(resourceNames []string) *pb.Secrets {
 }
 
 func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
+	const (
+		TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
+		TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+		TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
+		TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
+	)
 	simpRes := &SimpleResponse{}
 
 	simpRes.Version = res.VersionInfo
 	simpRes.Nonce = res.Nonce
 	simpRes.Resources = []string{}
-
-	if res.TypeUrl == "type.googleapis.com/envoy.config.listener.v3.Listener" {
+	switch res.TypeUrl {
+	case TypeUrlLDS:
 		for _, resource := range res.GetResources() {
 			listener := &listener.Listener{}
 			if err := resource.UnmarshalTo(listener); err != nil {
@@ -112,8 +119,7 @@ func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (
 			}
 			simpRes.Resources = append(simpRes.Resources, listener.Name)
 		}
-	}
-	if res.TypeUrl == "type.googleapis.com/envoy.config.cluster.v3.Cluster" {
+	case TypeUrlCDS:
 		for _, resource := range res.GetResources() {
 			cluster := &cluster.Cluster{}
 			if err := resource.UnmarshalTo(cluster); err != nil {
@@ -122,8 +128,7 @@ func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (
 			}
 			simpRes.Resources = append(simpRes.Resources, cluster.Name)
 		}
-	}
-	if res.TypeUrl == "type.googleapis.com/envoy.config.route.v3.RouteConfiguration" {
+	case TypeUrlRDS:
 		for _, resource := range res.GetResources() {
 			routeConfig := &route.RouteConfiguration{}
 			if err := resource.UnmarshalTo(routeConfig); err != nil {
@@ -131,6 +136,15 @@ func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (
 				return nil, err
 			}
 			simpRes.Resources = append(simpRes.Resources, routeConfig.Name)
+		}
+	case TypeUrlEDS:
+		for _, resource := range res.GetResources() {
+			endpointConfig := &endpoint.ClusterLoadAssignment{}
+			if err := resource.UnmarshalTo(endpointConfig); err != nil {
+				fmt.Printf("ERORROROROR: %v", err)
+				return nil, err
+			}
+			simpRes.Resources = append(simpRes.Resources, endpointConfig.ClusterName)
 		}
 	}
 	return simpRes, nil

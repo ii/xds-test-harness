@@ -1,7 +1,6 @@
 package runner
 
 import (
-	// "fmt"
 	"context"
 	"time"
 	// core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -9,6 +8,7 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	rds "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
+	eds "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
 	"google.golang.org/grpc"
 )
 
@@ -16,6 +16,7 @@ const (
 	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
 	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
+	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
 
 type Channels struct {
@@ -199,15 +200,64 @@ func (b *RDSBuilder) getService() *XDSService {
 	}
 }
 
-func getBuilder(builderType string) serviceBuilder {
-	if builderType == "LDS" {
-		return &LDSBuilder{}
+type EDSBuilder struct {
+	Name     string
+	TypeURL  string
+	Channels *Channels
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
+}
+
+func (b *EDSBuilder) openChannels() {
+	b.Channels = &Channels{
+		Req:  make(chan *discovery.DiscoveryRequest, 2),
+		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Err:  make(chan error, 2),
+		Done: make(chan bool),
 	}
-	if builderType == "CDS" {
-		return &CDSBuilder{}
+}
+
+func (b *EDSBuilder) setStream(conn *grpc.ClientConn) error {
+	client := eds.NewEndpointDiscoveryServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	stream, err := client.StreamEndpoints(ctx)
+	if err != nil {
+		defer cancel()
+		return err
 	}
-	if builderType == "RDS" {
-		return &RDSBuilder{}
-	}
+	b.Context.context = ctx
+	b.Context.cancel = cancel
+	b.Stream = stream
 	return nil
+}
+
+func (b *EDSBuilder) setInitResources(res []string) {
+	b.Cache = &ServiceCache{}
+	b.Cache.InitResource = res
+}
+
+func (b *EDSBuilder) getService() *XDSService {
+	return &XDSService{
+		Name:     "EDS",
+		TypeURL:  TypeUrlEDS,
+		Channels: b.Channels,
+		Cache:    b.Cache,
+		Stream:   b.Stream,
+	}
+}
+
+func getBuilder(builderType string) serviceBuilder {
+	switch builderType {
+	case "LDS":
+		return &LDSBuilder{}
+	case "CDS":
+		return &CDSBuilder{}
+	case "RDS":
+		return &RDSBuilder{}
+	case "EDS":
+		return &EDSBuilder{}
+	default:
+		return nil
+	}
 }

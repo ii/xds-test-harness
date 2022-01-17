@@ -50,7 +50,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
 
 
-  @active
+
   Scenario:  When subscribing to specific resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -62,6 +62,7 @@ Feature: Fetching Resources with LDS and CDS
       | "CDS"   | "1"              | "A,B,C,D" | "B,D"               |
       | "LDS"   | "1"              | "G,B,L,D" | "L,G"               |
       | "RDS"   | "1"              | "A,B"     | "A,B"               |
+      | "EDS"   | "1"              | "A,B"     | "A,B"               |
 
 
   @CDS @LDS
@@ -91,6 +92,7 @@ Feature: Fetching Resources with LDS and CDS
     Examples:
       | service | starting version | resources   | subset of resources | subscribed resource | next version |
       | "RDS"   | "1"              | "A,B,C,D"   | "B,D"               | "B"                 | "2"          |
+      | "EDS"   | "1"              | "A,B,C,D"   | "B,D"               | "B"                 | "2"          |
 
 
   @CDS @LDS
@@ -120,6 +122,7 @@ Feature: Fetching Resources with LDS and CDS
     Examples:
       | service | starting version | resources   | subset of resources | existing subset | chosen resource | next version |
       | "RDS"   | "1"              | "A,B,C,D"   | "A,Z"               | "A"             | "Z"             | "2"          |
+      | "EDS"   | "1"              | "A,B,C,D"   | "A,Z"               | "A"             | "Z"             | "2"          |
 
 
   @CDS @LDS
@@ -156,6 +159,7 @@ Feature: Fetching Resources with LDS and CDS
     Examples:
       | service | starting version | resources   | subset of resources | resource from subset |   next version  |
       | "RDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
+      | "EDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
 
@@ -174,3 +178,4 @@ Feature: Fetching Resources with LDS and CDS
       | "CDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "LDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "RDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
+      | "EDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
