@@ -136,7 +136,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 					if !versionsMatch(version, actual.Version) {
 						continue
 					}
-					if stream.Name == "RDS" || stream.Name == "EDS" { // this is because RDS resources can come from multiple responses.
+					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
 						actualResources = append(actualResources, actual.Resources...)
 					} else {
 						actualResources = actual.Resources
@@ -365,7 +365,7 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 							Msg("can't parse discovery response ")
 						return err
 					}
-					currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots) - 1]
+					currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots)-1]
 					if actual.Version != currentState.Version {
 						continue
 					}
@@ -379,13 +379,12 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 	}
 }
 
-
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
 	ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
-    ctx.Step(`^the Client receives only the "([^"]*)" and "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
+	ctx.Step(`^the Client receives only the "([^"]*)" and "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
 	ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)

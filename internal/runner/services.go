@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"time"
-	// core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	cds "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
