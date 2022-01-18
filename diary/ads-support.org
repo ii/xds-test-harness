@@ -2,7 +2,7 @@
 #+DATE: 2021-01-18
 #+AUTHOR: Zach Mandeville
 
-* Introduction
+** Introduction
 This diary is a work-in-progress, documenting how we add ADS support to the xDS
 test harness. It starts by checking assumptions I have about ADS, sets out an
 initial design for the work, and then acts as a work diary of my pgoress.
@@ -11,7 +11,7 @@ The bottom of the document has open questions for which I'd love feedback. When
 a question is answered, it'll be removed from that section and its answer woven
 into this diary.
 
-* Assumptions/Current Understanding
+** Assumptions/Current Understanding
 - The xDS transport protocol has [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol][four variants]]. An xDS server can handle any or
   all of these variants.
 - The test framework, too, should cover all variants.
@@ -25,12 +25,10 @@ into this diary.
   configured as basic or aggregated.
   + However, there will be additional 'ADS-only' tests
 - A team may want to ensure their server can handle basic /and/ ADS.
-- **The framework should be able to be configured for a server's configuration, a configuration that**
-   **holds through the entire test suite.**
-- **If a team wants to test their server with multiple configurations, they should**
-  **run the test suite multiple times, once per configuration.**
+- **The framework should be able to be configured for a server's configuration, a configuration that holds through the entire test suite.**
+- **If a team wants to test their server with multiple configurations, they should run the test suite multiple times, once per configuration.**
 
-* Design Goals
+** Design Goals
 A person testing their xDS server can start up our harness with an `--ads` flag.
 
 When ADS is set, Our suite runs a hook before the tests are run to tell each step
@@ -50,15 +48,15 @@ In addition, the suite would run tests tagged with "@ads". The easiest way to do
 this is through negation. By default the tests run as "run everything BUT ads".
 With the "@ads" flag set it becomes "run everything".
 
-* Process
-** TODO Double Check assumptions and design with team
-** Implement hook for switching between ADS and Basic
-** Refactor functions as necessary
-** Write ADS only test
-** Celebrate and Dance
-* Questions
-** Are my assumptions about ADS and our harness correct?
-** Should the harness detect how the target is configured?
+** Process
+*** TODO Double Check assumptions and design with team
+*** Implement hook for switching between ADS and Basic
+*** Refactor functions as necessary
+*** Write ADS only test
+*** Celebrate and Dance
+** Questions
+*** Are my assumptions about ADS and our harness correct?
+*** Should the harness detect how the target is configured?
 In this case, someone could run the harness without flags and we'd auto-detect
 how to perform our tests. This is kind of how I read it in the Statement of
 Work, but it seems the flags would be simpler and easier?
