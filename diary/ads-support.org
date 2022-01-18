@@ -1,0 +1,64 @@
+#+TITLE: Ads Support
+#+DATE: 2021-01-18
+#+AUTHOR: Zach Mandeville
+
+* Introduction
+This diary is a work-in-progress, documenting how we add ADS support to the xDS
+test harness. It starts by checking assumptions I have about ADS, sets out an
+initial design for the work, and then acts as a work diary of my pgoress.
+
+The bottom of the document has open questions for which I'd love feedback. When
+a question is answered, it'll be removed from that section and its answer woven
+into this diary.
+
+* Assumptions/Current Understanding
+- The xDS transport protocol has [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol][four variants]]. An xDS server can handle any or
+  all of these variants.
+- The test framework, too, should cover all variants.
+  + It [[https://github.com/ii/xds-test-harness/tree/de750b5ba26ba3f0de5a6ecca1fcac20b787ee30][currently]] only supports SoTW(State of the World)/Basic
+  + SoTW/ADS(Aggregated Discovery) should be the added next, followed by Delta/Basic and Delta/ADS.
+- An xDS server is configured for a single variant on startup
+  + e.g: if it's set to SoTW/ADS, then all CDS,LDS,RDS,EDS features will be handled
+    via ADS
+  + It cannot switch itself from basic to ADS and remain running.
+- The intent of our current tests are the same, no matter if a server is
+  configured as basic or aggregated.
+  + However, there will be additional 'ADS-only' tests
+- A team may want to ensure their server can handle basic /and/ ADS.
+- **The framework should be able to be configured for a server's configuration, a configuration that**
+   **holds through the entire test suite.**
+- **If a team wants to test their server with multiple configurations, they should**
+  **run the test suite multiple times, once per configuration.**
+
+* Design Goals
+A person testing their xDS server can start up our harness with an `--ads` flag.
+
+When ADS is set, Our suite runs a hook before the tests are run to tell each step
+to assume it's working with an ADS server.
+
+Currently, we have a [[https://github.com/ii/xds-test-harness/blob/ads-support/internal/runner/services.go#L54][service builder]] that is passed an xDS service and then sets
+up the right kind of stream and opens the required message passing channels. We
+could use this same design to build an ADS service and follow the same behaviour.
+
+We, ideally, do not need to change the steps much to have this work. We would
+mainly need to refactor the [[https://github.com/ii/xds-test-harness/blob/ads-support/internal/runner/steps.go#L99][clientSubscribesToService]] function, to tell it to
+open an ADS stream instead of a specific stream of the tested service. We'd also
+want to make sure our validation steps were only examining responses with the right
+type url.
+
+In addition, the suite would run tests tagged with "@ads". The easiest way to do
+this is through negation. By default the tests run as "run everything BUT ads".
+With the "@ads" flag set it becomes "run everything".
+
+* Process
+** TODO Double Check assumptions and design with team
+** Implement hook for switching between ADS and Basic
+** Refactor functions as necessary
+** Write ADS only test
+** Celebrate and Dance
+* Questions
+** Are my assumptions about ADS and our harness correct?
+** Should the harness detect how the target is configured?
+In this case, someone could run the harness without flags and we'd auto-detect
+how to perform our tests. This is kind of how I read it in the Statement of
+Work, but it seems the flags would be simpler and easier?
