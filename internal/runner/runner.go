@@ -167,12 +167,12 @@ func (r *Runner) Stream(service *XDSService) error {
 			in, err := service.Stream.Recv()
 			if err == io.EOF {
 				log.Debug().
-					Msg("No more Discovery Responses from LDS stream")
+					Msgf("No more Discovery Responses from %v stream", r.Service.Name)
 				close(service.Channels.Res)
 				return
 			}
 			if err != nil {
-				log.Err(err).Msg("error receiving responses on LDS stream")
+				log.Err(err).Msgf("error receiving responses on %v stream", r.Service.Name)
 				service.Channels.Err <- err
 				return
 			}

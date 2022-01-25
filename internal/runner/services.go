@@ -3,11 +3,13 @@ package runner
 import (
 	"context"
 	"time"
+
 	cds "github.com/envoyproxy/go-control-plane/envoy/service/cluster/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	eds "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	rds "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
-	eds "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -320,7 +322,7 @@ func getBuilder(builderType string) serviceBuilder {
 	case "EDS":
 		return &EDSBuilder{}
 	case "ADS":
-		return &EDSBuilder{}
+		return &ADSBuilder{}
 	default:
 		return nil
 	}
