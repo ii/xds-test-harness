@@ -55,7 +55,7 @@ type serviceBuilder interface {
 	openChannels()
 	setStream(conn *grpc.ClientConn) error
 	setInitResources([]string)
-	getService() *XDSService
+	getService(srv string) *XDSService
 }
 
 type LDSBuilder struct {
@@ -65,6 +65,21 @@ type LDSBuilder struct {
 	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
+}
+
+func getTypeUrl(service string) (typeUrl string) {
+	typeUrl = ""
+	switch service {
+	case "LDS":
+		typeUrl = TypeUrlLDS
+	case "CDS":
+		typeUrl = TypeUrlCDS
+	case "EDS":
+		typeUrl = TypeUrlEDS
+	case "RDS":
+		typeUrl = TypeUrlRDS
+	}
+	return typeUrl
 }
 
 func (b *LDSBuilder) openChannels() {
@@ -95,10 +110,10 @@ func (b *LDSBuilder) setInitResources(res []string) {
 	b.Cache.InitResource = res
 }
 
-func (b *LDSBuilder) getService() *XDSService {
+func (b *LDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "LDS",
-		TypeURL:  TypeUrlLDS,
+		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -142,10 +157,10 @@ func (b *CDSBuilder) setInitResources(res []string) {
 	b.Cache.InitResource = res
 }
 
-func (b *CDSBuilder) getService() *XDSService {
+func (b *CDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "CDS",
-		TypeURL:  TypeUrlCDS,
+		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -189,10 +204,10 @@ func (b *RDSBuilder) setInitResources(res []string) {
 	b.Cache.InitResource = res
 }
 
-func (b *RDSBuilder) getService() *XDSService {
+func (b *RDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "RDS",
-		TypeURL:  TypeUrlRDS,
+		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -236,15 +251,63 @@ func (b *EDSBuilder) setInitResources(res []string) {
 	b.Cache.InitResource = res
 }
 
-func (b *EDSBuilder) getService() *XDSService {
+func (b *EDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "EDS",
-		TypeURL:  TypeUrlEDS,
+		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
+
+type ADSBuilder struct {
+	Name     string
+	TypeURL  string
+	Channels *Channels
+	Cache    *ServiceCache
+	Stream   Stream
+	Context  Context
+}
+
+func (b *ADSBuilder) openChannels() {
+	b.Channels = &Channels{
+		Req:  make(chan *discovery.DiscoveryRequest, 2),
+		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Err:  make(chan error, 2),
+		Done: make(chan bool),
+	}
+}
+
+func (b *ADSBuilder) setStream(conn *grpc.ClientConn) error {
+	client := discovery.NewAggregatedDiscoveryServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	stream, err := client.StreamAggregatedResources(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
+	b.Context.context = ctx
+	b.Context.cancel = cancel
+	b.Stream = stream
+	return nil
+}
+
+func (b *ADSBuilder) setInitResources(res []string) {
+	b.Cache = &ServiceCache{}
+	b.Cache.InitResource = res
+}
+
+func (b *ADSBuilder) getService(service string) *XDSService {
+	return &XDSService{
+		Name:     "ADS",
+		TypeURL:  getTypeUrl(service),
+		Channels: b.Channels,
+		Cache:    b.Cache,
+		Stream:   b.Stream,
+	}
+}
+
 
 func getBuilder(builderType string) serviceBuilder {
 	switch builderType {
@@ -255,6 +318,8 @@ func getBuilder(builderType string) serviceBuilder {
 	case "RDS":
 		return &RDSBuilder{}
 	case "EDS":
+		return &EDSBuilder{}
+	case "ADS":
 		return &EDSBuilder{}
 	default:
 		return nil

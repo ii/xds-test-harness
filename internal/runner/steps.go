@@ -85,6 +85,7 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 }
 
 func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) error {
+	log.Info().Msgf("The Runner is aggregated: %v", r.Aggregated)
 	resources := []string{}
 	r.ClientSubscribesToServiceForResources(service, resources)
 	return nil
@@ -97,14 +98,19 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 }
 
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	builder := getBuilder(srv)
+	var builder serviceBuilder
+	if r.Aggregated {
+		builder = getBuilder("ADS")
+	} else {
+	  builder = getBuilder(srv)
+	}
 	builder.openChannels()
 	builder.setInitResources(resources)
 	err := builder.setStream(r.Target.Conn)
 	if err != nil {
 		return err
 	}
-	r.Service = builder.getService()
+	r.Service = builder.getService(srv)
 
 	request := r.NewRequest(r.Service.Cache.InitResource, r.Service.TypeURL)
 
