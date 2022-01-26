@@ -3,15 +3,24 @@ package parser
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 )
+
+const (
+	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
+	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
+	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
+)
+
 
 func RandomAddress() string {
 	var (
@@ -97,13 +106,24 @@ func ToSecrets(resourceNames []string) *pb.Secrets {
 	return secrets
 }
 
+func ServiceToTypeURL(service string) (err error, typeURL string) {
+	typeURLs := map[string]string{
+		"lds": TypeUrlLDS,
+		"cds": TypeUrlCDS,
+		"eds": TypeUrlEDS,
+		"rds": TypeUrlRDS,
+	}
+	service = strings.ToLower(service)
+
+	typeURL, ok := typeURLs[service]
+	if !ok {
+		err = fmt.Errorf("Cannot find type URL for given service: %v", service)
+		return err, typeURL
+	}
+	return nil, typeURL
+}
+
 func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
-	const (
-		TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
-		TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-		TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
-		TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
-	)
 	simpRes := &SimpleResponse{}
 
 	simpRes.Version = res.VersionInfo

@@ -9,15 +9,7 @@ import (
 	eds "github.com/envoyproxy/go-control-plane/envoy/service/endpoint/v3"
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	rds "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-)
-
-const (
-	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
-	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
-	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
-	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
 
 type Channels struct {
@@ -46,7 +38,6 @@ type Stream interface {
 
 type XDSService struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
@@ -62,26 +53,10 @@ type serviceBuilder interface {
 
 type LDSBuilder struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
-}
-
-func getTypeUrl(service string) (typeUrl string) {
-	typeUrl = ""
-	switch service {
-	case "LDS":
-		typeUrl = TypeUrlLDS
-	case "CDS":
-		typeUrl = TypeUrlCDS
-	case "EDS":
-		typeUrl = TypeUrlEDS
-	case "RDS":
-		typeUrl = TypeUrlRDS
-	}
-	return typeUrl
 }
 
 func (b *LDSBuilder) openChannels() {
@@ -115,7 +90,6 @@ func (b *LDSBuilder) setInitResources(res []string) {
 func (b *LDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "LDS",
-		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -124,7 +98,6 @@ func (b *LDSBuilder) getService(srv string) *XDSService {
 
 type CDSBuilder struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
@@ -162,7 +135,6 @@ func (b *CDSBuilder) setInitResources(res []string) {
 func (b *CDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "CDS",
-		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -171,7 +143,6 @@ func (b *CDSBuilder) getService(srv string) *XDSService {
 
 type RDSBuilder struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
@@ -209,7 +180,6 @@ func (b *RDSBuilder) setInitResources(res []string) {
 func (b *RDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "RDS",
-		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -218,7 +188,6 @@ func (b *RDSBuilder) getService(srv string) *XDSService {
 
 type EDSBuilder struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
@@ -256,7 +225,6 @@ func (b *EDSBuilder) setInitResources(res []string) {
 func (b *EDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "EDS",
-		TypeURL:  getTypeUrl(srv),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
@@ -265,7 +233,6 @@ func (b *EDSBuilder) getService(srv string) *XDSService {
 
 type ADSBuilder struct {
 	Name     string
-	TypeURL  string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
@@ -303,7 +270,6 @@ func (b *ADSBuilder) setInitResources(res []string) {
 func (b *ADSBuilder) getService(service string) *XDSService {
 	return &XDSService{
 		Name:     "ADS",
-		TypeURL:  getTypeUrl(service),
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,

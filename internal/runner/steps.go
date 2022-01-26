@@ -85,7 +85,6 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 }
 
 func (r *Runner) TheClientDoesAWildcardSubscriptionToService(service string) error {
-	log.Info().Msgf("The Runner is aggregated: %v", r.Aggregated)
 	resources := []string{}
 	r.ClientSubscribesToServiceForResources(service, resources)
 	return nil
@@ -112,7 +111,12 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	}
 	r.Service = builder.getService(srv)
 
-	request := r.NewRequest(r.Service.Cache.InitResource, r.Service.TypeURL)
+	err, typeURL := parser.ServiceToTypeURL(srv)
+	if err != nil {
+		return err
+	}
+
+	request := r.NewRequest(r.Service.Cache.InitResource, typeURL)
 
 	log.Debug().
 		Msgf("Sending subscribing request: %v\n", request)
@@ -326,10 +330,16 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{resource},
-		TypeUrl:       r.Service.TypeURL,
+		TypeUrl:       typeURL,
 	}
 	// small hack as i build this out, to ensure Acking our last response happens before we update subscription
 	time.Sleep(2 * time.Second)
@@ -341,11 +351,16 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	version := r.Cache.StartState.Version
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{""},
-		TypeUrl:       r.Service.TypeURL,
+		TypeUrl:       typeURL,
 	}
 	time.Sleep(3 * time.Second)
 	log.Debug().
