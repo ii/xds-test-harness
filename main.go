@@ -143,9 +143,7 @@ func main() {
 		incremental = false
 		aggregated = false
 		godogOpts.Tags = "@sotw && @separate"
-		if status := suite.Run(); status == 1 {
-			os.Exit(status)
-		}
+		suite.Run();
 	}
 
 	//SOTW, Aggregated
@@ -153,9 +151,7 @@ func main() {
 		incremental = false
 		aggregated = true
 		godogOpts.Tags = "@sotw && @aggregated"
-		if status := suite.Run(); status == 1 {
-			os.Exit(status)
-		}
+		suite.Run();
 	}
 
 	//Incremental, Separate
@@ -163,9 +159,7 @@ func main() {
 		incremental = true
 		aggregated = false
 		godogOpts.Tags = "@incremental && @separate"
-		if status := suite.Run(); status == 1 {
-			os.Exit(status)
-		}
+		suite.Run();
 	}
 
 	//Incremental, Aggregated
@@ -173,9 +167,7 @@ func main() {
 		incremental = true
 		aggregated = true
 		godogOpts.Tags = "@incremental && @aggregated"
-		if status := suite.Run(); status == 1 {
-			os.Exit(status)
-		}
+		suite.Run();
 	}
 	os.Exit(0)
 }
