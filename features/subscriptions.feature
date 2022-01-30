@@ -183,15 +183,15 @@ Feature: Fetching Resources with LDS and CDS
     Scenario: Client can subscribe to multiple services via ADS
       Given a target setup with <service>, <resources>, and <starting version>
       When the Client subscribes to a <subset of resources> for <service>
-      Then the Client receives the <subset of resources> for <service> and <starting version>
+      Then the Client receives the <subset of resources> and <starting version> for <service>
       When the Client then subscribes to a <subset of resources> for <other service>
-      Then the Client receives the <subset of resources> for <other service> and <starting version>
+      Then the Client receives the <subset of resources> and <starting version> for <other service>
       When a <subset of resources> of the <service> is updated to the <next version>
-      Then the Client receives the <subset of resources> for <service> and <next version>
+      Then the Client receives the <subset of resources> and <next version> for <service>
       # trying out different language for server not responding to acks
       And the service never responds more than necessary
 
       Examples:
         | service | other service | starting version | resources | subset of resources | next version |
         | "CDS"   | "LDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
-        | "EDS"   | "RDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
+        | "RDS"   | "EDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
