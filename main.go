@@ -142,7 +142,7 @@ func main() {
 	if supportedVariants[0] {
 		incremental = false
 		aggregated = false
-		godogOpts.Tags = "@sotw && @separate"
+		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@sotw","@separate"}, " && ")
 		suite.Run();
 	}
 
@@ -150,7 +150,7 @@ func main() {
 	if supportedVariants[1] {
 		incremental = false
 		aggregated = true
-		godogOpts.Tags = "@sotw && @aggregated"
+		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@sotw","@aggregated"}, " && ")
 		suite.Run();
 	}
 
@@ -158,7 +158,7 @@ func main() {
 	if supportedVariants[2] {
 		incremental = true
 		aggregated = false
-		godogOpts.Tags = "@incremental && @separate"
+		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@incremental","@separate"}, " && ")
 		suite.Run();
 	}
 
@@ -166,7 +166,7 @@ func main() {
 	if supportedVariants[3] {
 		incremental = true
 		aggregated = true
-		godogOpts.Tags = "@incremental && @aggregated"
+		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@incremental","@aggregated"}, " && ")
 		suite.Run();
 	}
 	os.Exit(0)
