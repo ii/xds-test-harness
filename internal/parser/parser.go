@@ -129,6 +129,7 @@ func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (
 	simpRes.Version = res.VersionInfo
 	simpRes.Nonce = res.Nonce
 	simpRes.Resources = []string{}
+	simpRes.TypeUrl = res.TypeUrl
 	switch res.TypeUrl {
 	case TypeUrlLDS:
 		for _, resource := range res.GetResources() {
