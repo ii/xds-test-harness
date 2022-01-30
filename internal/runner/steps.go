@@ -24,9 +24,11 @@ func itemInSlice(item string, slice []string) bool {
 	return false
 }
 
-func versionsMatch(expected string, actual string) bool {
+func stringsMatch(expected string, actual string) bool {
 	return expected == actual
 }
+
+
 
 func resourcesMatch(expected []string, actual []string) bool {
 	log.Debug().Msgf("resources to match...expected: %v, actual: %v\n", expected, actual)
@@ -125,6 +127,19 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	return nil
 }
 
+func (r *Runner) TheClientThenSubscribesToResourcesForService(resources, service string) error {
+	resourceList := strings.Split(resources, ",")
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	request := r.NewRequest(resourceList, typeURL)
+	r.Service.Channels.Req <- request
+	log.Debug().
+		Msgf("Sent new subscribing request: %v\n", request)
+	return nil
+}
+
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
 	expectedResources := strings.Split(resources, ",")
 	stream := r.Service
@@ -143,7 +158,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !versionsMatch(version, actual.Version) {
+					if !stringsMatch(version, actual.Version) {
 						continue
 					}
 					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
@@ -160,6 +175,52 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 		}
 	}
 }
+
+func (r *Runner) TheClientReceivesResourcesAndVersionForService(resources, version, service string) error {
+	expectedResources := strings.Split(resources, ",")
+	stream := r.Service
+	actualResources := []string{}
+
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			log.Err(err).Msg("From our step")
+			return errors.New("Could not find expected response within grace period of 10 seconds.")
+		default:
+			if len(stream.Cache.Responses) > 0 {
+				for _, response := range stream.Cache.Responses {
+					actual, err := parser.ParseDiscoveryResponse(response)
+					if err != nil {
+						log.Error().Err(err).Msg("can't parse discovery response ")
+						return err
+					}
+					if !stringsMatch(version, actual.Version) {
+						continue
+					}
+					if !stringsMatch(typeUrl, actual.TypeUrl) {
+						continue
+					}
+					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
+						actualResources = append(actualResources, actual.Resources...)
+					} else {
+						actualResources = actual.Resources
+					}
+					if !resourcesMatch(expectedResources, actualResources) {
+						continue
+					}
+					return nil
+				}
+			}
+		}
+	}
+}
+
+
 
 func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
 	stream := r.Service
@@ -178,7 +239,7 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !versionsMatch(version, actual.Version) {
+					if !stringsMatch(version, actual.Version) {
 						continue
 					}
 					// we set our subscription to a single resource, and the services should only send a single resource.
@@ -199,6 +260,23 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 }
 
 func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) error {
+	stream := r.Service
+	stream.Channels.Done <- true
+
+	// give some time for the final messages to come through, if there's any lingering responses.
+	time.Sleep(3 * time.Second)
+	log.Debug().
+		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
+	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
+		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
+		log.Err(err).
+			Msgf("Requests:%v, Responses: \v", stream.Cache.Requests, stream.Cache.Responses)
+		return err
+	}
+	return nil
+}
+
+func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	stream := r.Service
 	stream.Channels.Done <- true
 
@@ -412,4 +490,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
+	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
+    ctx.Step(`^the Client then subscribes to a "([^"]*)" for "([^"]*)"$`, r.TheClientThenSubscribesToResourcesForService)
+    ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 }
