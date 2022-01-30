@@ -1,11 +1,9 @@
-
 Feature: Fetching Resources with LDS and CDS
   Client can do wildcard subscriptions or normal subscriptions
   and receive updates when any subscribed resources change.
 
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
-
 
   @sotw @separate @aggregated
   Scenario Outline: The service should send all resources on a wildcard request.
@@ -179,3 +177,21 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "RDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
       | "EDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
+
+
+    @sotw @aggregated @active
+    Scenario: Client can subscribe to multiple services via ADS
+      Given a target setup with <service>, <resources>, and <starting version>
+      When the Client subscribes to a <subset of resources> for <service>
+      Then the Client receives the <subset of resources> for <service> and <starting version>
+      When the Client then subscribes to a <subset of resources> for <other service>
+      Then the Client receives the <subset of resources> for <other service> and <starting version>
+      When a <subset of resources> of the <service> is updated to the <next version>
+      Then the Client receives the <subset of resources> for <service> and <next version>
+      # trying out different language for server not responding to acks
+      And the service never responds more than necessary
+
+      Examples:
+        | service | other service | starting version | resources | subset of resources | next version |
+        | "CDS"   | "LDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
+        | "EDS"   | "RDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
