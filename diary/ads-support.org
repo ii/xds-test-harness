@@ -3,28 +3,32 @@
 #+AUTHOR: Zach Mandeville, Mark Roth
 
 ** Introduction
-This diary is a work-in-progress, documenting how we add ADS support to the xDS
-test harness. It starts by checking assumptions I have about ADS, sets out an
-initial design for the work, and then acts as a work diary of my pgoress.
+This diary is a work-in-progress to document how we added ADS support to the xDS
+test harness. It sets up a background of the problem, our design of the work,
+and a work diary of the progress to implement it.
 
 The bottom of the document has open questions for which I'd love feedback. When
 a question is answered, it'll be removed from that section and its answer woven
 into this diary.
 
 ** Background
-The xDS transport protocol has [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol][four variants]]. Each of the variants are handled
-by [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#rpc-services-and-methods-for-each-variant][different RPC services/methods]], and so an xDS server can support any or all
-of them at the same time.
+The xDS transport protocol has [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol][four variants]]:
+- State of the World, non-aggregated
+- SOTW, aggregated
+- Incremental(or delta), non-aggregated
+- Incremental, aggregated
+
+Each of the variants are handled by [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#rpc-services-and-methods-for-each-variant][different RPC services/methods]], and an xDS
+server can support any or all of them at the same time.
 
 For example, for LDS, the various protocol variants are provided via the
 following RPC methods:
+- SotW, non aggregated: ListenerDiscoveryService.StreamListeners
+- SOTW, Aggregated : AggregatedDiscoveryService.StreamAggregatedResources
+- Incremental, non-agg: ListenerDiscoveryService.DeltaListeners
+- Incremental, Aggregated: AggregatedDiscoveryService.DeltaAggregatedResources
 
-    Basic SotW: ListenerDiscoveryService.StreamListeners Incremental:
-    ListenerDiscoveryService.DeltaListeners Aggregated SotW:
-    AggregatedDiscoveryService.StreamAggregatedResources Aggregated Incremental:
-    AggregatedDiscoveryService.DeltaAggregatedResources
-
-For each of SotW and incremental, the actual communication on the stream will be
+For  SotW and incremental, the actual communication on the stream will be
 essentially the same for both aggregated and non-aggregated, regardless of which
 of the above RPC methods you use to create the stream.
 
@@ -34,57 +38,100 @@ example, with a basic LDS test, our test runner should be able to run it against
 both ~ListenerDiscoveryService.StreamListeners~ and
 ~AggregatedDisocveryService.StreamAggregatedResources~.
 
-Similarly, when we implement tests for the incremental variant, then the test
-should run against ~ListenerDiscoveryService.DeltaListeners~ and
-~AggregatedDiscoveryService.DeltaAggregatedResources~
-
 A target server may be configured for any subset of combinations from the four
 variants, and we should not lock in any required configuration for our tests.
 Instead, through something like command line flags, a person can tell the test
 runner which variants their implementation supports.
-
-** Design Goals
-
-Our test runner will have a set of flags for each of the variants. A person can use
-these flags to narrow the tests run to their server's subset of support variants.
-
+** Design
+*** Specifying variants with cli flags
 A person should only start the runner once, and then the runner executes the
 test suite against the different set variants, by running the right stream
 against each of the supported, appropriate RPC methods (as outlined above).
 
-A test may be general enough to work across all variants, or only be appropriate
-for a subset. We indicate this, in the test, using tags. The four tags, then,
-would be:
+A person can indicate which variants their target supports using the flag
+~--variants~. This flag expects a four character stirng made up of 1's and 0's.
+1 represents support, 0 non-support. The variants are, right to left, sotw
+non-agg, sotw agg, incremental non-agg, incremental agg.
+
+So if a person wanted to run the test suite against a server
+running only non-aggregated, but supporting sotw and incremental, they'd run:
+: ./runner --variants 1010
+
+If they are an edge case that only supports SoTW, non-aggregated and
+incremental, aggregated, then they'd run:
+: ./runner --variants 1001
+*** Tagging  the tests
+For the tests themselves, some may be general enough to work across all
+variants, and some may only be appropriate for a particular combination. We can
+indicate this using tags added to the top of the test scenario. The tags are:
 - @sotw
 - @incremental
 - @aggregate
 - @separate
+*** reading flags and tags in our main
+In our main function, we parse the variant flag to build an array of boolean values.
+For each true value in the array, we run the test suite for that variant. This means
+the suite can run from 1-4 times.
 
-If a person invokes the runner as:
-: ./runner --sotw --separate --aggregate
+(The ~aggregate~ and ~incremental~ variables are passed into the runner on suite
+initialization, so that all the test step functions can adjust, as necessary,
+for the variant.)
 
-Then the runner would go through the test suite twice. Once, running all tests
-tagged with ~@sotw~ and ~@separate~, and then running all tests flagged with
-~@sotw~ and ~@aggregate~.
+*** Changes to our test Steps
 
-In addition, we set a variable in the runner for whether it is testing against
-separate or aggregate. This adjusts the RPC methods that are used throughout the
-test steps.
+The main flow for our tests is to set up state on the target server using the
+adapter, then initialize a service for the duration of the test. This service
+includes channels for requests and responses (and caches for both). Each test
+step in the scenario can use this service interface to pass along new requests
+or update state as nceeded.
 
+We can use the same pattern for ADS, with some modifications:
 
-Currently, we have a [[https://github.com/ii/xds-test-harness/blob/ads-support/internal/runner/services.go#L54][service builder]] that is passed an xDS service and then sets
-up the right kind of stream and opens the required message passing channels. We
-could use this same design to build the aggregated service. We then, ideally, do not
-need to change the steps much to have this work.
+Originally, the service interface included its typeURL value.
+When we needed to make a new request, we'd use the service's assign typeURL.
+This doesn't work for ADs, so now our new request functions pass the required
+typeURL, which is determined from the test step itself.
 
-Mainly, we would need to refactor the [[https://github.com/ii/xds-test-harness/blob/ads-support/internal/runner/steps.go#L99][clientSubscribesToService]] function, to
-tell it to open an ADS stream instead of a specific stream of the tested
-service. We'd also want to make sure our validation steps were only examining
-responses with the right type url.
+Originally, our subscribing step assumed you would be doing one subscription per
+scenario, and so built a service interface as part of the subscription step.
+This doesn't work for ADS-Only tests where you are subscribing to multiple
+services across the same stream, and building a new service interface means
+clearing the existing caches. Now, the subscribing function checks if we
+already have a service initialized and, if so, uses its existing inferface. I
+think this change makes the function stronge overall, and may help me fix the
+unsubscribing issues.
 
+*** Uncertain changes
+I added a new step at the end of our ADS-only test, that reads:
+"And the server does not respond more than necessary".
+
+This step is functionally identical to our current step "And the client ACKS to
+which the server does not respond".
+
+I duplicated the function due to an issue in the function's logic. It closes
+down our response and request channels, so that any remaining messages can come
+through and we can look at the entire range of messages sent. Then, we count
+the # of responses and # of requests. Since ACK'ing is built into the client's
+lifecycle, and it is acking every response it gets from the server, than in this
+final step there should be 1 more request than response. If not, the step fails.
+
+This logic requires the step to be run at the end of the test. However, in the
+test cases doc, for the ADS-only test there are multiple "and the client sends
+an ack to which the server doesn't respond". If I tried to match the test case
+verbatim, we'd be closing the ADS stream too early. If I just put the existing
+step at the end, it seems as if we are only ACK'ing once.
+
+Now, the ACK'ing is assumed to happen as part of the test, and we just check at
+the end that the server hasn't sent more responses than it needed to. I worry
+this makes the test steps too opaque, and it may be highlighting that the
+existing steps are not as elegant as they could be. I am v. open for feedback or
+suggestions on if this needs to change, and how it could be improved.
 ** Process
-*** Implement hook for switching between aggregated and separate
-*** Refactor functions as necessary
-*** Write ADS only test
-*** Celebrate and Dance
+*** DONE Implement hook for switching between variants
+*** DONE Refactor functions as necessary
+*** DONE Write ADS only test
+*** TODO Celebrate and Dance
 ** Questions
+- Does the wording of the ADS test work for everyone?
+  + does the test run as we'd expect?
+- Are there any objections/improvements to the --variants flag?
