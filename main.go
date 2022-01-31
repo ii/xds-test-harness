@@ -117,6 +117,14 @@ func supportedVariants(combo string) (err error, supportedVariants []bool) {
 	return nil, supportedVariants
 }
 
+func combineTags(godogTags string, customTags []string) (tags string){
+	if godogTags != "" {
+		customTags = append(customTags, godogTags)
+	}
+	tags = strings.Join(customTags, " && ")
+	return tags
+}
+
 func main() {
 	pflag.Parse()
 	godogOpts.Paths = pflag.Args()
@@ -131,6 +139,8 @@ func main() {
 		Options:              &godogOpts,
 	}
 
+	// any tags passed in with -t when invoking the runner
+	godogTags := godogOpts.Tags
 	// we have four variants, either set to T or F
 	err, supportedVariants := supportedVariants(*variants)
 	if err != nil {
@@ -142,7 +152,8 @@ func main() {
 	if supportedVariants[0] {
 		incremental = false
 		aggregated = false
-		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@sotw","@separate"}, " && ")
+		customTags := []string{"@sotw", "@separate"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
 		suite.Run();
 	}
 
@@ -150,7 +161,8 @@ func main() {
 	if supportedVariants[1] {
 		incremental = false
 		aggregated = true
-		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@sotw","@aggregated"}, " && ")
+		customTags := []string{"@sotw", "@aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
 		suite.Run();
 	}
 
@@ -158,7 +170,8 @@ func main() {
 	if supportedVariants[2] {
 		incremental = true
 		aggregated = false
-		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@incremental","@separate"}, " && ")
+		customTags := []string{"@incremental", "@separate"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
 		suite.Run();
 	}
 
@@ -166,7 +179,8 @@ func main() {
 	if supportedVariants[3] {
 		incremental = true
 		aggregated = true
-		godogOpts.Tags = strings.Join([]string{godogOpts.Tags, "@incremental","@aggregated"}, " && ")
+		customTags := []string{"@incremental", "@aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
 		suite.Run();
 	}
 	os.Exit(0)
