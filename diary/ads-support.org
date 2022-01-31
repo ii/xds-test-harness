@@ -63,24 +63,20 @@ incremental, aggregated, then they'd run:
 *** Tagging  the tests
 For the tests themselves, some may be general enough to work across all
 variants, and some may only be appropriate for a particular combination. We can
-indicate this using tags added to the top of the test scenario. The tags are:
+indicate this using [[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L8][tags added to the top of the test scenario]]. The tags are:
 - @sotw
 - @incremental
 - @aggregate
 - @separate
 *** reading flags and tags in our main
-In our main function, we parse the variant flag to build an array of boolean values.
-For each true value in the array, we run the test suite for that variant. This means
+In our main function, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L101][parse the variant flag]] to build an array of boolean values.
+For each true value in the array, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L152][run the test suite]] for that variant. This means
 the suite can run from 1-4 times.
-
-(The ~aggregate~ and ~incremental~ variables are passed into the runner on suite
-initialization, so that all the test step functions can adjust, as necessary,
-for the variant.)
 
 *** Changes to our test Steps
 
 The main flow for our tests is to set up state on the target server using the
-adapter, then initialize a service for the duration of the test. This service
+adapter, then [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/services.go#L39][initialize a service]] for the duration of the test. This service
 includes channels for requests and responses (and caches for both). Each test
 step in the scenario can use this service interface to pass along new requests
 or update state as nceeded.
@@ -89,24 +85,24 @@ We can use the same pattern for ADS, with some modifications:
 
 Originally, the service interface included its typeURL value.
 When we needed to make a new request, we'd use the service's assign typeURL.
-This doesn't work for ADs, so now our new request functions pass the required
-typeURL, which is determined from the test step itself.
+This doesn't work for ADs, so now [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L102][our new request functions pass the required
+typeURL]], which is determined from the test step itself.
 
 Originally, our subscribing step assumed you would be doing one subscription per
 scenario, and so built a service interface as part of the subscription step.
 This doesn't work for ADS-Only tests where you are subscribing to multiple
 services across the same stream, and building a new service interface means
-clearing the existing caches. Now, the subscribing function checks if we
-already have a service initialized and, if so, uses its existing inferface. I
-think this change makes the function stronge overall, and may help me fix the
+clearing the existing caches. Now, the subscribing function [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L107][checks if we
+already]] have a service initialized and, if so, uses its existing inferface. I
+think this change makes the function stronger overall, and may help me fix the
 unsubscribing issues.
 
 *** Uncertain changes
 I added a new step at the end of our ADS-only test, that reads:
-"And the server does not respond more than necessary".
+[[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L192]["And the server never responds more than necessary"]].
 
-This step is functionally identical to our current step "And the client ACKS to
-which the server does not respond".
+This step is functionally identical to our current step [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L257]["And the client ACKS to
+which the server does not respond".]]
 
 I duplicated the function due to an issue in the function's logic. It closes
 down our response and request channels, so that any remaining messages can come
