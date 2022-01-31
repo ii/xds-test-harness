@@ -179,7 +179,7 @@ Feature: Fetching Resources with LDS and CDS
       | "EDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
 
 
-    @sotw @aggregated @active
+    @sotw @aggregated
     Scenario: Client can subscribe to multiple services via ADS
       Given a target setup with <service>, <resources>, and <starting version>
       When the Client subscribes to a <subset of resources> for <service>
