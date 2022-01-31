@@ -99,45 +99,40 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 }
 
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	var builder serviceBuilder
-	if r.Aggregated {
-		builder = getBuilder("ADS")
-	} else {
-	  builder = getBuilder(srv)
-	}
-	builder.openChannels()
-	builder.setInitResources(resources)
-	err := builder.setStream(r.Target.Conn)
-	if err != nil {
-		return err
-	}
-	r.Service = builder.getService(srv)
-
 	err, typeURL := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
+	// check if we are updating existing stream or starting a new one.
+	if r.Service.Stream != nil {
+		request := r.NewRequest(resources, typeURL)
+		r.Service.Channels.Req <- request
+		log.Debug().
+			Msgf("Sent new subscribing request: %v\n", request)
+		return nil
+	} else {
+		var builder serviceBuilder
+		if r.Aggregated {
+			builder = getBuilder("ADS")
+		} else {
+			builder = getBuilder(srv)
+		}
+		builder.openChannels()
+		builder.setInitResources(resources)
+		err := builder.setStream(r.Target.Conn)
+		if err != nil {
+			return err
+		}
+		r.Service = builder.getService(srv)
 
-	request := r.NewRequest(r.Service.Cache.InitResource, typeURL)
+		request := r.NewRequest(r.Service.Cache.InitResource, typeURL)
 
-	log.Debug().
-		Msgf("Sending subscribing request: %v\n", request)
-	go r.Stream(r.Service)
-	go r.Ack(request, r.Service)
-	return nil
-}
-
-func (r *Runner) TheClientThenSubscribesToResourcesForService(resources, service string) error {
-	resourceList := strings.Split(resources, ",")
-	err, typeURL := parser.ServiceToTypeURL(service)
-	if err != nil {
-		return err
+		log.Debug().
+			Msgf("Sending first subscribing request: %v\n", request)
+		go r.Stream(r.Service)
+		go r.Ack(request, r.Service)
+		return nil
 	}
-	request := r.NewRequest(resourceList, typeURL)
-	r.Service.Channels.Req <- request
-	log.Debug().
-		Msgf("Sent new subscribing request: %v\n", request)
-	return nil
 }
 
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
@@ -491,6 +486,5 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
-    ctx.Step(`^the Client then subscribes to a "([^"]*)" for "([^"]*)"$`, r.TheClientThenSubscribesToResourcesForService)
     ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 }

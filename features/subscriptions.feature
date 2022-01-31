@@ -184,7 +184,7 @@ Feature: Fetching Resources with LDS and CDS
       Given a target setup with <service>, <resources>, and <starting version>
       When the Client subscribes to a <subset of resources> for <service>
       Then the Client receives the <subset of resources> and <starting version> for <service>
-      When the Client then subscribes to a <subset of resources> for <other service>
+      When the Client subscribes to a <subset of resources> for <other service>
       Then the Client receives the <subset of resources> and <starting version> for <other service>
       When a <subset of resources> of the <service> is updated to the <next version>
       Then the Client receives the <subset of resources> and <next version> for <service>
