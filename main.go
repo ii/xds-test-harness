@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	// "fmt"
 	"os"
 
 	"strings"
@@ -22,7 +20,7 @@ var (
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
-	variants       = pflag.StringP("variants", "V", "1111", "Set which xDS transport variants your server supports.\n These are, in order: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n. 1 if your server supports that variant, 0 if not\n. eg: --variants 1010 supports sotw non-aggregated and incremental non-aggregated.")
+	variant       = pflag.StringArrayP("variant", "V", []string{"sotw non-aggregated", "sotw aggregated","incremental non-aggregated", "incremental aggregated"}, "xDS protocol variant your server supports. Add a separate flag per each supported variant.\n Possibleariants are: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n.")
 	aggregated     = false
 	incremental    = false
 
@@ -98,23 +96,24 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	r.LoadSteps(ctx)
 }
 
-func supportedVariants(combo string) (err error, supportedVariants []bool) {
-	flags := strings.Split(combo, "")
-	if len(flags) < 4 {
-		err := fmt.Errorf("Expected four digits, each a 1 or 0 (e.g. 1001). Given \"%v\"", combo)
-		return err, []bool{}
-	}
-	for i := 0; i < 4; i++ {
-		if flags[i] == "1" {
-			supportedVariants = append(supportedVariants, true)
-		} else if flags[i] == "0" {
-			supportedVariants = append(supportedVariants, false)
-		} else {
-			err := fmt.Errorf("Expected four digits, each a 1 or 0 (e.g. 1001). Given \"%v\"", combo)
-			return err, []bool{}
+func supportedVariants(variants []string) (err error, supported map[string]bool) {
+	supported = make(map[string]bool)
+	for _, variant := range variants {
+		variant = strings.ToLower(strings.TrimSpace(variant))
+		switch variant {
+		case "sotw non-aggregated":
+			supported["sotw non-aggregated"] = true
+		case "sotw aggregated":
+			supported["sotw aggregated"] = true
+		case "incremental non-aggregated":
+			supported["incremental non-aggregated"] = true
+		case "incremental aggregated":
+			supported["incremental aggregated"] = true
+		default:
+			log.Info().Msgf("Cannot recognize variant: %v\nWe support:\nsotw non-aggregated\nsotw aggregated\nincremental non-aggregated\nincremental aggregated\n", variant)
 		}
 	}
-	return nil, supportedVariants
+	return nil, supported
 }
 
 func combineTags(godogTags string, customTags []string) (tags string){
@@ -139,17 +138,16 @@ func main() {
 		Options:              &godogOpts,
 	}
 
+
 	// any tags passed in with -t when invoking the runner
 	godogTags := godogOpts.Tags
-	// we have four variants, either set to T or F
-	err, supportedVariants := supportedVariants(*variants)
+	err, supportedVariants := supportedVariants(*variant)
 	if err != nil {
-		log.Info().Msgf("Error parsing variants config: %v\n", err)
+		log.Info().Msgf("Error parsing supported variants: %v\n", err)
 		os.Exit(0)
 	}
 
-	//SOTW, Separate
-	if supportedVariants[0] {
+	if supportedVariants["sotw non-aggregated"] {
 		incremental = false
 		aggregated = false
 		customTags := []string{"@sotw", "@separate"}
@@ -157,8 +155,7 @@ func main() {
 		suite.Run();
 	}
 
-	//SOTW, Aggregated
-	if supportedVariants[1] {
+	if supportedVariants["sotw aggregated"] {
 		incremental = false
 		aggregated = true
 		customTags := []string{"@sotw", "@aggregated"}
@@ -166,8 +163,7 @@ func main() {
 		suite.Run();
 	}
 
-	//Incremental, Separate
-	if supportedVariants[2] {
+	if supportedVariants["incremental non-aggregated"] {
 		incremental = true
 		aggregated = false
 		customTags := []string{"@incremental", "@separate"}
@@ -175,8 +171,7 @@ func main() {
 		suite.Run();
 	}
 
-	//Incremental, Aggregated
-	if supportedVariants[3] {
+	if supportedVariants["incremental aggregated"] {
 		incremental = true
 		aggregated = true
 		customTags := []string{"@incremental", "@aggregated"}

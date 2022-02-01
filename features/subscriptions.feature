@@ -5,7 +5,7 @@ Feature: Fetching Resources with LDS and CDS
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
-  @sotw @separate @aggregated
+  @sotw @separate @aggregated @active
   Scenario Outline: The service should send all resources on a wildcard request.
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
