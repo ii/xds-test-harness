@@ -9,6 +9,7 @@ import (
 	"github.com/cucumber/godog/colors"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/runner"
+	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
@@ -16,6 +17,7 @@ import (
 
 var (
 	debug          = pflag.BoolP("debug", "D", false, "sets log level to debug")
+	config         = pflag.StringP("config", "C", "", "Path to optional config file. This file sets the adapter and target addresses and supported variants.")
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
@@ -61,7 +63,7 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 		r.NodeID = *nodeID
 		r.Aggregated = aggregated
 		log.Info().
-			Msgf("Connected to target at %s and adapter at %s\n", *targetAddress, *adapterAddress)
+			Msgf("Connected to target at port %s and adapter at port %s\n", *targetAddress, *adapterAddress)
 		if r.Aggregated {
 			log.Info().
 				Msgf("Tests will be run via ADS")
@@ -95,7 +97,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	r.LoadSteps(ctx)
 }
 
-func supportedVariants(variants []string) (err error, supported map[string]bool) {
+func parseSupportedVariants(variants []string) (err error, supported map[string]bool) {
 	supported = make(map[string]bool)
 	for _, variant := range variants {
 		variant = strings.ToLower(strings.TrimSpace(variant))
@@ -126,8 +128,41 @@ func combineTags(godogTags string, customTags []string) (tags string) {
 func main() {
 	pflag.Parse()
 	godogOpts.Paths = pflag.Args()
+	variantsInConfig := []string{}
+
 	if *debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
+
+	if *config != ""{
+		c, err := yaml.ReadFile(*config)
+		if err != nil {
+			log.Info().Msgf("Error reading config file %v: %v\n", *config, err)
+		}
+		target, err := c.Get("targetAddress")
+		if err != nil {
+			log.Info().Msgf("Cannot get target address from config file: %v\n", err)
+		} else {
+		  *targetAddress = target
+		}
+		adapter, err := c.Get("adapterAddress")
+		if err != nil {
+			log.Info().Msgf("Cannot get adapter address from config file: %v\n", err)
+		} else {
+			*adapterAddress = adapter
+		}
+		variants, err := yaml.Child(c.Root, "variants")
+		if err != nil {
+			log.Info().Msgf("Error getting variants from config: %v\n", err)
+		}
+		varList, ok := variants.(yaml.List)
+		if ok {
+			for i := 0; i < varList.Len(); i++ {
+				node := varList.Item(i)
+				variant := string(node.(yaml.Scalar))
+				variantsInConfig = append(variantsInConfig, variant)
+			}
+		}
 	}
 
 	suite := godog.TestSuite{
@@ -139,10 +174,11 @@ func main() {
 
 	// any tags passed in with -t when invoking the runner
 	godogTags := godogOpts.Tags
-	err, supportedVariants := supportedVariants(*variant)
-	if err != nil {
-		log.Info().Msgf("Error parsing supported variants: %v\n", err)
-		os.Exit(0)
+	supportedVariants := make(map[string]bool)
+	if len(variantsInConfig) > 0 {
+		_, supportedVariants = parseSupportedVariants(variantsInConfig)
+	} else {
+	   _, supportedVariants = parseSupportedVariants(*variant)
 	}
 
 	if supportedVariants["sotw non-aggregated"] {
