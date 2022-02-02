@@ -5,7 +5,7 @@ Feature: Fetching Resources with LDS and CDS
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
-  @sotw @separate @aggregated @active
+  @sotw @non-aggregated @aggregated @active
   Scenario Outline: The service should send all resources on a wildcard request.
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
@@ -18,7 +18,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "F,D,E"            |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario Outline: The service should send updates to the client
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
@@ -33,7 +33,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario Outline: Wildcard subscriptions receive updates when new resources are added
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
@@ -48,7 +48,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario:  When subscribing to specific resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -63,7 +63,7 @@ Feature: Fetching Resources with LDS and CDS
       | "EDS"   | "1"              | "A,B"     | "A,B"               |
 
 
-  @CDS @LDS @sotw @separate @aggregated
+  @CDS @LDS @sotw @non-aggregated @aggregated
   Scenario: When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -78,7 +78,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "L,G"               | "G"                 | "2"          |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario: When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -93,7 +93,7 @@ Feature: Fetching Resources with LDS and CDS
       | "EDS"   | "1"              | "A,B,C,D"   | "B,D"               | "B"                 | "2"          |
 
 
-  @CDS @LDS @sotw @separate @aggregated
+  @CDS @LDS @sotw @non-aggregated @aggregated
   Scenario: When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -108,7 +108,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario: When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
@@ -123,7 +123,7 @@ Feature: Fetching Resources with LDS and CDS
       | "EDS"   | "1"              | "A,B,C,D"   | "A,Z"               | "A"             | "Z"             | "2"          |
 
 
-  @CDS @LDS @sotw @separate @aggregated
+  @CDS @LDS @sotw @non-aggregated @aggregated
   Scenario: Client can unsubcribe from some resources
     # This test does not check if the final results are only the subscribed resources
     # it is valid(though not desired) for a server to send more than is requested.
@@ -142,7 +142,7 @@ Feature: Fetching Resources with LDS and CDS
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario: Client can unsubcribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     # This currently does not pass for go-control-plane
@@ -160,7 +160,7 @@ Feature: Fetching Resources with LDS and CDS
       | "EDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @sotw @separate @aggregated
+  @sotw @non-aggregated @aggregated
   Scenario: Client can unsubscribe from all resources
     # This is not working currently, the unsusbcribe is not registered,
     # neither as an unsubscribe nor a new wildcard request
