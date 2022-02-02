@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
@@ -18,7 +19,9 @@ var (
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
-	ADS            = pflag.StringP("ADS", "X", "on", "Whether to include ADS tests, or only run ADS tests. Can be: on, off, or only.")
+	variant        = pflag.StringArrayP("variant", "V", []string{"sotw non-aggregated", "sotw aggregated", "incremental non-aggregated", "incremental aggregated"}, "xDS protocol variant your server supports. Add a separate flag per each supported variant.\n Possibleariants are: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n.")
+	aggregated     = false
+	incremental    = false
 
 	godogOpts = godog.Options{
 		ShowStepDefinitions: false,
@@ -26,6 +29,7 @@ var (
 		StopOnFailure:       false,
 		Strict:              false,
 		NoColors:            false,
+		Tags:                "",
 		Format:              "",
 		Concurrency:         0,
 		Paths:               []string{},
@@ -43,6 +47,7 @@ func init() {
 }
 
 func InitializeTestSuite(sc *godog.TestSuiteContext) {
+
 	sc.BeforeSuite(func() {
 		r = runner.FreshRunner()
 		if err := r.ConnectClient("target", *targetAddress); err != nil {
@@ -54,8 +59,16 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 				Msgf("error connecting to adapter: %v", err)
 		}
 		r.NodeID = *nodeID
+		r.Aggregated = aggregated
 		log.Info().
 			Msgf("Connected to target at %s and adapter at %s\n", *targetAddress, *adapterAddress)
+		if r.Aggregated {
+			log.Info().
+				Msgf("Tests will be run via ADS")
+		} else {
+			log.Info().
+				Msgf("Tests will be run non-aggregated, via separate streams")
+		}
 	})
 }
 
@@ -82,24 +95,86 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	r.LoadSteps(ctx)
 }
 
+func supportedVariants(variants []string) (err error, supported map[string]bool) {
+	supported = make(map[string]bool)
+	for _, variant := range variants {
+		variant = strings.ToLower(strings.TrimSpace(variant))
+		switch variant {
+		case "sotw non-aggregated":
+			supported["sotw non-aggregated"] = true
+		case "sotw aggregated":
+			supported["sotw aggregated"] = true
+		case "incremental non-aggregated":
+			supported["incremental non-aggregated"] = true
+		case "incremental aggregated":
+			supported["incremental aggregated"] = true
+		default:
+			log.Info().Msgf("Cannot recognize variant: %v\nWe support:\nsotw non-aggregated\nsotw aggregated\nincremental non-aggregated\nincremental aggregated\n", variant)
+		}
+	}
+	return nil, supported
+}
+
+func combineTags(godogTags string, customTags []string) (tags string) {
+	if godogTags != "" {
+		customTags = append(customTags, godogTags)
+	}
+	tags = strings.Join(customTags, " && ")
+	return tags
+}
+
 func main() {
 	pflag.Parse()
 	godogOpts.Paths = pflag.Args()
-	if *ADS == "off" {
-		godogOpts.Tags = "~@ADS"
-	}
-	if *ADS == "only" {
-		godogOpts.Tags = "@ADS"
-	}
 	if *debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
-	status := godog.TestSuite{
+	suite := godog.TestSuite{
 		Name:                 "xDS Test Suite",
 		ScenarioInitializer:  InitializeScenario,
 		TestSuiteInitializer: InitializeTestSuite,
 		Options:              &godogOpts,
-	}.Run()
-	os.Exit(status)
+	}
+
+	// any tags passed in with -t when invoking the runner
+	godogTags := godogOpts.Tags
+	err, supportedVariants := supportedVariants(*variant)
+	if err != nil {
+		log.Info().Msgf("Error parsing supported variants: %v\n", err)
+		os.Exit(0)
+	}
+
+	if supportedVariants["sotw non-aggregated"] {
+		incremental = false
+		aggregated = false
+		customTags := []string{"@sotw", "@non-aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
+		suite.Run()
+	}
+
+	if supportedVariants["sotw aggregated"] {
+		incremental = false
+		aggregated = true
+		customTags := []string{"@sotw", "@aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
+		suite.Run()
+	}
+
+	if supportedVariants["incremental non-aggregated"] {
+		incremental = true
+		aggregated = false
+		customTags := []string{"@incremental", "@non-aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
+		suite.Run()
+	}
+
+	if supportedVariants["incremental aggregated"] {
+		incremental = true
+		aggregated = true
+		customTags := []string{"@incremental", "@aggregated"}
+		godogOpts.Tags = combineTags(godogTags, customTags)
+		suite.Run()
+	}
+	os.Exit(0)
 }

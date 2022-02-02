@@ -39,6 +39,7 @@ type Runner struct {
 	Target  *ClientConfig
 	NodeID  string
 	Cache   *Cache
+	Aggregated bool
 	Service *XDSService
 }
 
@@ -47,12 +48,14 @@ func FreshRunner(current ...*Runner) *Runner {
 		adapter = &ClientConfig{}
 		target  = &ClientConfig{}
 		nodeID  = ""
+		aggregated = false
 	)
 
 	if len(current) > 0 {
 		adapter = current[0].Adapter
 		target = current[0].Target
 		nodeID = current[0].NodeID
+		aggregated = current[0].Aggregated
 
 	}
 
@@ -62,19 +65,20 @@ func FreshRunner(current ...*Runner) *Runner {
 		NodeID:  nodeID,
 		Cache:   &Cache{},
 		Service: &XDSService{},
+		Aggregated: aggregated,
 	}
 }
 
-func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn, err error) {
-	conn, err = grpc.Dial(client.Port, opts...)
-	if err != nil {
-		err = fmt.Errorf("Cannot connect at %v: %v\n", client.Port, err)
-		return nil, err
+	func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn, err error) {
+		conn, err = grpc.Dial(client.Port, opts...)
+		if err != nil {
+			err = fmt.Errorf("Cannot connect at %v: %v\n", client.Port, err)
+			return nil, err
+		}
+		log.Debug().
+			Msgf("Runner connected to %v", server)
+		return conn, nil
 	}
-	log.Debug().
-		Msgf("Runner connected to %v", server)
-	return conn, nil
-}
 
 func (r *Runner) ConnectClient(server, address string) error {
 	var client *ClientConfig
@@ -163,12 +167,12 @@ func (r *Runner) Stream(service *XDSService) error {
 			in, err := service.Stream.Recv()
 			if err == io.EOF {
 				log.Debug().
-					Msg("No more Discovery Responses from LDS stream")
+					Msgf("No more Discovery Responses from %v stream", r.Service.Name)
 				close(service.Channels.Res)
 				return
 			}
 			if err != nil {
-				log.Err(err).Msg("error receiving responses on LDS stream")
+				log.Err(err).Msgf("error receiving responses on %v stream", r.Service.Name)
 				service.Channels.Err <- err
 				return
 			}

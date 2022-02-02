@@ -64,4 +64,5 @@ type SimpleResponse struct {
 	Version   string
 	Resources []string
 	Nonce     string
+	TypeUrl   string
 }

@@ -24,9 +24,11 @@ func itemInSlice(item string, slice []string) bool {
 	return false
 }
 
-func versionsMatch(expected string, actual string) bool {
+func stringsMatch(expected string, actual string) bool {
 	return expected == actual
 }
+
+
 
 func resourcesMatch(expected []string, actual []string) bool {
 	log.Debug().Msgf("resources to match...expected: %v, actual: %v\n", expected, actual)
@@ -97,22 +99,40 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 }
 
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	builder := getBuilder(srv)
-	builder.openChannels()
-	builder.setInitResources(resources)
-	err := builder.setStream(r.Target.Conn)
+	err, typeURL := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
-	r.Service = builder.getService()
+	// check if we are updating existing stream or starting a new one.
+	if r.Service.Stream != nil {
+		request := r.NewRequest(resources, typeURL)
+		r.Service.Channels.Req <- request
+		log.Debug().
+			Msgf("Sent new subscribing request: %v\n", request)
+		return nil
+	} else {
+		var builder serviceBuilder
+		if r.Aggregated {
+			builder = getBuilder("ADS")
+		} else {
+			builder = getBuilder(srv)
+		}
+		builder.openChannels()
+		builder.setInitResources(resources)
+		err := builder.setStream(r.Target.Conn)
+		if err != nil {
+			return err
+		}
+		r.Service = builder.getService(srv)
 
-	request := r.NewRequest(r.Service.Cache.InitResource, r.Service.TypeURL)
+		request := r.NewRequest(r.Service.Cache.InitResource, typeURL)
 
-	log.Debug().
-		Msgf("Sending subscribing request: %v\n", request)
-	go r.Stream(r.Service)
-	go r.Ack(request, r.Service)
-	return nil
+		log.Debug().
+			Msgf("Sending first subscribing request: %v\n", request)
+		go r.Stream(r.Service)
+		go r.Ack(request, r.Service)
+		return nil
+	}
 }
 
 func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
@@ -133,7 +153,7 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !versionsMatch(version, actual.Version) {
+					if !stringsMatch(version, actual.Version) {
 						continue
 					}
 					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
@@ -150,6 +170,52 @@ func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version 
 		}
 	}
 }
+
+func (r *Runner) TheClientReceivesResourcesAndVersionForService(resources, version, service string) error {
+	expectedResources := strings.Split(resources, ",")
+	stream := r.Service
+	actualResources := []string{}
+
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			log.Err(err).Msg("From our step")
+			return errors.New("Could not find expected response within grace period of 10 seconds.")
+		default:
+			if len(stream.Cache.Responses) > 0 {
+				for _, response := range stream.Cache.Responses {
+					actual, err := parser.ParseDiscoveryResponse(response)
+					if err != nil {
+						log.Error().Err(err).Msg("can't parse discovery response ")
+						return err
+					}
+					if !stringsMatch(version, actual.Version) {
+						continue
+					}
+					if !stringsMatch(typeUrl, actual.TypeUrl) {
+						continue
+					}
+					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
+						actualResources = append(actualResources, actual.Resources...)
+					} else {
+						actualResources = actual.Resources
+					}
+					if !resourcesMatch(expectedResources, actualResources) {
+						continue
+					}
+					return nil
+				}
+			}
+		}
+	}
+}
+
+
 
 func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
 	stream := r.Service
@@ -168,7 +234,7 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !versionsMatch(version, actual.Version) {
+					if !stringsMatch(version, actual.Version) {
 						continue
 					}
 					// we set our subscription to a single resource, and the services should only send a single resource.
@@ -188,7 +254,7 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 	}
 }
 
-func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) error {
+func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	stream := r.Service
 	stream.Channels.Done <- true
 
@@ -320,10 +386,16 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{resource},
-		TypeUrl:       r.Service.TypeURL,
+		TypeUrl:       typeURL,
 	}
 	// small hack as i build this out, to ensure Acking our last response happens before we update subscription
 	time.Sleep(2 * time.Second)
@@ -335,11 +407,16 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	version := r.Cache.StartState.Version
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   version,
 		ResourceNames: []string{""},
-		TypeUrl:       r.Service.TypeURL,
+		TypeUrl:       typeURL,
 	}
 	time.Sleep(3 * time.Second)
 	log.Debug().
@@ -386,9 +463,11 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
 	ctx.Step(`^the Client receives only the "([^"]*)" and "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
-	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
+	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
+	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
+    ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 }

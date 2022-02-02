@@ -1,0 +1,120 @@
+#+TITLE: Ads Support
+#+DATE: 2021-01-18
+#+AUTHOR: Zach Mandeville, Mark Roth
+
+** Introduction
+This diary is a work-in-progress to document how we added ADS support to the xDS
+test harness. It sets up a background of the problem, our design of the work,
+and a work diary of the progress to implement it.
+
+The bottom of the document has open questions for which I'd love feedback. When
+a question is answered, it'll be removed from that section and its answer woven
+into this diary.
+
+** Background
+The xDS transport protocol has [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol][four variants]]:
+- State of the World, non-aggregated
+- SOTW, aggregated
+- Incremental(or delta), non-aggregated
+- Incremental, aggregated
+
+Each of the variants are handled by [[https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#rpc-services-and-methods-for-each-variant][different RPC services/methods]], and an xDS
+server can support any or all of them at the same time.
+
+For example, for LDS, the various protocol variants are provided via the
+following RPC methods:
+- SotW, non aggregated: ListenerDiscoveryService.StreamListeners
+- SOTW, Aggregated : AggregatedDiscoveryService.StreamAggregatedResources
+- Incremental, non-agg: ListenerDiscoveryService.DeltaListeners
+- Incremental, Aggregated: AggregatedDiscoveryService.DeltaAggregatedResources
+
+For  SotW and incremental, the actual communication on the stream will be
+essentially the same for both aggregated and non-aggregated, regardless of which
+of the above RPC methods you use to create the stream.
+
+For our tests, then, when a test is not variant specific, we should run the same
+test for each qualifying variant, by opening a stream with the correct RPC. For
+example, with a basic LDS test, our test runner should be able to run it against
+both ~ListenerDiscoveryService.StreamListeners~ and
+~AggregatedDisocveryService.StreamAggregatedResources~.
+
+A target server may be configured for any subset of combinations from the four
+variants, and we should not lock in any required configuration for our tests.
+Instead, through something like command line flags, a person can tell the test
+runner which variants their implementation supports.
+** Design
+*** Specifying variants with cli flags
+A person should only start the runner once, and then the runner executes the
+test suite against the different set variants, by running the right stream
+against each of the supported, appropriate RPC methods (as outlined above).
+
+A person can indicate which variants their target supports using the ~--variant~
+flag. You can invoke the flag with a variant name to include it in the suite—
+invoking it multiple times per variant your server supports.
+
+#+begin_example
+./runner \
+--variant "sotw non-aggregated" \
+--variant "incremental aggregated"
+#+end_example
+
+
+*** Tagging  the tests
+For the tests themselves, some may be general enough to work across all
+variants, and some may only be appropriate for a particular combination. We can
+indicate this using [[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L8][tags added to the top of the test scenario]]. The tags are:
+- @sotw
+- @incremental
+- @aggregated
+- @non-aggregated
+*** reading flags and tags in our main
+In our main function, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L98][parse the variant flag]] to build a map of variants and
+whether they're supported. For each true value in the array, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L147][run the test
+suite]] for that variant. This means the suite can run from 1-4 times.
+
+*** Changes to our test Steps
+
+The main flow for our tests is to set up state on the target server using the
+adapter, then [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/services.go#L39][initialize a service]] for the duration of the test. This service
+includes channels for requests and responses (and caches for both). Each test
+step in the scenario can use this service interface to pass along new requests
+or update state as nceeded.
+
+We can use the same pattern for ADS, with some modifications:
+
+Originally, the service interface included its typeURL value. When we needed to
+make a new request, we'd use the service's assign typeURL. This doesn't work for
+ADs, so now we pass the type to the runner from the step itself.
+
+Originally, our subscribing step assumed you would be doing one subscription per
+scenario, and so built a service interface as part of the subscription step.
+This doesn't work for ADS-Only tests where you are subscribing to multiple
+services across the same stream, and building a new service interface means
+clearing the existing caches. Now, the subscribing function checks if we already
+have a service initialized and, if so, uses its existing inferface. I think this
+change makes the function stronger overall, and may help me fix the
+unsubscribing issues.
+
+*** Uncertain changes
+I added a new step at the end of our ADS-only test, that reads: [[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L192]["And the server
+never responds more than necessary"]]. This line points to our existing testing
+function for "And the client ACKS to which the server does not respond".
+
+For all our existing tests, we set up the test environment so the server always
+sends back a valid response and our test runner always ACKS every response it
+gets. The server should not respond to an ACK. Because of this built-in logic,
+if the server has not responded to an ACK, then there should always be at least
+one more request from the client than there is response from server (e.g. the
+final ACK the client sent).
+
+Because of this, our test step runs at the end, closes the channels so no more
+requests or responses can be sent, and then verifies that the request count is
+higher than the response count. This step, then, should run at the end of the
+scenario.
+
+With the ADS-Only test, the client is acking alot more than at the end of the
+step. I wanted to be as clear as possible, and so adjusted the wording.
+
+In a situation where we want to test error handling on the client, or the server
+sending out a new response from a stale nonce, we will use new functions that
+test for these specific environments.
