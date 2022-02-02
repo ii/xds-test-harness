@@ -48,30 +48,29 @@ A person should only start the runner once, and then the runner executes the
 test suite against the different set variants, by running the right stream
 against each of the supported, appropriate RPC methods (as outlined above).
 
-A person can indicate which variants their target supports using the flag
-~--variants~. This flag expects a four character stirng made up of 1's and 0's.
-1 represents support, 0 non-support. The variants are, right to left, sotw
-non-agg, sotw agg, incremental non-agg, incremental agg.
+A person can indicate which variants their target supports using the ~--variant~
+flag. You can invoke the flag with a variant name to include it in the suite—
+invoking it multiple times per variant your server supports.
 
-So if a person wanted to run the test suite against a server
-running only non-aggregated, but supporting sotw and incremental, they'd run:
-: ./runner --variants 1010
+#+begin_example
+./runner \
+--variant "sotw non-aggregated" \
+--variant "incremental aggregated"
+#+end_example
 
-If they are an edge case that only supports SoTW, non-aggregated and
-incremental, aggregated, then they'd run:
-: ./runner --variants 1001
+
 *** Tagging  the tests
 For the tests themselves, some may be general enough to work across all
 variants, and some may only be appropriate for a particular combination. We can
 indicate this using [[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L8][tags added to the top of the test scenario]]. The tags are:
 - @sotw
 - @incremental
-- @aggregate
-- @separate
+- @aggregated
+- @non-aggregated
 *** reading flags and tags in our main
-In our main function, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L101][parse the variant flag]] to build an array of boolean values.
-For each true value in the array, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L152][run the test suite]] for that variant. This means
-the suite can run from 1-4 times.
+In our main function, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L98][parse the variant flag]] to build a map of variants and
+whether they're supported. For each true value in the array, we [[https://github.com/ii/xds-test-harness/blob/ads-work/main.go#L147][run the test
+suite]] for that variant. This means the suite can run from 1-4 times.
 
 *** Changes to our test Steps
 
@@ -83,51 +82,39 @@ or update state as nceeded.
 
 We can use the same pattern for ADS, with some modifications:
 
-Originally, the service interface included its typeURL value.
-When we needed to make a new request, we'd use the service's assign typeURL.
-This doesn't work for ADs, so now [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L102][our new request functions pass the required
-typeURL]], which is determined from the test step itself.
+Originally, the service interface included its typeURL value. When we needed to
+make a new request, we'd use the service's assign typeURL. This doesn't work for
+ADs, so now we pass the type to the runner from the step itself.
 
 Originally, our subscribing step assumed you would be doing one subscription per
 scenario, and so built a service interface as part of the subscription step.
 This doesn't work for ADS-Only tests where you are subscribing to multiple
 services across the same stream, and building a new service interface means
-clearing the existing caches. Now, the subscribing function [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L107][checks if we
-already]] have a service initialized and, if so, uses its existing inferface. I
-think this change makes the function stronger overall, and may help me fix the
+clearing the existing caches. Now, the subscribing function checks if we already
+have a service initialized and, if so, uses its existing inferface. I think this
+change makes the function stronger overall, and may help me fix the
 unsubscribing issues.
 
 *** Uncertain changes
-I added a new step at the end of our ADS-only test, that reads:
-[[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L192]["And the server never responds more than necessary"]].
+I added a new step at the end of our ADS-only test, that reads: [[https://github.com/ii/xds-test-harness/blob/ads-work/features/subscriptions.feature#L192]["And the server
+never responds more than necessary"]]. This line points to our existing testing
+function for "And the client ACKS to which the server does not respond".
 
-This step is functionally identical to our current step [[https://github.com/ii/xds-test-harness/blob/ads-work/internal/runner/steps.go#L257]["And the client ACKS to
-which the server does not respond".]]
+For all our existing tests, we set up the test environment so the server always
+sends back a valid response and our test runner always ACKS every response it
+gets. The server should not respond to an ACK. Because of this built-in logic,
+if the server has not responded to an ACK, then there should always be at least
+one more request from the client than there is response from server (e.g. the
+final ACK the client sent).
 
-I duplicated the function due to an issue in the function's logic. It closes
-down our response and request channels, so that any remaining messages can come
-through and we can look at the entire range of messages sent. Then, we count
-the # of responses and # of requests. Since ACK'ing is built into the client's
-lifecycle, and it is acking every response it gets from the server, than in this
-final step there should be 1 more request than response. If not, the step fails.
+Because of this, our test step runs at the end, closes the channels so no more
+requests or responses can be sent, and then verifies that the request count is
+higher than the response count. This step, then, should run at the end of the
+scenario.
 
-This logic requires the step to be run at the end of the test. However, in the
-test cases doc, for the ADS-only test there are multiple "and the client sends
-an ack to which the server doesn't respond". If I tried to match the test case
-verbatim, we'd be closing the ADS stream too early. If I just put the existing
-step at the end, it seems as if we are only ACK'ing once.
+With the ADS-Only test, the client is acking alot more than at the end of the
+step. I wanted to be as clear as possible, and so adjusted the wording.
 
-Now, the ACK'ing is assumed to happen as part of the test, and we just check at
-the end that the server hasn't sent more responses than it needed to. I worry
-this makes the test steps too opaque, and it may be highlighting that the
-existing steps are not as elegant as they could be. I am v. open for feedback or
-suggestions on if this needs to change, and how it could be improved.
-** Process
-*** DONE Implement hook for switching between variants
-*** DONE Refactor functions as necessary
-*** DONE Write ADS only test
-*** TODO Celebrate and Dance
-** Questions
-- Does the wording of the ADS test work for everyone?
-  + does the test run as we'd expect?
-- Are there any objections/improvements to the --variants flag?
+In a situation where we want to test error handling on the client, or the server
+sending out a new response from a stale nonce, we will use new functions that
+test for these specific environments.
