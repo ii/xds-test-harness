@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -20,7 +19,7 @@ var (
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
-	variant       = pflag.StringArrayP("variant", "V", []string{"sotw non-aggregated", "sotw aggregated","incremental non-aggregated", "incremental aggregated"}, "xDS protocol variant your server supports. Add a separate flag per each supported variant.\n Possibleariants are: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n.")
+	variant        = pflag.StringArrayP("variant", "V", []string{"sotw non-aggregated", "sotw aggregated", "incremental non-aggregated", "incremental aggregated"}, "xDS protocol variant your server supports. Add a separate flag per each supported variant.\n Possibleariants are: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n.")
 	aggregated     = false
 	incremental    = false
 
@@ -116,7 +115,7 @@ func supportedVariants(variants []string) (err error, supported map[string]bool)
 	return nil, supported
 }
 
-func combineTags(godogTags string, customTags []string) (tags string){
+func combineTags(godogTags string, customTags []string) (tags string) {
 	if godogTags != "" {
 		customTags = append(customTags, godogTags)
 	}
@@ -138,7 +137,6 @@ func main() {
 		Options:              &godogOpts,
 	}
 
-
 	// any tags passed in with -t when invoking the runner
 	godogTags := godogOpts.Tags
 	err, supportedVariants := supportedVariants(*variant)
@@ -150,9 +148,9 @@ func main() {
 	if supportedVariants["sotw non-aggregated"] {
 		incremental = false
 		aggregated = false
-		customTags := []string{"@sotw", "@separate"}
+		customTags := []string{"@sotw", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		suite.Run();
+		suite.Run()
 	}
 
 	if supportedVariants["sotw aggregated"] {
@@ -160,15 +158,15 @@ func main() {
 		aggregated = true
 		customTags := []string{"@sotw", "@aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		suite.Run();
+		suite.Run()
 	}
 
 	if supportedVariants["incremental non-aggregated"] {
 		incremental = true
 		aggregated = false
-		customTags := []string{"@incremental", "@separate"}
+		customTags := []string{"@incremental", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		suite.Run();
+		suite.Run()
 	}
 
 	if supportedVariants["incremental aggregated"] {
@@ -176,7 +174,7 @@ func main() {
 		aggregated = true
 		customTags := []string{"@incremental", "@aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		suite.Run();
+		suite.Run()
 	}
 	os.Exit(0)
 }
