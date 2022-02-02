@@ -254,23 +254,6 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 	}
 }
 
-func (r *Runner) TheClientSendsAnACKToWhichTheDoesNotRespond(service string) error {
-	stream := r.Service
-	stream.Channels.Done <- true
-
-	// give some time for the final messages to come through, if there's any lingering responses.
-	time.Sleep(3 * time.Second)
-	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
-	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
-		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
-		log.Err(err).
-			Msgf("Requests:%v, Responses: \v", stream.Cache.Requests, stream.Cache.Responses)
-		return err
-	}
-	return nil
-}
-
 func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	stream := r.Service
 	stream.Channels.Done <- true
@@ -480,7 +463,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
 	ctx.Step(`^the Client receives only the "([^"]*)" and "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
-	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheClientSendsAnACKToWhichTheDoesNotRespond)
+	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
