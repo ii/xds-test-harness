@@ -1,3 +1,7 @@
+# xDS Conformance Configuration
+# All values are required.
+
+nodeID: test-id
 targetAddress: 18000
 adapterAddress: 17000
 variants:
