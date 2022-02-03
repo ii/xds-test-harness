@@ -52,6 +52,8 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 
 	sc.BeforeSuite(func() {
 		r = runner.FreshRunner()
+		r.NodeID = *nodeID
+		r.Aggregated = aggregated
 		if err := r.ConnectClient("target", *targetAddress); err != nil {
 			log.Fatal().
 				Msgf("error connecting to target: %v", err)
@@ -60,10 +62,9 @@ func InitializeTestSuite(sc *godog.TestSuiteContext) {
 			log.Fatal().
 				Msgf("error connecting to adapter: %v", err)
 		}
-		r.NodeID = *nodeID
-		r.Aggregated = aggregated
 		log.Info().
-			Msgf("Connected to target at port %s and adapter at port %s\n", *targetAddress, *adapterAddress)
+			Msgf("Connected to target at %s and adapter at %s\n", *targetAddress, *adapterAddress)
+
 		if r.Aggregated {
 			log.Info().
 				Msgf("Tests will be run via ADS")
@@ -125,44 +126,62 @@ func combineTags(godogTags string, customTags []string) (tags string) {
 	return tags
 }
 
+func valuesFromConfig(config string) (target string, adapter string, nodeID string, supportedVariants map[string]bool) {
+	c, err := yaml.ReadFile(config)
+	if err != nil {
+		log.Fatal().Msgf("Cannot read config: %v", config)
+	}
+	nodeID, err = c.Get("nodeID")
+	if err != nil {
+		log.Fatal().Msgf("Error reading config file for Node ID: %v\n", err)
+	}
+	target, err = c.Get("targetAddress")
+	if err != nil {
+		log.Fatal().Msgf("Error reading config file for Target Address: %v\n", config, err)
+	}
+	adapter, err = c.Get("adapterAddress")
+	if err != nil {
+		log.Info().Msgf("Cannot get adapter address from config file: %v\n", err)
+	}
+	v, err := yaml.Child(c.Root, "variants")
+	if err != nil {
+		log.Fatal().Msgf("Error getting variants from config: %v\n", err)
+	}
+	variants := []string{}
+	varsInYaml, ok := v.(yaml.List)
+	if ok {
+		for i := 0; i < varsInYaml.Len(); i++ {
+			node := varsInYaml.Item(i)
+			variant := string(node.(yaml.Scalar))
+			variants = append(variants, variant)
+		}
+	}
+	err, supportedVariants = parseSupportedVariants(variants)
+	if err != nil {
+		log.Fatal().Msgf("Cannot parse supported variants from config: %v", err)
+	}
+	return target, adapter, nodeID, supportedVariants
+}
+
 func main() {
 	pflag.Parse()
 	godogOpts.Paths = pflag.Args()
-	variantsInConfig := []string{}
+	godogTags := godogOpts.Tags
+	supportedVariants := make(map[string]bool)
 
 	if *debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
+	// default to using CLI Flag for settings
+	err, supportedVariants := parseSupportedVariants(*variant)
+	if err != nil {
+		log.Fatal().Msgf("Cannot parse variants from CLI: %v\n", err)
+	}
+
+	// If config present, use it for all non-debugging values
 	if *config != ""{
-		c, err := yaml.ReadFile(*config)
-		if err != nil {
-			log.Info().Msgf("Error reading config file %v: %v\n", *config, err)
-		}
-		target, err := c.Get("targetAddress")
-		if err != nil {
-			log.Info().Msgf("Cannot get target address from config file: %v\n", err)
-		} else {
-		  *targetAddress = target
-		}
-		adapter, err := c.Get("adapterAddress")
-		if err != nil {
-			log.Info().Msgf("Cannot get adapter address from config file: %v\n", err)
-		} else {
-			*adapterAddress = adapter
-		}
-		variants, err := yaml.Child(c.Root, "variants")
-		if err != nil {
-			log.Info().Msgf("Error getting variants from config: %v\n", err)
-		}
-		varList, ok := variants.(yaml.List)
-		if ok {
-			for i := 0; i < varList.Len(); i++ {
-				node := varList.Item(i)
-				variant := string(node.(yaml.Scalar))
-				variantsInConfig = append(variantsInConfig, variant)
-			}
-		}
+		*targetAddress, *adapterAddress, *nodeID, supportedVariants = valuesFromConfig(*config)
 	}
 
 	suite := godog.TestSuite{
@@ -170,15 +189,6 @@ func main() {
 		ScenarioInitializer:  InitializeScenario,
 		TestSuiteInitializer: InitializeTestSuite,
 		Options:              &godogOpts,
-	}
-
-	// any tags passed in with -t when invoking the runner
-	godogTags := godogOpts.Tags
-	supportedVariants := make(map[string]bool)
-	if len(variantsInConfig) > 0 {
-		_, supportedVariants = parseSupportedVariants(variantsInConfig)
-	} else {
-	   _, supportedVariants = parseSupportedVariants(*variant)
 	}
 
 	if supportedVariants["sotw non-aggregated"] {
