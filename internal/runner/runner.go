@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -88,7 +89,11 @@ func (r *Runner) ConnectClient(server, address string) error {
 	if server == "adapter" {
 		client = r.Adapter
 	}
-	client.Port = address
+	if strings.HasPrefix(address, ":") {
+		client.Port = address
+	} else {
+		client.Port = ":" + address
+	}
 	conn, err := connectViaGRPC(client, server)
 	if err != nil {
 		return err

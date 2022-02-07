@@ -1,0 +1,11 @@
+# xDS Conformance Configuration
+# All values are required.
+
+nodeID: test-id
+targetAddress: 18000
+adapterAddress: 17000
+variants:
+  - sotw non-aggregated
+  - sotw aggregated
+  - incremental non-aggregated
+  - incremental aggregated
