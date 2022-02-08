@@ -49,7 +49,6 @@ func init() {
 }
 
 func InitializeTestSuite(sc *godog.TestSuiteContext) {
-
 	sc.BeforeSuite(func() {
 		r = runner.FreshRunner()
 		r.NodeID = *nodeID
@@ -196,6 +195,7 @@ func main() {
 		aggregated = false
 		customTags := []string{"@sotw", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
+		godogOpts.Format = "pretty,cucumber:results/sotw-non-aggregated.json"
 		suite.Run()
 	}
 
@@ -204,6 +204,7 @@ func main() {
 		aggregated = true
 		customTags := []string{"@sotw", "@aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
+		godogOpts.Format = "pretty,cucumber:results/sotw-aggregated.json"
 		suite.Run()
 	}
 
@@ -212,6 +213,7 @@ func main() {
 		aggregated = false
 		customTags := []string{"@incremental", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
+		godogOpts.Format = "pretty,cucumber:results/incremental-non-aggregated.json"
 		suite.Run()
 	}
 
@@ -220,6 +222,7 @@ func main() {
 		aggregated = true
 		customTags := []string{"@incremental", "@aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
+		godogOpts.Format = "pretty,cucumber:results/incremental-aggregated.json"
 		suite.Run()
 	}
 	os.Exit(0)
