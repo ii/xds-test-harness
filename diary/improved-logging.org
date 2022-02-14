@@ -1,0 +1,45 @@
+#+TITLE: Improved Logging
+
+* Logging to a file
+This is a built in feature of godog, where we can output the test results to a
+file. There are five types of built-in formatters for this output:
+- cucumber :: JSON. Includes the step, keyword, and result for each scenario and
+  feature. Follows a spec, so can be ingested by other tools easily.
+- pretty :: Meant to be printed to console. The default readout for godog, that
+  shows the test being run, the lines it's attached to, whether the lines are
+  passing, and the final results. Not structured to be ingested elsewhere.
+- event :: JSON. emits every event that happens during the test suite, like
+  finding a test step, running it, finishing the step, moving to the next one.
+  In each event, you have the name, timestamp, line from the gherkin document
+  that is being run. For the ...Finished steps, it also includes a
+  result...showing whether a test step has passed or if the entire test run has
+  passed.
+- progress :: Like a compact version of ~pretty~. Shows a dot for each test, the
+  dots increasing along the screen as the test suite progresses. Ends with a
+  summary of # of tests run, # of tests passed, and how long it took.
+- junit :: XML. Follows the junit script, ~<testsuite>~ tag with nested
+  ~<testcase>~ tags, each one with a status of passed or failed.
+You can output to any of them using the Format option of godog. To output to a
+file, you would do
+: Format: 'cucumber:path/to/file.json'
+to output multiple formats you do a comma-separated list. For example, to output
+to a junit xml file and also a pretty console print, you would do:
+: Format 'pretty,junit:path/to/file.xml'
+* What I want
+I want to still have pretty logging of some sort, so that when you run the suite
+youc an see, in near real-time, how it is doing. But I also want to have a
+combined results json at the end that details how many variants were tested
+against, the overall suite results, and the results per variant. We could also
+print out the cucumber.json for each test suite, so that someone can study the
+tests in detail or have them ingested into another program.
+* Custom Formatter
+Godog has the feature of building a custom formatter, so you can structure the test
+results however you see fit.  The junit, cucumber, pretty, etc. are all actually
+built-in custom formats. To add a new one, you register it with the formatter and have
+it inherit some basic, but adjust them as you see fit.
+* Progress
+** TODO register a custom format that looks like junit
+The junit results are the closest to the summary that I want, I think, without
+giving too much additional detail.
+** Can i adjust the results so the feature includes a meta tag for the variant?
+** Can I print out output along with printing to file?

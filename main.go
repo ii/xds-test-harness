@@ -1,7 +1,9 @@
 package main
 
 import (
+	// "bytes"
 	"context"
+	// "encoding/json"
 	"os"
 	"strings"
 
@@ -22,6 +24,9 @@ var (
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
 	nodeID         = pflag.StringP("nodeID", "N", "test-id", "node id of target")
 	variant        = pflag.StringArrayP("variant", "V", []string{"sotw non-aggregated", "sotw aggregated", "incremental non-aggregated", "incremental aggregated"}, "xDS protocol variant your server supports. Add a separate flag per each supported variant.\n Possibleariants are: sotw non-aggregated\n, sotw aggregated\n, incremental non-aggregated\n, incremental aggregated\n.")
+
+
+	r *runner.Runner
 	aggregated     = false
 	incremental    = false
 
@@ -37,8 +42,6 @@ var (
 		Paths:               []string{},
 		Output:              colors.Colored(os.Stdout),
 	}
-
-	r *runner.Runner
 )
 
 func init() {
@@ -183,6 +186,8 @@ func main() {
 		*targetAddress, *adapterAddress, *nodeID, supportedVariants = valuesFromConfig(*config)
 	}
 
+	// buf := bytes.NewBuffer(nil)
+
 	suite := godog.TestSuite{
 		Name:                 "xDS Test Suite",
 		ScenarioInitializer:  InitializeScenario,
@@ -195,16 +200,27 @@ func main() {
 		aggregated = false
 		customTags := []string{"@sotw", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		godogOpts.Format = "pretty,cucumber:results/sotw-non-aggregated.json"
+		godogOpts.Format = "pretty"
+		// godogOpts.Output = buf
 		suite.Run()
 	}
 
+	// var cukeResults []CukeFeatureJSON
+
+	// err = json.Unmarshal([]byte(buf.String()), &cukeResults)
+	// if err != nil {
+	// 	log.Err(err).Msgf("Error!!!: %v\n", err)
+	// }
+
+	// log.Info().Msgf("Cuke Results: %v\n", cukeResults[0].Name)
+
+	// do stuff with the buf.String() here!
 	if supportedVariants["sotw aggregated"] {
 		incremental = false
 		aggregated = true
 		customTags := []string{"@sotw", "@aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		godogOpts.Format = "pretty,cucumber:results/sotw-aggregated.json"
+		// godogOpts.Format = "pretty,cucumber:results/sotw-aggregated.json"
 		suite.Run()
 	}
 
@@ -226,4 +242,90 @@ func main() {
 		suite.Run()
 	}
 	os.Exit(0)
+}
+
+type cukeComment struct {
+	Value string `json:"value"`
+	Line  int    `json:"line"`
+}
+
+type cukeDocstring struct {
+	Value       string `json:"value"`
+	ContentType string `json:"content_type"`
+	Line        int    `json:"line"`
+}
+
+type cukeTag struct {
+	Name string `json:"name"`
+	Line int    `json:"line"`
+}
+
+type cukeResult struct {
+	Status   string `json:"status"`
+	Error    string `json:"error_message,omitempty"`
+	Duration *int   `json:"duration,omitempty"`
+}
+
+type cukeMatch struct {
+	Location string `json:"location"`
+}
+
+type cukeStep struct {
+	Keyword   string              `json:"keyword"`
+	Name      string              `json:"name"`
+	Line      int                 `json:"line"`
+	Docstring *cukeDocstring      `json:"doc_string,omitempty"`
+	Match     cukeMatch           `json:"match"`
+	Result    cukeResult          `json:"result"`
+	DataTable []*cukeDataTableRow `json:"rows,omitempty"`
+}
+
+type cukeDataTableRow struct {
+	Cells []string `json:"cells"`
+}
+
+type cukeElement struct {
+	ID          string     `json:"id"`
+	Keyword     string     `json:"keyword"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Line        int        `json:"line"`
+	Type        string     `json:"type"`
+	Tags        []cukeTag  `json:"tags,omitempty"`
+	Steps       []cukeStep `json:"steps,omitempty"`
+}
+
+// CukeFeatureJSON ...
+type CukeFeatureJSON struct {
+	URI         string        `json:"uri"`
+	ID          string        `json:"id"`
+	Keyword     string        `json:"keyword"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Line        int           `json:"line"`
+	Comments    []cukeComment `json:"comments,omitempty"`
+	Tags        []cukeTag     `json:"tags,omitempty"`
+	Elements    []cukeElement `json:"elements,omitempty"`
+}
+
+type Results  struct {
+	Total int64
+	Passed int64
+	Failed int64
+	Variants []string
+	ResultsByVariant []VariantResults
+}
+
+type VariantResults struct {
+	Name string
+	Total int64
+	Passed int64
+	Failed int64
+	FailedTests []FailedTest
+}
+
+type FailedTest struct {
+	Scenario string
+	FailedStep string
+	Source string
 }
