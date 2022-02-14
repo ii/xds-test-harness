@@ -1,9 +1,9 @@
 package main
 
 import (
-	// "bytes"
+	"bytes"
 	"context"
-	// "encoding/json"
+	"encoding/json"
 	"os"
 	"strings"
 
@@ -186,7 +186,7 @@ func main() {
 		*targetAddress, *adapterAddress, *nodeID, supportedVariants = valuesFromConfig(*config)
 	}
 
-	// buf := bytes.NewBuffer(nil)
+	buf := bytes.NewBuffer(nil)
 
 	suite := godog.TestSuite{
 		Name:                 "xDS Test Suite",
@@ -200,21 +200,24 @@ func main() {
 		aggregated = false
 		customTags := []string{"@sotw", "@non-aggregated"}
 		godogOpts.Tags = combineTags(godogTags, customTags)
-		godogOpts.Format = "pretty"
-		// godogOpts.Output = buf
+		godogOpts.Format = "xds"
+		godogOpts.Output = buf
 		suite.Run()
 	}
 
-	// var cukeResults []CukeFeatureJSON
+	var cukeResults []CukeFeatureJSON
+	var results Results
 
-	// err = json.Unmarshal([]byte(buf.String()), &cukeResults)
-	// if err != nil {
-	// 	log.Err(err).Msgf("Error!!!: %v\n", err)
-	// }
+	err = json.Unmarshal([]byte(buf.String()), &cukeResults)
+	if err != nil {
+		log.Err(err).Msgf("Error!!!: %v\n", err)
+	}
 
-	// log.Info().Msgf("Cuke Results: %v\n", cukeResults[0].Name)
+	for _, cuke := range cukeResults {
+	  results = gatherResults(results, cuke)
+	}
+	log.Info().Msgf("Results! %v\n", results)
 
-	// do stuff with the buf.String() here!
 	if supportedVariants["sotw aggregated"] {
 		incremental = false
 		aggregated = true
@@ -242,6 +245,32 @@ func main() {
 		suite.Run()
 	}
 	os.Exit(0)
+}
+
+func gatherResults (current Results, cuke CukeFeatureJSON) Results {
+	totalTests := len(cuke.Elements)
+	passedTests := 0
+	failedTests := 0
+	failedScenarios := []string{}
+
+	for _, scenario := range cuke.Elements {
+		passed := true
+		for _, step := range scenario.Steps {
+			if step.Result.Status == "failed" {
+				passed = false
+			}
+		}
+		if passed {
+			passedTests++
+		} else {
+			failedTests++
+			failedScenarios = append(failedScenarios, scenario.Name)
+		}
+	}
+	current.Total += int64(totalTests)
+	current.Passed += int64(passedTests)
+	current.Failed += int64(failedTests)
+	return current
 }
 
 type cukeComment struct {
