@@ -6,3 +6,6 @@ tmate*.log
 nohup.out
 example/*/*.pb.go
 api/*/*.pb.go
+results.json
+sotw-*.json
+incremental-*.json
