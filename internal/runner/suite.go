@@ -92,6 +92,9 @@ func (b *Suite) ConfigureSuite() error {
 		b.Runner.LoadSteps(ctx)
 	}
 
+	outputFile := variantToOutputFile(b.Variant)
+	format := "xds,cucumber:" + outputFile
+
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
 		Randomize:           0,
@@ -99,8 +102,8 @@ func (b *Suite) ConfigureSuite() error {
 		Strict:              false,
 		NoColors:            false,
 		Tags:                b.Tags,
-		Format:              "xds",
 		Output:              &b.Buffer,
+		Format:              format,
 		Concurrency:         0,
 	}
 
@@ -114,8 +117,8 @@ func (b *Suite) ConfigureSuite() error {
 	return nil
 }
 
-func (s *Suite) Run(adapter,target,nodeId,tags string) (err error, results types.VariantResults) {
-	if err = s.StartRunner(nodeId,adapter,target); err != nil {
+func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results types.VariantResults) {
+	if err = s.StartRunner(nodeId, adapter, target); err != nil {
 		return
 	}
 	if err = s.SetTags(tags); err != nil {
@@ -194,10 +197,9 @@ func NewSuite(variant types.Variant) *Suite {
 	}
 }
 
-
 func UpdateResults(current types.Results, variantResults types.VariantResults) types.Results {
 	return types.Results{
-		Total:            current.Total  + variantResults.Total,
+		Total:            current.Total + variantResults.Total,
 		Passed:           current.Passed + variantResults.Passed,
 		Failed:           current.Failed + variantResults.Failed,
 		Variants:         append(current.Variants, variantResults.Name),
@@ -230,6 +232,12 @@ func gatherResults(current types.VariantResults, cuke types.CukeFeatureJSON) typ
 	current.Failed += int64(failed)
 	current.FailedTests = append(current.FailedTests, failedTests...)
 	return current
+}
+
+func variantToOutputFile(v types.Variant) string {
+	parts := strings.Split(string(v), " ")
+	fileName := strings.Join(parts, "-")
+	return fileName + ".json"
 }
 
 func createFailedTest(scenario types.CukeElement, failedStep types.CukeStep) types.FailedTest {
