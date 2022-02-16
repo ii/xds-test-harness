@@ -9,9 +9,12 @@ import (
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	"github.com/ii/xds-test-harness/internal/types"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/kylelemons/go-gypsy/yaml"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -169,4 +172,64 @@ func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (
 		}
 	}
 	return simpRes, nil
+}
+
+func ParseSupportedVariants(variants []string) (err error, supported []types.Variant) {
+	variantMap := map[string]types.Variant{
+		"sotw non-aggregated": types.SotwNonAggregated,
+		"sotw aggregated": types.SotwAggregated,
+		"incremental non-aggregated": types.IncrementalNonAggregated,
+		"incremental aggregated": types.IncrementalAggregated,
+	}
+
+	for _, v := range variants {
+		variant, ok := variantMap[v]
+		if !ok {
+			err := fmt.Errorf("Config included unrecognized variant. Please remove it and try again: %v\n", variant)
+			return err, nil
+		}
+		supported = append(supported, variant)
+	}
+	return nil, supported
+}
+
+func ValuesFromConfig(config string) (target string, adapter string, nodeID string, supportedVariants []types.Variant) {
+	c, err := yaml.ReadFile(config)
+	if err != nil {
+		log.Fatal().
+			Msgf("Cannot read config: %v", config)
+	}
+	nodeID, err = c.Get("nodeID")
+	if err != nil {
+		log.Fatal().
+			Msgf("Error reading config file for Node ID: %v\n", err)
+	}
+	target, err = c.Get("targetAddress")
+	if err != nil {
+		log.Fatal().
+			Msgf("Error reading config file for Target Address: %v\n", config, err)
+	}
+	adapter, err = c.Get("adapterAddress")
+	if err != nil {
+		log.Info().
+			Msgf("Cannot get adapter address from config file: %v\n", err)
+	}
+	v, err := yaml.Child(c.Root, "variants")
+	if err != nil {
+		log.Fatal().Msgf("Error getting variants from config: %v\n", err)
+	}
+	variants := []string{}
+	varsInYaml, ok := v.(yaml.List)
+	if ok {
+		for i := 0; i < varsInYaml.Len(); i++ {
+			node := varsInYaml.Item(i)
+			variant := string(node.(yaml.Scalar))
+			variants = append(variants, variant)
+		}
+	}
+	err, supportedVariants = ParseSupportedVariants(variants)
+	if err != nil {
+		log.Fatal().Msgf("Cannot parse supported variants from config: %v", err)
+	}
+	return target, adapter, nodeID, supportedVariants
 }
