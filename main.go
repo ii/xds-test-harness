@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
+	// "strings"
 
 	"github.com/cucumber/godog"
 	"github.com/ii/xds-test-harness/internal/parser"
@@ -62,10 +64,36 @@ func main() {
 		}
 		results = runner.UpdateResults(results, variantResults)
 	}
-	log.Info().
-		Msgf("All done, here are your results!!: %v\n", results)
+	printResults(results)
 
 	file, _ := json.MarshalIndent(results, "", "  ")
 	_ = ioutil.WriteFile("results.json", file, 0644)
 	os.Exit(0)
+}
+
+func printResults(results types.Results) {
+
+	divider := "-------------------"
+	fmt.Println("\nTest Suite Finished\n" + divider)
+	fmt.Printf("Ran %v tests across %v variants\n\n", results.Total, len(results.Variants))
+	fmt.Printf("Passed: %v\nFailed: %v", results.Passed, results.Failed)
+	fmt.Printf("\n\nResults broken down by Variant....\n\n")
+	for _, variant := range results.ResultsByVariant {
+		fmt.Println(variant.Name+"\n"+divider)
+		fmt.Println(variantResults(variant))
+	}
+}
+
+func variantResults(results types.VariantResults) string {
+	total := fmt.Sprintf("Total tests: %v\n", results.Total)
+	passed := fmt.Sprintf("Passed: %v\n", results.Passed)
+	failed := fmt.Sprintf("Failed: %v\n", results.Failed)
+	var failedTests string
+	if len(results.FailedTests) > 0 {
+		failedTests = "Failed Tests:\n"
+		for _, test := range results.FailedTests {
+			failedTests = failedTests + "  - " + test.Scenario + "\n"
+		}
+	}
+	return total + passed + failed + failedTests
 }
