@@ -7,7 +7,7 @@ Feature: Unsubscribing to Resources
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
   @CDS @LDS @sotw @non-aggregated @aggregated
-  Scenario: Client can unsubcribe from some resources
+  Scenario: [<service>] Client can unsubcribe from some resources
     # This test does not check if the final results are only the subscribed resources
     # it is valid(though not desired) for a server to send more than is requested.
     # So the test will pass if client subscribes to A,B,C, unsubscribes from B,C and gets A,B,C back.
@@ -26,7 +26,7 @@ Feature: Unsubscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario: Client can unsubcribe from some resources
+  Scenario: [<service>] Client can unsubcribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     # This currently does not pass for go-control-plane
     Given a target setup with <service>, <resources>, and <starting version>
@@ -44,7 +44,7 @@ Feature: Unsubscribing to Resources
 
 
   @sotw @non-aggregated @aggregated @skip
-  Scenario: Client can unsubscribe from all resources
+  Scenario: [<service>] Client can unsubscribe from all resources
     # This is not working currently, the unsusbcribe is not registered,
     # neither as an unsubscribe nor a new wildcard request
     Given a target setup with <service>, <resources>, and <starting version>
@@ -63,7 +63,7 @@ Feature: Unsubscribing to Resources
 
 
     @sotw @aggregated
-    Scenario: Client can subscribe to multiple services via ADS
+    Scenario: [<service>] Client can subscribe to multiple services via ADS
       Given a target setup with <service>, <resources>, and <starting version>
       When the Client subscribes to a <subset of resources> for <service>
       Then the Client receives the <subset of resources> and <starting version> for <service>

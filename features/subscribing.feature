@@ -6,7 +6,7 @@ Feature: Subscribing to Resources
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
   @sotw @non-aggregated @aggregated
-  Scenario Outline: The service should send all resources on a wildcard request.
+  Scenario Outline: [<service>] The service should send all resources on a wildcard request.
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
     Then the Client receives the <expected resources> and <starting version>
@@ -19,7 +19,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario Outline: The service should send updates to the client
+  Scenario Outline: [<service>] The service should send updates to the client
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
     Then the Client receives the <expected resources> and <starting version>
@@ -34,7 +34,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario Outline: Wildcard subscriptions receive updates when new resources are added
+  Scenario Outline: [<service>] Wildcard subscriptions receive updates when new resources are added
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client does a wildcard subscription to <service>
     Then the Client receives the <resources> and <starting version>
@@ -49,7 +49,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario:  When subscribing to specific resources, receive only these resources
+  Scenario: [<service>]  When subscribing to specific resources, receive only these resources
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <subset of resources> and <starting version>
@@ -64,7 +64,7 @@ Feature: Subscribing to Resources
 
 
   @CDS @LDS @sotw @non-aggregated @aggregated
-  Scenario: When subscribing to specific resources, receive response when those resources change
+  Scenario: [<service>] When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <subset of resources> and <starting version>
@@ -79,7 +79,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario: When subscribing to specific resources, receive response when those resources change
+  Scenario: [<service>] When subscribing to specific resources, receive response when those resources change
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <subset of resources> and <starting version>
@@ -94,7 +94,7 @@ Feature: Subscribing to Resources
 
 
   @CDS @LDS @sotw @non-aggregated @aggregated
-  Scenario: When subscribing to resources that don't exist, receive response when they are created
+  Scenario: [<service>] When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <existing subset> and <starting version>
@@ -109,7 +109,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @non-aggregated @aggregated
-  Scenario: When subscribing to resources that don't exist, receive response when they are created
+  Scenario: [<service>] When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with <service>, <resources>, and <starting version>
     When the Client subscribes to a <subset of resources> for <service>
     Then the Client receives the <existing subset> and <starting version>
