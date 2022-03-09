@@ -1,11 +1,12 @@
 package types
 
 type Variant string
+
 const (
-	SotwNonAggregated Variant = "sotw non-aggregated"
-	SotwAggregated Variant = "sotw aggregated"
+	SotwNonAggregated        Variant = "sotw non-aggregated"
+	SotwAggregated           Variant = "sotw aggregated"
 	IncrementalNonAggregated Variant = "incremental non-aggregated"
-	IncrementalAggregated Variant = "incremental aggregated"
+	IncrementalAggregated    Variant = "incremental aggregated"
 )
 
 type CukeComment struct {
@@ -72,25 +73,27 @@ type CukeFeatureJSON struct {
 	Elements    []CukeElement `json:"elements,omitempty"`
 }
 
-type Results  struct {
-	Total int64
-	Passed int64
-	Failed int64
-	Variants []string
-	ResultsByVariant []VariantResults
-}
-
 type VariantResults struct {
-	Name string
-	Total int64
-	Passed int64
-	Failed int64
-	FailedTests []FailedTest
+	Name            string           `json:"name"`
+	Total           int              `json:"total"`
+	Passed          int              `json:"passed"`
+	Failed          int              `json:"failed"`
+	Skipped         int              `json:"skipped"`
+	Undefined       int              `json:"undefined"`
+	Pending         int              `json:"pending"`
+	FailedScenarios []FailedScenario `json:"failedScenarios"`
 }
 
-type FailedTest struct {
-	Scenario string
-	FailedStep string
-	Feature string
-	Source string
+type FailedScenario struct {
+	Name       string `json:"name"`
+	FailedStep string `json:"failedStep"`
+	Line       string `json:"line"`
+}
+
+type Results struct {
+	Total            int64
+	Passed           int64
+	Failed           int64
+	Variants         []string
+	ResultsByVariant []VariantResults
 }

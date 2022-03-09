@@ -89,10 +89,10 @@ func variantResults(results types.VariantResults) string {
 	passed := fmt.Sprintf("Passed: %v\n", results.Passed)
 	failed := fmt.Sprintf("Failed: %v\n", results.Failed)
 	var failedTests string
-	if len(results.FailedTests) > 0 {
+	if len(results.FailedScenarios) > 0 {
 		failedTests = "Failed Tests:\n"
-		for _, test := range results.FailedTests {
-			failedTests = failedTests + "  - " + test.Scenario + "\n"
+		for _, test := range results.FailedScenarios {
+			failedTests = failedTests + "  - " + test.Name + "\n"
 		}
 	}
 	return total + passed + failed + failedTests

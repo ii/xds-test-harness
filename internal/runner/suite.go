@@ -93,7 +93,7 @@ func (b *Suite) ConfigureSuite() error {
 	}
 
 	outputFile := variantToOutputFile(b.Variant)
-	format := "xds,cucumber:" + outputFile
+	format := "emoji,cucumber:" + outputFile
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
@@ -129,17 +129,13 @@ func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results ty
 	}
 
 	s.TestSuite.Run()
-
-	cukeResults := []types.CukeFeatureJSON{}
-	if err = json.Unmarshal([]byte(s.Buffer.String()), &cukeResults); err != nil {
+	vr := types.VariantResults{}
+	s.Buffer.String()
+	if err = json.Unmarshal([]byte(s.Buffer.String()), &vr); err != nil {
 		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
 		return err, results
 	}
-
-	for _, cuke := range cukeResults {
-		results = gatherResults(results, cuke)
-	}
-
+	results = vr
 	results.Name = string(s.Variant)
 	return err, results
 }
@@ -199,40 +195,40 @@ func NewSuite(variant types.Variant) *Suite {
 
 func UpdateResults(current types.Results, variantResults types.VariantResults) types.Results {
 	return types.Results{
-		Total:            current.Total + variantResults.Total,
-		Passed:           current.Passed + variantResults.Passed,
-		Failed:           current.Failed + variantResults.Failed,
+		Total:            current.Total + int64(variantResults.Total),
+		Passed:           current.Passed + int64(variantResults.Passed),
+		Failed:           current.Failed + int64(variantResults.Failed),
 		Variants:         append(current.Variants, variantResults.Name),
 		ResultsByVariant: append(current.ResultsByVariant, variantResults),
 	}
 }
 
-func gatherResults(current types.VariantResults, cuke types.CukeFeatureJSON) types.VariantResults {
-	totalTests := len(cuke.Elements)
-	passed := 0
-	failed := 0
-	failedTests := []types.FailedTest{}
+// func gatherResults(current types.VariantResults, cuke types.CukeFeatureJSON) types.VariantResults {
+// 	totalTests := len(cuke.Elements)
+// 	passed := 0
+// 	failed := 0
+// 	failedTests := []types.FailedTest{}
 
-	for _, test := range cuke.Elements {
-		testPassed := true
-		for _, step := range test.Steps {
-			if step.Result.Status == "failed" {
-				testPassed = false
-				failedTests = append(failedTests, createFailedTest(test, step))
-			}
-		}
-		if testPassed {
-			passed++
-		} else {
-			failed++
-		}
-	}
-	current.Total += int64(totalTests)
-	current.Passed += int64(passed)
-	current.Failed += int64(failed)
-	current.FailedTests = append(current.FailedTests, failedTests...)
-	return current
-}
+// 	for _, test := range cuke.Elements {
+// 		testPassed := true
+// 		for _, step := range test.Steps {
+// 			if step.Result.Status == "failed" {
+// 				testPassed = false
+// 				failedTests = append(failedTests, createFailedTest(test, step))
+// 			}
+// 		}
+// 		if testPassed {
+// 			passed++
+// 		} else {
+// 			failed++
+// 		}
+// 	}
+// 	current.Total += int64(totalTests)
+// 	current.Passed += int64(passed)
+// 	current.Failed += int64(failed)
+// 	current.FailedTests = append(current.FailedTests, failedTests...)
+// 	return current
+// }
 
 func variantToOutputFile(v types.Variant) string {
 	parts := strings.Split(string(v), " ")
@@ -240,13 +236,13 @@ func variantToOutputFile(v types.Variant) string {
 	return fileName + ".json"
 }
 
-func createFailedTest(scenario types.CukeElement, failedStep types.CukeStep) types.FailedTest {
-	return types.FailedTest{
-		Scenario:   scenario.Name,
-		FailedStep: failedStep.Name,
-		Source:     failedStep.Match.Location,
-	}
-}
+// func createFailedTest(scenario types.CukeElement, failedStep types.CukeStep) types.FailedTest {
+// 	return types.FailedTest{
+// 		Scenario:   scenario.Name,
+// 		FailedStep: failedStep.Name,
+// 		Source:     failedStep.Match.Location,
+// 	}
+// }
 
 type SuiteConfig struct {
 	adapter string
