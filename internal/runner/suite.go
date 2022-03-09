@@ -93,7 +93,7 @@ func (b *Suite) ConfigureSuite() error {
 	}
 
 	outputFile := variantToOutputFile(b.Variant)
-	format := "emoji,cucumber:" + outputFile
+	format := "xds,cucumber:" + outputFile
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
