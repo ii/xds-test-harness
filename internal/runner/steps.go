@@ -15,35 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func itemInSlice(item string, slice []string) bool {
-	for _, sliceItem := range slice {
-		if item == sliceItem {
-			return true
-		}
-	}
-	return false
-}
-
-func stringsMatch(expected string, actual string) bool {
-	return expected == actual
-}
-
-
-
-func resourcesMatch(expected []string, actual []string) bool {
-	log.Debug().Msgf("resources to match...expected: %v, actual: %v\n", expected, actual)
-	// Compare the resources in a discovery response to the ones we expect.
-	// It is valid for the response to give more resources than subscribed to,
-	// which is why we are not checking the equality of the two slices, only that
-	// all of expected is contained in actual.
-	for _, ec := range expected {
-		if match := itemInSlice(ec, actual); match == false {
-			return false
-		}
-	}
-	return true
-}
-
 func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, version string) error {
 	snapshot := &pb.Snapshot{
 		Node:    r.NodeID,
@@ -214,8 +185,6 @@ func (r *Runner) TheClientReceivesResourcesAndVersionForService(resources, versi
 		}
 	}
 }
-
-
 
 func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
 	stream := r.Service
@@ -457,22 +426,49 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 }
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`,r.ATargetSetupWithServiceResourcesAndVersion)
+	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
-    ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-    ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
-    ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
+	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
+	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
-    ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
+	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-    ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-    ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-    ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
 	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion) // delete?
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
-    ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 
+}
+
+func itemInSlice(item string, slice []string) bool {
+	for _, sliceItem := range slice {
+		if item == sliceItem {
+			return true
+		}
+	}
+	return false
+}
+
+func stringsMatch(expected string, actual string) bool {
+	return expected == actual
+}
+
+func resourcesMatch(expected []string, actual []string) bool {
+	log.Debug().Msgf("resources to match...expected: %v, actual: %v\n", expected, actual)
+	// Compare the resources in a discovery response to the ones we expect.
+	// It is valid for the response to give more resources than subscribed to,
+	// which is why we are not checking the equality of the two slices, only that
+	// all of expected is contained in actual.
+	for _, ec := range expected {
+		if match := itemInSlice(ec, actual); match == false {
+			return false
+		}
+	}
+	return true
 }
