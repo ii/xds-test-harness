@@ -15,6 +15,28 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+
+func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
+	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
+	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
+	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
+	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
+	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
+	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
+	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
+	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+	ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion) // delete?
+	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
+	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
+	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+
+}
+
 func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, version string) error {
 	snapshot := &pb.Snapshot{
 		Node:    r.NodeID,
@@ -23,24 +45,19 @@ func (r *Runner) ATargetSetupWithServiceResourcesAndVersion(service, resources, 
 	resourceNames := strings.Split(resources, ",")
 
 	//Set endpoints
-	endpoints := parser.ToEndpoints(resourceNames)
-	snapshot.Endpoints = endpoints
+	snapshot.Endpoints = parser.ToEndpoints(resourceNames)
 
 	//Set clusters
-	clusters := parser.ToClusters(resourceNames)
-	snapshot.Clusters = clusters
+	snapshot.Clusters = parser.ToClusters(resourceNames)
 
 	//Set Routes
-	routes := parser.ToRoutes(resourceNames)
-	snapshot.Routes = routes
+	snapshot.Routes = parser.ToRoutes(resourceNames)
 
 	//Set listeners
-	listeners := parser.ToListeners(resourceNames)
-	snapshot.Listeners = listeners
+	snapshot.Listeners = parser.ToListeners(resourceNames)
 
 	//Set runtimes
-	runtimes := parser.ToRuntimes(resourceNames)
-	snapshot.Runtimes = runtimes
+	snapshot.Runtimes = parser.ToRuntimes(resourceNames)
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 
@@ -103,42 +120,6 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 		go r.Stream(r.Service)
 		go r.Ack(request, r.Service)
 		return nil
-	}
-}
-
-func (r *Runner) TheClientReceivesCorrectResourcesAndVersion(resources, version string) error {
-	expectedResources := strings.Split(resources, ",")
-	stream := r.Service
-	actualResources := []string{}
-
-	for {
-		select {
-		case err := <-stream.Channels.Err:
-			log.Err(err).Msg("From our step")
-			return errors.New("Could not find expected response within grace period of 10 seconds.")
-		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponse(response)
-					if err != nil {
-						log.Error().Err(err).Msg("can't parse discovery response ")
-						return err
-					}
-					if !stringsMatch(version, actual.Version) {
-						continue
-					}
-					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
-						actualResources = append(actualResources, actual.Resources...)
-					} else {
-						actualResources = actual.Resources
-					}
-					if !resourcesMatch(expectedResources, actualResources) {
-						continue
-					}
-					return nil
-				}
-			}
-		}
 	}
 }
 
@@ -233,8 +214,7 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
 	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
-		log.Err(err).
-			Msgf("Requests:%v, Responses: \v", stream.Cache.Requests, stream.Cache.Responses)
+		log.Err(err)
 		return err
 	}
 	return nil
@@ -252,30 +232,6 @@ func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, v
 	snapshot.Listeners = startState.Listeners
 	snapshot.Runtimes = startState.Runtimes
 	snapshot.Secrets = startState.Secrets
-
-	// TODO I am uncertain if we need to update the contents of any
-	// resource? Is updating just the version enough to trigger
-	// a subscription update? If so, we can remove the majority of this
-	// function body.
-	if service == "LDS" {
-		listeners := snapshot.GetListeners()
-		for _, listener := range listeners.Items {
-			if listener.Name == resource {
-				listener.Address = parser.RandomAddress()
-			}
-		}
-		snapshot.Listeners = listeners
-	}
-
-	if service == "CDS" {
-		clusters := snapshot.GetClusters()
-		for _, cluster := range clusters.Items {
-			if cluster.Name == resource {
-				cluster.ConnectTimeout = map[string]int32{"seconds": 10}
-			}
-		}
-		snapshot.Clusters = clusters
-	}
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 
@@ -423,27 +379,6 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 			}
 		}
 	}
-}
-
-func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
-	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
-	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
-	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
-	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
-	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
-	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
-	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-	ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-	ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
-	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion) // delete?
-	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
-	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
-	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
-
 }
 
 func itemInSlice(item string, slice []string) bool {
