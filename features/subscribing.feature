@@ -9,7 +9,7 @@ Feature: Subscribing to Resources
   Scenario Outline: [<service>] The service should send all resources on a wildcard request.
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client does a wildcard subscription to <service>
-    Then the Client receives the resources <expected resources> and version <starting version>
+    Then the Client receives the resources <expected resources> and version <starting version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -22,9 +22,9 @@ Feature: Subscribing to Resources
   Scenario Outline: [<service>] The service should send updates to the client
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client does a wildcard subscription to <service>
-    Then the Client receives the resources <expected resources> and version <starting version>
+    Then the Client receives the resources <expected resources> and version <starting version> for <service>
     When  the resources <chosen resource> of the <service> is updated to version <next version>
-    Then the Client receives the resources <expected resources> and version <next version>
+    Then the Client receives the resources <expected resources> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -33,13 +33,13 @@ Feature: Subscribing to Resources
       | "LDS"   | "1"              | "2"          | "D,E,F"   | "D,E,F"            | "D"             |
 
 
-  @sotw @non-aggregated @aggregated @active
+  @sotw @non-aggregated @aggregated
   Scenario Outline: [<service>] Wildcard subscriptions receive updates when new resources are added
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client does a wildcard subscription to <service>
-    Then the Client receives the resources <resources> and version <starting version>
+    Then the Client receives the resources <resources> and version <starting version> for <service>
     When the resource <new resource> is added to the <service> with version <next version>
-    Then the Client receives the resources <expected resources> and version <next version>
+    Then the Client receives the resources <expected resources> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -48,11 +48,11 @@ Feature: Subscribing to Resources
       | "LDS"   | "1"              | "D,E,F"   | "G"          | "D,E,F,G"          | "2"          |
 
 
-  @sotw @non-aggregated @aggregated @active
+  @sotw @non-aggregated @aggregated
   Scenario: [<service>]  When subscribing to specific resources, receive only these resources
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -67,9 +67,9 @@ Feature: Subscribing to Resources
   Scenario: [<service>] When subscribing to specific resources, receive response when those resources change
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the resources <subscribed resource> of the <service> is updated to version <next version>
-    Then the Client receives the resources <subset of resources> and version <next version>
+    Then the Client receives the resources <subset of resources> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -82,9 +82,9 @@ Feature: Subscribing to Resources
   Scenario: [<service>] When subscribing to specific resources, receive response when those resources change
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the resources <subscribed resource> of the <service> is updated to version <next version>
-    Then the Client receives the resources <subscribed resource> and version <next version>
+    Then the Client receives the resources <subscribed resource> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -97,9 +97,9 @@ Feature: Subscribing to Resources
   Scenario: [<service>] When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
-    Then the Client receives the resources <existing subset> and version <starting version>
+    Then the Client receives the resources <existing subset> and version <starting version> for <service>
     When the resource <chosen resource> is added to the <service> with version <next version>
-    Then the Client receives the resources <subset of resources> and version <next version>
+    Then the Client receives the resources <subset of resources> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -108,13 +108,13 @@ Feature: Subscribing to Resources
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
 
 
-  @sotw @non-aggregated @aggregated
+  @sotw @non-aggregated @aggregated @wip
   Scenario: [<service>] When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
-    Then the Client receives the resources <existing subset> and version <starting version>
+    Then the Client receives the resources <existing subset> and version <starting version> for <service>
     When the resource <chosen resource> is added to the <service> with version <next version>
-    Then the Client receives the resources <chosen resource> and version <next version>
+    Then the Client receives the resources <chosen resource> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -126,9 +126,9 @@ Feature: Subscribing to Resources
   @sotw @aggregated
   Scenario: [<service>] Client can subscribe to multiple services via ADS
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
-    When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
-    When the Client subscribes to a subset of resources, <subset of resources>, for <other service>
+    When the Client subscribes to resources <subset of resources> for <service>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
+    When the Client subscribes to resources <subset of resources> for <other service>
     Then the Client receives the resources <subset of resources> and version <starting version> for <other service>
     When the resources <subset of resources> of the <service> is updated to version <next version>
     Then the Client receives the resources <subset of resources> and version <next version> for <service>
