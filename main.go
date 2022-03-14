@@ -18,6 +18,7 @@ import (
 
 var (
 	debug          = pflag.BoolP("debug", "D", false, "sets log level to debug")
+	testWriting    = pflag.BoolP("testwriting", "W", false, "Sets a pretty output that doesn't write to file, for better feedback while writing tests.")
 	config         = pflag.StringP("config", "C", "", "Path to optional config file. This file sets the adapter and target addresses and supported variants.")
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
@@ -56,7 +57,7 @@ func main() {
 		log.Info().
 			Msgf("Starting Tests for %v\n", string(variant))
 
-		suite := runner.NewSuite(variant)
+		suite := runner.NewSuite(variant, *testWriting)
 		err, variantResults := suite.Run(*adapterAddress, *targetAddress, *nodeID, godogTags)
 		if err != nil {
 			log.Fatal().
@@ -64,10 +65,11 @@ func main() {
 		}
 		results = runner.UpdateResults(results, variantResults)
 	}
-	printResults(results)
-
-	file, _ := json.MarshalIndent(results, "", "  ")
-	_ = ioutil.WriteFile("results.json", file, 0644)
+	if !*testWriting {
+		printResults(results)
+		file, _ := json.MarshalIndent(results, "", "  ")
+		_ = ioutil.WriteFile("results.json", file, 0644)
+	}
 	os.Exit(0)
 }
 

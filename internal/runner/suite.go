@@ -19,6 +19,7 @@ type Suite struct {
 	Runner      *Runner
 	Aggregated  bool
 	Incremental bool
+	TestWriting bool
 	Buffer      bytes.Buffer
 	Tags        string
 	TestSuite   godog.TestSuite
@@ -70,16 +71,16 @@ func (s *Suite) SetTags(base string) error {
 	return nil
 }
 
-func (b *Suite) ConfigureSuite() error {
+func (s *Suite) ConfigureSuite() error {
 	initScenario := func(ctx *godog.ScenarioContext) {
 		ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 			log.Debug().Msg("Creating Fresh Runner!")
-			b.Runner = FreshRunner(b.Runner)
+			s.Runner = FreshRunner(s.Runner)
 			return ctx, nil
 		})
 		ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-			c := pb.NewAdapterClient(b.Runner.Adapter.Conn)
-			clearRequest := &pb.ClearRequest{Node: b.Runner.NodeID}
+			c := pb.NewAdapterClient(s.Runner.Adapter.Conn)
+			clearRequest := &pb.ClearRequest{Node: s.Runner.NodeID}
 			clear, err := c.ClearState(context.Background(), clearRequest)
 			if err != nil {
 				log.Err(err).
@@ -89,11 +90,8 @@ func (b *Suite) ConfigureSuite() error {
 				Msgf("Clearing State: %v\n", clear.Response)
 			return ctx, nil
 		})
-		b.Runner.LoadSteps(ctx)
+		s.Runner.LoadSteps(ctx)
 	}
-
-	outputFile := variantToOutputFile(b.Variant)
-	format := "xds,cucumber:" + outputFile
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
@@ -101,19 +99,23 @@ func (b *Suite) ConfigureSuite() error {
 		StopOnFailure:       false,
 		Strict:              false,
 		NoColors:            false,
-		Tags:                b.Tags,
-		Output:              &b.Buffer,
-		Format:              format,
+		Tags:                s.Tags,
+		Format: "pretty",
 		Concurrency:         0,
+	}
+	if !s.TestWriting { // default is ppretty output to stdout. Only use default when writing tests, otherwise print to our special buffer.
+		outputFile := variantToOutputFile(s.Variant)
+		godogOpts.Format = "xds,cucumber:" + outputFile
+		godogOpts.Output = &s.Buffer
 	}
 
 	suite := godog.TestSuite{
-		Name:                fmt.Sprintf("xds Test Suite [%v]", b.Variant),
+		Name:                fmt.Sprintf("xds Test Suite [%v]", s.Variant),
 		ScenarioInitializer: initScenario,
 		Options:             &godogOpts,
 	}
 
-	b.TestSuite = suite
+	s.TestSuite = suite
 	return nil
 }
 
@@ -129,8 +131,10 @@ func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results ty
 	}
 
 	s.TestSuite.Run()
+	if s.TestWriting {
+		return err, types.VariantResults{}
+	}
 	vr := types.VariantResults{}
-	s.Buffer.String()
 	if err = json.Unmarshal([]byte(s.Buffer.String()), &vr); err != nil {
 		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
 		return err, results
@@ -140,54 +144,58 @@ func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results ty
 	return err, results
 }
 
-func NewSotwNonAggregatedSuite() *Suite {
+func NewSotwNonAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.SotwNonAggregated,
 		Aggregated:  false,
 		Incremental: false,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 }
 
-func NewSotwAggregatedSuite() *Suite {
+func NewSotwAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.SotwAggregated,
 		Aggregated:  true,
 		Incremental: false,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 
 }
 
-func NewIncrementalNonAggregatedSuite() *Suite {
+func NewIncrementalNonAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.IncrementalNonAggregated,
 		Aggregated:  false,
 		Incremental: true,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 
 }
 
-func NewIncrementalAggregatedSuite() *Suite {
+func NewIncrementalAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.IncrementalAggregated,
 		Aggregated:  true,
 		Incremental: true,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 }
 
-func NewSuite(variant types.Variant) *Suite {
+func NewSuite(variant types.Variant, testWriting bool) *Suite {
 	switch variant {
 	case types.SotwNonAggregated:
-		return NewSotwNonAggregatedSuite()
+		return NewSotwNonAggregatedSuite(testWriting)
 	case types.SotwAggregated:
-		return NewSotwAggregatedSuite()
+		return NewSotwAggregatedSuite(testWriting)
 	case types.IncrementalNonAggregated:
-		return NewIncrementalNonAggregatedSuite()
+		return NewIncrementalNonAggregatedSuite(testWriting)
 	case types.IncrementalAggregated:
-		return NewIncrementalAggregatedSuite()
+		return NewIncrementalAggregatedSuite(testWriting)
 	default:
 		return nil
 	}
@@ -203,46 +211,11 @@ func UpdateResults(current types.Results, variantResults types.VariantResults) t
 	}
 }
 
-// func gatherResults(current types.VariantResults, cuke types.CukeFeatureJSON) types.VariantResults {
-// 	totalTests := len(cuke.Elements)
-// 	passed := 0
-// 	failed := 0
-// 	failedTests := []types.FailedTest{}
-
-// 	for _, test := range cuke.Elements {
-// 		testPassed := true
-// 		for _, step := range test.Steps {
-// 			if step.Result.Status == "failed" {
-// 				testPassed = false
-// 				failedTests = append(failedTests, createFailedTest(test, step))
-// 			}
-// 		}
-// 		if testPassed {
-// 			passed++
-// 		} else {
-// 			failed++
-// 		}
-// 	}
-// 	current.Total += int64(totalTests)
-// 	current.Passed += int64(passed)
-// 	current.Failed += int64(failed)
-// 	current.FailedTests = append(current.FailedTests, failedTests...)
-// 	return current
-// }
-
 func variantToOutputFile(v types.Variant) string {
 	parts := strings.Split(string(v), " ")
 	fileName := strings.Join(parts, "-")
 	return fileName + ".json"
 }
-
-// func createFailedTest(scenario types.CukeElement, failedStep types.CukeStep) types.FailedTest {
-// 	return types.FailedTest{
-// 		Scenario:   scenario.Name,
-// 		FailedStep: failedStep.Name,
-// 		Source:     failedStep.Match.Location,
-// 	}
-// }
 
 type SuiteConfig struct {
 	adapter string
