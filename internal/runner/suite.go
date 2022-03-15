@@ -100,7 +100,7 @@ func (s *Suite) ConfigureSuite() error {
 		Strict:              false,
 		NoColors:            false,
 		Tags:                s.Tags,
-		Format: "pretty",
+		Format:              "pretty",
 		Concurrency:         0,
 	}
 	if !s.TestWriting { // default is ppretty output to stdout. Only use default when writing tests, otherwise print to our special buffer.
@@ -206,6 +206,9 @@ func UpdateResults(current types.Results, variantResults types.VariantResults) t
 		Total:            current.Total + int64(variantResults.Total),
 		Passed:           current.Passed + int64(variantResults.Passed),
 		Failed:           current.Failed + int64(variantResults.Failed),
+		Skipped:          current.Skipped + int64(variantResults.Skipped),
+		Undefined:        current.Undefined + int64(variantResults.Undefined),
+		Pending:          current.Pending + int64(variantResults.Pending),
 		Variants:         append(current.Variants, variantResults.Name),
 		ResultsByVariant: append(current.ResultsByVariant, variantResults),
 	}
