@@ -78,7 +78,19 @@ func printResults(results types.Results) {
 	divider := "-------------------"
 	fmt.Println("\nTest Suite Finished\n" + divider)
 	fmt.Printf("Ran %v tests across %v variants\n\n", results.Total, len(results.Variants))
-	fmt.Printf("Passed: %v\nFailed: %v", results.Passed, results.Failed)
+	fmt.Println("Passed: ", results.Passed)
+	if results.Failed > 0 {
+	  fmt.Println("Failed: ", results.Failed)
+	}
+	if results.Skipped > 0 {
+	  fmt.Println("Skipped: ", results.Skipped)
+	}
+	if results.Undefined > 0 {
+	  fmt.Println("Undefined: ", results.Undefined)
+	}
+	if results.Pending > 0 {
+	  fmt.Println("Pending: ", results.Pending)
+	}
 	fmt.Printf("\n\nResults broken down by Variant....\n\n")
 	for _, variant := range results.ResultsByVariant {
 		fmt.Println(variant.Name+"\n"+divider)
@@ -90,6 +102,9 @@ func variantResults(results types.VariantResults) string {
 	total := fmt.Sprintf("Total tests: %v\n", results.Total)
 	passed := fmt.Sprintf("Passed: %v\n", results.Passed)
 	failed := fmt.Sprintf("Failed: %v\n", results.Failed)
+	skipped := fmt.Sprintf("Skipped: %v\n", results.Skipped)
+	undefined := fmt.Sprintf("Undefined: %v\n", results.Undefined)
+	pending := fmt.Sprintf("Pending: %v\n", results.Pending)
 	var failedTests string
 	if len(results.FailedScenarios) > 0 {
 		failedTests = "Failed Tests:\n"
@@ -97,5 +112,5 @@ func variantResults(results types.VariantResults) string {
 			failedTests = failedTests + "  - " + test.Name + "\n"
 		}
 	}
-	return total + passed + failed + failedTests
+	return total + passed + failed + failedTests + skipped + undefined + pending
 }
