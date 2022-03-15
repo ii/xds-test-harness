@@ -15,7 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
@@ -141,21 +140,20 @@ func (r *Runner) TheClientReceivesResourcesAndVersionForService(resources, versi
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponse(response)
+					resourceNames, err := parser.ResourceNames(response)
 					if err != nil {
-						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !stringsMatch(version, actual.Version) {
+					if !stringsMatch(version, response.VersionInfo) {
 						continue
 					}
-					if !stringsMatch(typeUrl, actual.TypeUrl) {
+					if !stringsMatch(typeUrl, response.TypeUrl) {
 						continue
 					}
 					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
-						actualResources = append(actualResources, actual.Resources...)
+						actualResources = append(actualResources, resourceNames...)
 					} else {
-						actualResources = actual.Resources
+						actualResources = resourceNames
 					}
 					if !resourcesMatch(expectedResources, actualResources) {
 						continue
@@ -179,22 +177,25 @@ func (r *Runner) theClientReceivesOnlyTheCorrectResourceAndVersion(resource, ver
 		default:
 			if len(stream.Cache.Responses) > 0 {
 				for _, response := range stream.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponse(response)
+					resourceNames, err := parser.ResourceNames(response)
+					if err != nil {
+						return fmt.Errorf("Could not parse resource names from response. cannot validate response. response:%v\nerr: %v", response, err)
+					}
 					if err != nil {
 						log.Error().Err(err).Msg("can't parse discovery response ")
 						return err
 					}
-					if !stringsMatch(version, actual.Version) {
+					if !stringsMatch(version, response.VersionInfo) {
 						continue
 					}
 					// we set our subscription to a single resource, and the services should only send a single resource.
 					// If the resources slice is empty or more than one, it is incorrect and we can continue.
 					// (this fn is not designed for LDS or CDS tests)
-					if len(actual.Resources) != 1 {
+					if len(resourceNames) != 1 {
 						continue
 					}
-					if !resourcesMatch([]string{resource}, actual.Resources) {
-						log.Debug().Msgf("resources don't match: %v", actual.Resources)
+					if !resourcesMatch([]string{resource}, resourceNames) {
+						log.Debug().Msgf("resources don't match: %v", resourceNames)
 						continue
 					}
 					return nil
@@ -360,20 +361,13 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 		default:
 			if len(r.Service.Cache.Responses) > 0 {
 				for _, response := range r.Service.Cache.Responses {
-					actual, err := parser.ParseDiscoveryResponse(response)
-					if err != nil {
-						log.Error().
-							Err(err).
-							Msg("can't parse discovery response ")
-						return err
-					}
 					currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots)-1]
-					if actual.Version != currentState.Version {
+					if response.VersionInfo != currentState.Version {
 						continue
 					}
-					err = errors.New("Received a response when we expected no response")
+					err := errors.New("Received a response when we expected no response")
 					log.Err(err).
-						Msgf("Response: %v", actual)
+						Msgf("Response: %v", response)
 					return err
 				}
 			}

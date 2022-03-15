@@ -8,7 +8,6 @@ import (
 	"time"
 
 	pb "github.com/ii/xds-test-harness/api/adapter"
-	"github.com/ii/xds-test-harness/internal/parser"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -118,22 +117,15 @@ func (r *Runner) NewRequest(resourceList []string, typeURL string) *discovery.Di
 }
 
 func (r *Runner) NewAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) (*discovery.DiscoveryRequest, error) {
-	response, err := parser.ParseDiscoveryResponse(res)
-	if err != nil {
-		err := fmt.Errorf("error parsing dres for acking: %v", err)
-		return nil, err
-	}
-
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
 	request := &discovery.DiscoveryRequest{
-		VersionInfo:   response.Version,
+		VersionInfo:   res.VersionInfo,
 		ResourceNames: initReq.ResourceNames,
 		TypeUrl:       initReq.TypeUrl,
-		ResponseNonce: response.Nonce,
+		ResponseNonce: res.Nonce,
 	}
-
 	return request, nil
 }
 

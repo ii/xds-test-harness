@@ -9,10 +9,10 @@ import (
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
-	"github.com/ii/xds-test-harness/internal/types"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/ii/xds-test-harness/internal/types"
 	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/rs/zerolog/log"
 )
@@ -23,7 +23,6 @@ const (
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
-
 
 func RandomAddress() string {
 	var (
@@ -126,64 +125,55 @@ func ServiceToTypeURL(service string) (err error, typeURL string) {
 	return nil, typeURL
 }
 
-func ParseDiscoveryResponse(res *envoy_service_discovery_v3.DiscoveryResponse) (*SimpleResponse, error) {
-	simpRes := &SimpleResponse{}
-
-	simpRes.Version = res.VersionInfo
-	simpRes.Nonce = res.Nonce
-	simpRes.Resources = []string{}
-	simpRes.TypeUrl = res.TypeUrl
-	switch res.TypeUrl {
+func ResourceNames(res *envoy_service_discovery_v3.DiscoveryResponse) (resourceNames []string, err error) {
+	typeUrl := res.TypeUrl
+	switch typeUrl {
 	case TypeUrlLDS:
 		for _, resource := range res.GetResources() {
 			listener := &listener.Listener{}
 			if err := resource.UnmarshalTo(listener); err != nil {
-				fmt.Printf("ERORROROROR: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("Could not get resource name from %v. err: %v", resource, err)
 			}
-			simpRes.Resources = append(simpRes.Resources, listener.Name)
+			resourceNames = append(resourceNames, listener.Name)
 		}
 	case TypeUrlCDS:
 		for _, resource := range res.GetResources() {
 			cluster := &cluster.Cluster{}
 			if err := resource.UnmarshalTo(cluster); err != nil {
-				fmt.Printf("ERORROROROR: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("Could not get resource name from %v. err: %v", resource, err)
 			}
-			simpRes.Resources = append(simpRes.Resources, cluster.Name)
-		}
-	case TypeUrlRDS:
-		for _, resource := range res.GetResources() {
-			routeConfig := &route.RouteConfiguration{}
-			if err := resource.UnmarshalTo(routeConfig); err != nil {
-				fmt.Printf("ERORROROROR: %v", err)
-				return nil, err
-			}
-			simpRes.Resources = append(simpRes.Resources, routeConfig.Name)
+			resourceNames = append(resourceNames, cluster.Name)
 		}
 	case TypeUrlEDS:
 		for _, resource := range res.GetResources() {
 			endpointConfig := &endpoint.ClusterLoadAssignment{}
 			if err := resource.UnmarshalTo(endpointConfig); err != nil {
-				fmt.Printf("ERORROROROR: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("Could not get resource name from %v. err: %v", resource, err)
 			}
-			simpRes.Resources = append(simpRes.Resources, endpointConfig.ClusterName)
+			resourceNames = append(resourceNames, endpointConfig.ClusterName)
+		}
+	case TypeUrlRDS:
+		for _, resource := range res.GetResources() {
+			route := &route.RouteConfiguration{}
+			if err := resource.UnmarshalTo(route); err != nil {
+				return nil, fmt.Errorf("Could not get resource name from %v. err: %v", resource, err)
+			}
+			resourceNames = append(resourceNames, route.Name)
 		}
 	}
-	return simpRes, nil
+	return resourceNames, err
 }
 
 func ParseSupportedVariants(variants []string) (err error, supported []types.Variant) {
 	variantMap := map[string]types.Variant{
-		"sotw non-aggregated": types.SotwNonAggregated,
-		"sotw aggregated": types.SotwAggregated,
+		"sotw non-aggregated":        types.SotwNonAggregated,
+		"sotw aggregated":            types.SotwAggregated,
 		"incremental non-aggregated": types.IncrementalNonAggregated,
-		"incremental aggregated": types.IncrementalAggregated,
+		"incremental aggregated":     types.IncrementalAggregated,
 	}
 
 	for _, v := range variants {
-		variant, ok := variantMap[v]
+		variant, ok := variantMap[strings.ToLower(v)]
 		if !ok {
 			err := fmt.Errorf("Config included unrecognized variant. Please remove it and try again: %v\n", variant)
 			return err, nil
@@ -207,7 +197,7 @@ func ValuesFromConfig(config string) (target string, adapter string, nodeID stri
 	target, err = c.Get("targetAddress")
 	if err != nil {
 		log.Fatal().
-			Msgf("Error reading config file for Target Address: %v\n", config, err)
+			Msgf("Error reading config file for Target Address: %v\n", config)
 	}
 	adapter, err = c.Get("adapterAddress")
 	if err != nil {
@@ -233,3 +223,4 @@ func ValuesFromConfig(config string) (target string, adapter string, nodeID stri
 	}
 	return target, adapter, nodeID, supportedVariants
 }
+
