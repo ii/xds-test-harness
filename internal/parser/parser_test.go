@@ -336,14 +336,13 @@ func itemInSlice(item string, slice []string) bool {
 	return false
 }
 
-
 func TestParseSupportedVariants(t *testing.T) {
 	yah := []string{"sotw Non-Aggregated", "incremental aggregated"}
 	yahTypes := []types.Variant{types.SotwNonAggregated, types.IncrementalAggregated}
 
 	nah := []string{"kakapo", "kea", "tui"}
 
-	err,yahVars := ParseSupportedVariants(yah)
+	err, yahVars := ParseSupportedVariants(yah)
 	if err != nil {
 		t.Errorf("Error parsing variants when expecting no err: %v", err)
 	}
@@ -359,12 +358,11 @@ func TestParseSupportedVariants(t *testing.T) {
 	}
 }
 
-
-func TestValuesFromConfig (t *testing.T) {
+func TestValuesFromConfig(t *testing.T) {
 	config := "../../testdata/config.yaml"
 	expected := map[string]string{
-		"nodeID": "testaroo",
-		"target": "12000",
+		"nodeID":  "testaroo",
+		"target":  "12000",
 		"adapter": "13000",
 	}
 	expectedVariants := []types.Variant{types.SotwNonAggregated, types.IncrementalAggregated}
