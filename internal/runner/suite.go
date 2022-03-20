@@ -31,23 +31,20 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner.Aggregated = s.Aggregated
 
 	if err := s.Runner.ConnectClient("target", target); err != nil {
-		log.Fatal().
-			Msgf("error connecting to target: %v", err)
+		return fmt.Errorf("Cannot connect to target: %v", err)
 	}
 	if err := s.Runner.ConnectClient("adapter", adapter); err != nil {
-		log.Fatal().
-			Msgf("error connecting to adapter: %v", err)
+		return fmt.Errorf("Cannot connect to adapter: %v", err)
 	}
-
 	log.Info().
 		Msgf("Connected to target at %s and adapter at %s\n", target, adapter)
 
 	if s.Runner.Aggregated {
 		log.Info().
-			Msgf("Tests will be run via a single aggregated streams")
+			Msgf("Tests will be run via an aggregated streams")
 	} else {
 		log.Info().
-			Msgf("Tests will be run via separate, non-aggregated streams")
+			Msgf("Tests will be run via separate streams")
 	}
 	return nil
 }
@@ -71,10 +68,11 @@ func (s *Suite) SetTags(base string) error {
 	return nil
 }
 
-func (s *Suite) ConfigureSuite() error {
+func (s *Suite) ConfigureSuite() {
 	initScenario := func(ctx *godog.ScenarioContext) {
 		ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-			log.Debug().Msg("Creating Fresh Runner!")
+			log.Debug().
+				Msg("Creating Fresh Runner!")
 			s.Runner = FreshRunner(s.Runner)
 			return ctx, nil
 		})
@@ -103,7 +101,8 @@ func (s *Suite) ConfigureSuite() error {
 		Format:              "pretty",
 		Concurrency:         0,
 	}
-	if !s.TestWriting { // default is ppretty output to stdout. Only use default when writing tests, otherwise print to our special buffer.
+	if !s.TestWriting { // default is pretty output to stdout.
+		// Only use default when writing tests, otherwise print to our special buffer.
 		outputFile := variantToOutputFile(s.Variant)
 		godogOpts.Format = "xds,cucumber:" + outputFile
 		godogOpts.Output = &s.Buffer
@@ -116,32 +115,21 @@ func (s *Suite) ConfigureSuite() error {
 	}
 
 	s.TestSuite = suite
-	return nil
 }
 
-func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results types.VariantResults) {
-	if err = s.StartRunner(nodeId, adapter, target); err != nil {
-		return
-	}
-	if err = s.SetTags(tags); err != nil {
-		return
-	}
-	if err = s.ConfigureSuite(); err != nil {
-		return
-	}
-
+func (s *Suite) Run() (results types.VariantResults, err error) {
 	s.TestSuite.Run()
 	if s.TestWriting {
-		return err, types.VariantResults{}
+		return results, err
 	}
-	vr := types.VariantResults{}
-	if err = json.Unmarshal([]byte(s.Buffer.String()), &vr); err != nil {
+
+	if err = json.Unmarshal([]byte(s.Buffer.String()), &results); err != nil {
 		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
-		return err, results
+		return results, err
 	}
-	results = vr
+
 	results.Name = string(s.Variant)
-	return err, results
+	return results, err
 }
 
 func NewSotwNonAggregatedSuite(testWriting bool) *Suite {
@@ -218,11 +206,4 @@ func variantToOutputFile(v types.Variant) string {
 	parts := strings.Split(string(v), " ")
 	fileName := strings.Join(parts, "-")
 	return fileName + ".json"
-}
-
-type SuiteConfig struct {
-	adapter string
-	target  string
-	nodeId  string
-	tags    string
 }
