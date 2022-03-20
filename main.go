@@ -58,7 +58,19 @@ func main() {
 			Msgf("Starting Tests for %v\n", string(variant))
 
 		suite := runner.NewSuite(variant, *testWriting)
-		err, variantResults := suite.Run(*adapterAddress, *targetAddress, *nodeID, godogTags)
+		if err = suite.StartRunner(*nodeID, *adapterAddress, *targetAddress); err != nil {
+			log.Fatal().
+				Err(err).
+				Msg("Could not start runner.")
+		}
+		if err = suite.SetTags(godogTags); err != nil {
+			log.Fatal().
+				Err(err).
+				Msg("Could not set tags properly to start up test suite.")
+		}
+		suite.ConfigureSuite()
+
+		variantResults, err := suite.Run()
 		if err != nil {
 			log.Fatal().
 				Msgf("Error when attempting to run test suite: %v\n", err)
@@ -80,21 +92,23 @@ func printResults(results types.Results) {
 	fmt.Printf("Ran %v tests across %v variants\n\n", results.Total, len(results.Variants))
 	fmt.Println("Passed: ", results.Passed)
 	if results.Failed > 0 {
-	  fmt.Println("Failed: ", results.Failed)
+		fmt.Println("Failed: ", results.Failed)
 	}
 	if results.Skipped > 0 {
-	  fmt.Println("Skipped: ", results.Skipped)
+		fmt.Println("Skipped: ", results.Skipped)
 	}
 	if results.Undefined > 0 {
-	  fmt.Println("Undefined: ", results.Undefined)
+		fmt.Println("Undefined: ", results.Undefined)
 	}
 	if results.Pending > 0 {
-	  fmt.Println("Pending: ", results.Pending)
+		fmt.Println("Pending: ", results.Pending)
 	}
 	fmt.Printf("\n\nResults broken down by Variant....\n\n")
 	for _, variant := range results.ResultsByVariant {
-		fmt.Println(variant.Name+"\n"+divider)
-		fmt.Println(variantResults(variant))
+		if variant.Total > 0 {
+			fmt.Println(variant.Name + "\n" + divider)
+			fmt.Println(variantResults(variant))
+		}
 	}
 }
 
