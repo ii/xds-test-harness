@@ -41,6 +41,7 @@ type Runner struct {
 	Cache      *Cache
 	Aggregated bool
 	Service    *XDSService
+	SubscribeRequest *discovery.DiscoveryRequest
 }
 
 func FreshRunner(current ...*Runner) *Runner {
@@ -90,14 +91,14 @@ func (r *Runner) ConnectClient(server, address string) error {
 	return nil
 }
 
-func (r *Runner) Ack(initReq *discovery.DiscoveryRequest, service *XDSService) {
-	service.Channels.Req <- initReq
-	service.Cache.Requests = append(service.Cache.Requests, initReq)
+func (r *Runner) Ack(service *XDSService) {
+	service.Channels.Req <- r.SubscribeRequest
+	service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
 	for {
 		select {
 		case res := <-service.Channels.Res:
 			service.Cache.Responses = append(service.Cache.Responses, res)
-			ack := newAckFromResponse(res, initReq)
+			ack := newAckFromResponse(res, r.SubscribeRequest)
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
@@ -184,3 +185,5 @@ func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.Disco
 		TypeUrl:       typeURL,
 	}
 }
+
+
