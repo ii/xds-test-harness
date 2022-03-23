@@ -223,4 +223,3 @@ func ValuesFromConfig(config string) (target string, adapter string, nodeID stri
 	}
 	return target, adapter, nodeID, supportedVariants
 }
-
