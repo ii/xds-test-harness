@@ -97,10 +97,10 @@ func (f *xdsFmt) step(pickleStepID string, scenario *godog.Scenario) {
 		if failed {
 			log.Info().
 				Str("failed step", failedStep).
-				Msgf("[%v]%v", colors.Red("FAILED"), scenario.Name)
+				Msgf("| [%v]%v", colors.Red("FAILED"), scenario.Name)
 		} else {
 			log.Info().
-				Msgf("[%v]%v", colors.Green("PASSED"), scenario.Name)
+				Msgf("| [%v]%v", colors.Green("PASSED"), scenario.Name)
 		}
 	}
 	*f.Steps++
