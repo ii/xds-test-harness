@@ -94,6 +94,9 @@ type Results struct {
 	Total            int64
 	Passed           int64
 	Failed           int64
+	Skipped          int64
+	Undefined        int64
+	Pending          int64
 	Variants         []string
 	ResultsByVariant []VariantResults
 }

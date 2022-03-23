@@ -19,6 +19,7 @@ type Suite struct {
 	Runner      *Runner
 	Aggregated  bool
 	Incremental bool
+	TestWriting bool
 	Buffer      bytes.Buffer
 	Tags        string
 	TestSuite   godog.TestSuite
@@ -30,23 +31,20 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner.Aggregated = s.Aggregated
 
 	if err := s.Runner.ConnectClient("target", target); err != nil {
-		log.Fatal().
-			Msgf("error connecting to target: %v", err)
+		return fmt.Errorf("Cannot connect to target: %v", err)
 	}
 	if err := s.Runner.ConnectClient("adapter", adapter); err != nil {
-		log.Fatal().
-			Msgf("error connecting to adapter: %v", err)
+		return fmt.Errorf("Cannot connect to adapter: %v", err)
 	}
-
 	log.Info().
 		Msgf("Connected to target at %s and adapter at %s\n", target, adapter)
 
 	if s.Runner.Aggregated {
 		log.Info().
-			Msgf("Tests will be run via a single aggregated streams")
+			Msgf("Tests will be run via an aggregated streams")
 	} else {
 		log.Info().
-			Msgf("Tests will be run via separate, non-aggregated streams")
+			Msgf("Tests will be run via separate streams")
 	}
 	return nil
 }
@@ -70,16 +68,17 @@ func (s *Suite) SetTags(base string) error {
 	return nil
 }
 
-func (b *Suite) ConfigureSuite() error {
+func (s *Suite) ConfigureSuite() {
 	initScenario := func(ctx *godog.ScenarioContext) {
 		ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-			log.Debug().Msg("Creating Fresh Runner!")
-			b.Runner = FreshRunner(b.Runner)
+			log.Debug().
+				Msg("Creating Fresh Runner!")
+			s.Runner = FreshRunner(s.Runner)
 			return ctx, nil
 		})
 		ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-			c := pb.NewAdapterClient(b.Runner.Adapter.Conn)
-			clearRequest := &pb.ClearRequest{Node: b.Runner.NodeID}
+			c := pb.NewAdapterClient(s.Runner.Adapter.Conn)
+			clearRequest := &pb.ClearRequest{Node: s.Runner.NodeID}
 			clear, err := c.ClearState(context.Background(), clearRequest)
 			if err != nil {
 				log.Err(err).
@@ -89,11 +88,8 @@ func (b *Suite) ConfigureSuite() error {
 				Msgf("Clearing State: %v\n", clear.Response)
 			return ctx, nil
 		})
-		b.Runner.LoadSteps(ctx)
+		s.Runner.LoadSteps(ctx)
 	}
-
-	outputFile := variantToOutputFile(b.Variant)
-	format := "xds,cucumber:" + outputFile
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
@@ -101,93 +97,93 @@ func (b *Suite) ConfigureSuite() error {
 		StopOnFailure:       false,
 		Strict:              false,
 		NoColors:            false,
-		Tags:                b.Tags,
-		Output:              &b.Buffer,
-		Format:              format,
+		Tags:                s.Tags,
+		Format:              "pretty",
 		Concurrency:         0,
+	}
+	if !s.TestWriting { // default is pretty output to stdout.
+		// Only use default when writing tests, otherwise print to our special buffer.
+		outputFile := variantToOutputFile(s.Variant)
+		godogOpts.Format = "xds,cucumber:" + outputFile
+		godogOpts.Output = &s.Buffer
 	}
 
 	suite := godog.TestSuite{
-		Name:                fmt.Sprintf("xds Test Suite [%v]", b.Variant),
+		Name:                fmt.Sprintf("xds Test Suite [%v]", s.Variant),
 		ScenarioInitializer: initScenario,
 		Options:             &godogOpts,
 	}
 
-	b.TestSuite = suite
-	return nil
+	s.TestSuite = suite
 }
 
-func (s *Suite) Run(adapter, target, nodeId, tags string) (err error, results types.VariantResults) {
-	if err = s.StartRunner(nodeId, adapter, target); err != nil {
-		return
-	}
-	if err = s.SetTags(tags); err != nil {
-		return
-	}
-	if err = s.ConfigureSuite(); err != nil {
-		return
-	}
-
+func (s *Suite) Run() (results types.VariantResults, err error) {
 	s.TestSuite.Run()
-	vr := types.VariantResults{}
-	s.Buffer.String()
-	if err = json.Unmarshal([]byte(s.Buffer.String()), &vr); err != nil {
-		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
-		return err, results
+	if s.TestWriting {
+		return results, err
 	}
-	results = vr
+
+	if err = json.Unmarshal([]byte(s.Buffer.String()), &results); err != nil {
+		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
+		return results, err
+	}
+
 	results.Name = string(s.Variant)
-	return err, results
+	return results, err
 }
 
-func NewSotwNonAggregatedSuite() *Suite {
+func NewSotwNonAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.SotwNonAggregated,
 		Aggregated:  false,
 		Incremental: false,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 }
 
-func NewSotwAggregatedSuite() *Suite {
+func NewSotwAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.SotwAggregated,
 		Aggregated:  true,
 		Incremental: false,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 
 }
 
-func NewIncrementalNonAggregatedSuite() *Suite {
+func NewIncrementalNonAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.IncrementalNonAggregated,
 		Aggregated:  false,
 		Incremental: true,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 
 }
 
-func NewIncrementalAggregatedSuite() *Suite {
+func NewIncrementalAggregatedSuite(testWriting bool) *Suite {
 	return &Suite{
 		Variant:     types.IncrementalAggregated,
 		Aggregated:  true,
 		Incremental: true,
+		TestWriting: testWriting,
 		Buffer:      *bytes.NewBuffer(nil),
 	}
 }
 
-func NewSuite(variant types.Variant) *Suite {
+func NewSuite(variant types.Variant, testWriting bool) *Suite {
 	switch variant {
 	case types.SotwNonAggregated:
-		return NewSotwNonAggregatedSuite()
+		return NewSotwNonAggregatedSuite(testWriting)
 	case types.SotwAggregated:
-		return NewSotwAggregatedSuite()
+		return NewSotwAggregatedSuite(testWriting)
 	case types.IncrementalNonAggregated:
-		return NewIncrementalNonAggregatedSuite()
+		return NewIncrementalNonAggregatedSuite(testWriting)
 	case types.IncrementalAggregated:
-		return NewIncrementalAggregatedSuite()
+		return NewIncrementalAggregatedSuite(testWriting)
 	default:
 		return nil
 	}
@@ -198,55 +194,16 @@ func UpdateResults(current types.Results, variantResults types.VariantResults) t
 		Total:            current.Total + int64(variantResults.Total),
 		Passed:           current.Passed + int64(variantResults.Passed),
 		Failed:           current.Failed + int64(variantResults.Failed),
+		Skipped:          current.Skipped + int64(variantResults.Skipped),
+		Undefined:        current.Undefined + int64(variantResults.Undefined),
+		Pending:          current.Pending + int64(variantResults.Pending),
 		Variants:         append(current.Variants, variantResults.Name),
 		ResultsByVariant: append(current.ResultsByVariant, variantResults),
 	}
 }
 
-// func gatherResults(current types.VariantResults, cuke types.CukeFeatureJSON) types.VariantResults {
-// 	totalTests := len(cuke.Elements)
-// 	passed := 0
-// 	failed := 0
-// 	failedTests := []types.FailedTest{}
-
-// 	for _, test := range cuke.Elements {
-// 		testPassed := true
-// 		for _, step := range test.Steps {
-// 			if step.Result.Status == "failed" {
-// 				testPassed = false
-// 				failedTests = append(failedTests, createFailedTest(test, step))
-// 			}
-// 		}
-// 		if testPassed {
-// 			passed++
-// 		} else {
-// 			failed++
-// 		}
-// 	}
-// 	current.Total += int64(totalTests)
-// 	current.Passed += int64(passed)
-// 	current.Failed += int64(failed)
-// 	current.FailedTests = append(current.FailedTests, failedTests...)
-// 	return current
-// }
-
 func variantToOutputFile(v types.Variant) string {
 	parts := strings.Split(string(v), " ")
 	fileName := strings.Join(parts, "-")
 	return fileName + ".json"
-}
-
-// func createFailedTest(scenario types.CukeElement, failedStep types.CukeStep) types.FailedTest {
-// 	return types.FailedTest{
-// 		Scenario:   scenario.Name,
-// 		FailedStep: failedStep.Name,
-// 		Source:     failedStep.Match.Location,
-// 	}
-// }
-
-type SuiteConfig struct {
-	adapter string
-	target  string
-	nodeId  string
-	tags    string
 }

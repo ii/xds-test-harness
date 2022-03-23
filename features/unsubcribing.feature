@@ -13,10 +13,10 @@ Feature: Unsubscribing to Resources
     # So the test will pass if client subscribes to A,B,C, unsubscribes from B,C and gets A,B,C back.
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the Client updates subscription to a resource(<resource from subset>) of <service> with version <starting version>
     And  the resources <resource from subset> of the <service> is updated to version <next version>
-    Then the Client receives the resources <resource from subset> and version <next version>
+    Then the Client receives the resources <resource from subset> and version <next version> for <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
@@ -25,13 +25,13 @@ Feature: Unsubscribing to Resources
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @sotw @non-aggregated @aggregated
+  @sotw @non-aggregated @aggregated @active
   Scenario: [<service>] Client can unsubcribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     # This currently does not pass for go-control-plane
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the Client updates subscription to a resource(<resource from subset>) of <service> with version <starting version>
     And  the resources <resource from subset> of the <service> is updated to version <next version>
     Then the Client receives only the resource <resource from subset> and version <next version>
@@ -43,13 +43,13 @@ Feature: Unsubscribing to Resources
       | "EDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @sotw @non-aggregated @aggregated @skip
+  @sotw @non-aggregated @aggregated
   Scenario: [<service>] Client can unsubscribe from all resources
     # This is not working currently, the unsusbcribe is not registered,
     # neither as an unsubscribe nor a new wildcard request
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-    Then the Client receives the resources <subset of resources> and version <starting version>
+    Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the Client unsubscribes from all resources for <service>
     And the resources <subset of resources> of the <service> is updated to version <next version>
     Then the Client does not receive any message from <service>
@@ -66,7 +66,7 @@ Feature: Unsubscribing to Resources
     Scenario: [<service>] Client can subscribe to multiple services via ADS
       Given a target setup with service <service>, resources <resources>, and starting version <starting version>
       When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-      Then the Client receives the resources <subset of resources> and version <starting version>
+      Then the Client receives the resources <subset of resources> and version <starting version> for <service>
       When the Client subscribes to a subset of resources, <subset of resources>, for <other service>
       Then the Client receives the resources <subset of resources> and version <starting version> for <other service>
       When the resources <subset of resources> of the <service> is updated to version <next version>

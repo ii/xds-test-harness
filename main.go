@@ -18,6 +18,7 @@ import (
 
 var (
 	debug          = pflag.BoolP("debug", "D", false, "sets log level to debug")
+	testWriting    = pflag.BoolP("testwriting", "W", false, "Sets a pretty output that doesn't write to file, for better feedback while writing tests.")
 	config         = pflag.StringP("config", "C", "", "Path to optional config file. This file sets the adapter and target addresses and supported variants.")
 	adapterAddress = pflag.StringP("adapter", "A", ":17000", "port of adapter on target")
 	targetAddress  = pflag.StringP("target", "T", ":18000", "port of xds target to test")
@@ -56,18 +57,31 @@ func main() {
 		log.Info().
 			Msgf("Starting Tests for %v\n", string(variant))
 
-		suite := runner.NewSuite(variant)
-		err, variantResults := suite.Run(*adapterAddress, *targetAddress, *nodeID, godogTags)
+		suite := runner.NewSuite(variant, *testWriting)
+		if err = suite.StartRunner(*nodeID, *adapterAddress, *targetAddress); err != nil {
+			log.Fatal().
+				Err(err).
+				Msg("Could not start runner.")
+		}
+		if err = suite.SetTags(godogTags); err != nil {
+			log.Fatal().
+				Err(err).
+				Msg("Could not set tags properly to start up test suite.")
+		}
+		suite.ConfigureSuite()
+
+		variantResults, err := suite.Run()
 		if err != nil {
 			log.Fatal().
 				Msgf("Error when attempting to run test suite: %v\n", err)
 		}
 		results = runner.UpdateResults(results, variantResults)
 	}
-	printResults(results)
-
-	file, _ := json.MarshalIndent(results, "", "  ")
-	_ = ioutil.WriteFile("results.json", file, 0644)
+	if !*testWriting {
+		printResults(results)
+		file, _ := json.MarshalIndent(results, "", "  ")
+		_ = ioutil.WriteFile("results.json", file, 0644)
+	}
 	os.Exit(0)
 }
 
@@ -76,11 +90,25 @@ func printResults(results types.Results) {
 	divider := "-------------------"
 	fmt.Println("\nTest Suite Finished\n" + divider)
 	fmt.Printf("Ran %v tests across %v variants\n\n", results.Total, len(results.Variants))
-	fmt.Printf("Passed: %v\nFailed: %v", results.Passed, results.Failed)
+	fmt.Println("Passed: ", results.Passed)
+	if results.Failed > 0 {
+		fmt.Println("Failed: ", results.Failed)
+	}
+	if results.Skipped > 0 {
+		fmt.Println("Skipped: ", results.Skipped)
+	}
+	if results.Undefined > 0 {
+		fmt.Println("Undefined: ", results.Undefined)
+	}
+	if results.Pending > 0 {
+		fmt.Println("Pending: ", results.Pending)
+	}
 	fmt.Printf("\n\nResults broken down by Variant....\n\n")
 	for _, variant := range results.ResultsByVariant {
-		fmt.Println(variant.Name+"\n"+divider)
-		fmt.Println(variantResults(variant))
+		if variant.Total > 0 {
+			fmt.Println(variant.Name + "\n" + divider)
+			fmt.Println(variantResults(variant))
+		}
 	}
 }
 
@@ -88,6 +116,9 @@ func variantResults(results types.VariantResults) string {
 	total := fmt.Sprintf("Total tests: %v\n", results.Total)
 	passed := fmt.Sprintf("Passed: %v\n", results.Passed)
 	failed := fmt.Sprintf("Failed: %v\n", results.Failed)
+	skipped := fmt.Sprintf("Skipped: %v\n", results.Skipped)
+	undefined := fmt.Sprintf("Undefined: %v\n", results.Undefined)
+	pending := fmt.Sprintf("Pending: %v\n", results.Pending)
 	var failedTests string
 	if len(results.FailedScenarios) > 0 {
 		failedTests = "Failed Tests:\n"
@@ -95,5 +126,5 @@ func variantResults(results types.VariantResults) string {
 			failedTests = failedTests + "  - " + test.Name + "\n"
 		}
 	}
-	return total + passed + failed + failedTests
+	return total + passed + failed + failedTests + skipped + undefined + pending
 }
