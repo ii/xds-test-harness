@@ -457,17 +457,22 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 }
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
-	ctx.Step(`^a target setup with "([^"]*)", "([^"]*)", and "([^"]*)"$`, r.ATargetSetupWithServiceResourcesAndVersion)
+	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`,r.ATargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.TheClientDoesAWildcardSubscriptionToService)
-	ctx.Step(`^the Client subscribes to a "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
-	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
-	ctx.Step(`^the Client receives only the "([^"]*)" and "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
+    ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+    ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)"$`, r.TheClientReceivesCorrectResourcesAndVersion)
+    ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.theClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
-	ctx.Step(`^a "([^"]*)" of the "([^"]*)" is updated to the "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
-	ctx.Step(`^a "([^"]*)" is added to the "([^"]*)" with "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+    ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
+	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+    ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+    ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
+    ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion) // delete?
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.TheClientReceivesResourcesAndVersionForService)
     ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+
 }
