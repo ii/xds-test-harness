@@ -47,7 +47,8 @@ func TestAck(t *testing.T) {
 
 	request := newRequest(resources, typeURL, r.NodeID)
 	// start the loop with basic request
-	go r.Ack(request, r.Service)
+	r.SubscribeRequest = request
+	go r.Ack(r.Service)
 
 	listeners := []*anypb.Any{}
 	for _, name := range resources {
