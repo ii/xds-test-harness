@@ -16,7 +16,6 @@ import (
 	utils "github.com/ii/xds-test-harness/internal/utils"
 	"github.com/rs/zerolog/log"
 )
-
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
@@ -35,6 +34,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+    ctx.Step(`^i can do incremental updates$`, r.ICanDoIncrementalUpdates)
 
 }
 
@@ -118,7 +118,11 @@ func (r *Runner) ClientDoesAWildcardSubscriptionToService(service string) error 
 // Wrapper to start stream, with given resources for given service
 func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
 	resources := strings.Split(subset, ",")
-	r.ClientSubscribesToServiceForResources(service, resources)
+	if r.Incremental {
+		r.Delta_ClientSubscribesToServiceForResources(service, resources)
+	} else {
+	  r.ClientSubscribesToServiceForResources(service, resources)
+	}
 	return nil
 }
 
@@ -163,9 +167,59 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	}
 }
 
+func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resources []string) error {
+	err, typeURL := parser.ServiceToTypeURL(srv)
+	if err != nil {
+		return err
+	}
+	// check if we are updating existing stream or starting a new one.
+	if r.Service.Delta != nil {
+		request := newDeltaRequest(resources, typeURL, r.NodeID)
+		r.Service.Channels.Delta_Req <- request
+		log.Debug().
+			Msgf("[delta] Sent new subscribing request: %v\n", request)
+		return nil
+	} else {
+		var builder serviceBuilder
+		if r.Aggregated {
+			builder = getBuilder("ADS")
+		} else {
+			builder = getBuilder(srv)
+		}
+		builder.openChannels()
+		builder.setInitResources(resources)
+		err := builder.setStreams(r.Target.Conn)
+		if err != nil {
+			return err
+		}
+		r.Service = builder.getService(srv)
+
+		request := newDeltaRequest(r.Service.Cache.InitResource, typeURL, r.NodeID)
+		r.Delta_SubscribeRequest = request
+
+		log.Debug().
+			Msgf("Sending first subscribing request: %v\n", request)
+		go r.Delta_Stream(r.Service)
+		go r.Delta_Ack(r.Service)
+		return nil
+	}
+}
+
 // Loop through the service's response cache until we get the expected response
 // or we reach the deadline for the service.
 func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version, service string) error {
+	if r.Incremental {
+		err := r.DeltaCheckResources(resources, version, service)
+		return err
+	} else {
+		err := r.CheckResources(resources, version, service)
+		return err
+	}
+}
+
+// Loop through the service's response cache until we get the expected response
+// or we reach the deadline for the service.
+func (r *Runner) CheckResources(resources, version, service string) error {
 	expectedResources := strings.Split(resources, ",")
 	stream := r.Service
 	actualResources := []string{}
@@ -200,6 +254,49 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 					} else {
 						actualResources = resourceNames
 					}
+					if !resourcesMatch(expectedResources, actualResources) {
+						continue
+					}
+					return nil
+				}
+			}
+		}
+	}
+}
+
+// Loop through the service's response cache until we get the expected response
+// or we reach the deadline for the service.
+func (r *Runner) DeltaCheckResources(resources, version, service string) error {
+	expectedResources := strings.Split(resources, ",")
+	stream := r.Service
+	actualResources := []string{}
+
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			// if there isn't ane rror in a response,
+			// the error will be passed down from the stream when
+			// it reaches its context deadline.
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+		default:
+			if len(stream.Cache.Delta_Responses) > 0 {
+				for _, response := range stream.Cache.Delta_Responses {
+					resourceNames, err := parser.DeltaResourceNames(response)
+					if err != nil {
+						return err
+					}
+					if !reflect.DeepEqual(version, response.SystemVersionInfo) {
+						continue
+					}
+					if !reflect.DeepEqual(typeUrl, response.TypeUrl) {
+						continue
+					}
+					actualResources = append(actualResources, resourceNames...)
 					if !resourcesMatch(expectedResources, actualResources) {
 						continue
 					}
@@ -264,7 +361,19 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	time.Sleep(3 * time.Second)
 	log.Debug().
 		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
-	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
+
+	var reqCount int
+	var resCount int
+
+	if r.Incremental {
+		reqCount = len(stream.Cache.Delta_Requests)
+		resCount = len(stream.Cache.Delta_Responses)
+	} else {
+		reqCount = len(stream.Cache.Requests)
+		resCount = len(stream.Cache.Responses)
+	}
+
+	if reqCount <= resCount {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		return err
 	}
@@ -406,6 +515,10 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 			}
 		}
 	}
+}
+
+func (r *Runner) ICanDoIncrementalUpdates() error {
+	return godog.ErrPending
 }
 
 func resourcesMatch(expected []string, actual []string) bool {

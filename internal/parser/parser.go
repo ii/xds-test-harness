@@ -164,6 +164,13 @@ func ResourceNames(res *envoy_service_discovery_v3.DiscoveryResponse) (resourceN
 	return resourceNames, err
 }
 
+func DeltaResourceNames(res *envoy_service_discovery_v3.DeltaDiscoveryResponse) (resourceNames []string, err error) {
+	for _, resource := range res.GetResources() {
+			resourceNames = append(resourceNames, resource.Name)
+	}
+	return resourceNames, err
+}
+
 func ParseSupportedVariants(variants []string) (err error, supported []types.Variant) {
 	variantMap := map[string]types.Variant{
 		"sotw non-aggregated":        types.SotwNonAggregated,
