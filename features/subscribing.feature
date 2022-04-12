@@ -108,7 +108,7 @@ Feature: Subscribing to Resources
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D,X"             | "B,D"           | "X"             | "2"          |
 
 
-  @sotw @non-aggregated @aggregated @wip
+  @sotw @non-aggregated @aggregated
   Scenario: [<service>] When subscribing to resources that don't exist, receive response when they are created
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
