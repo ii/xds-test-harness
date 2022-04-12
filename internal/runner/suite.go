@@ -40,13 +40,6 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	log.Info().
 		Msgf("Connected to target at %s and adapter at %s\n", target, adapter)
 
-	if s.Runner.Aggregated {
-		log.Info().
-			Msgf("Tests will be run via an aggregated streams")
-	} else {
-		log.Info().
-			Msgf("Tests will be run via separate streams")
-	}
 	return nil
 }
 
