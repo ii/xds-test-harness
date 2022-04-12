@@ -35,12 +35,13 @@ type Cache struct {
 }
 
 type Runner struct {
-	Adapter    *ClientConfig
-	Target     *ClientConfig
-	NodeID     string
-	Cache      *Cache
-	Aggregated bool
-	Service    *XDSService
+	Adapter          *ClientConfig
+	Target           *ClientConfig
+	NodeID           string
+	Cache            *Cache
+	Aggregated       bool
+	Incremental      bool
+	Service          *XDSService
 	SubscribeRequest *discovery.DiscoveryRequest
 }
 
@@ -50,6 +51,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		target     = &ClientConfig{}
 		nodeID     = ""
 		aggregated = false
+		incremental = false
 	)
 
 	if len(current) > 0 {
@@ -57,6 +59,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		target = current[0].Target
 		nodeID = current[0].NodeID
 		aggregated = current[0].Aggregated
+		incremental = current[0].Incremental
 
 	}
 
@@ -67,6 +70,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Cache:      &Cache{},
 		Service:    &XDSService{},
 		Aggregated: aggregated,
+		Incremental: incremental,
 	}
 }
 
@@ -161,7 +165,6 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 	return conn, nil
 }
 
-
 func newAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
@@ -185,5 +188,3 @@ func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.Disco
 		TypeUrl:       typeURL,
 	}
 }
-
-
