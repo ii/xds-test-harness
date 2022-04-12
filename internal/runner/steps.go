@@ -146,7 +146,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 		}
 		builder.openChannels()
 		builder.setInitResources(resources)
-		err := builder.setStream(r.Target.Conn)
+		err := builder.setStreams(r.Target.Conn)
 		if err != nil {
 			return err
 		}

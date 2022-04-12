@@ -13,16 +13,20 @@ import (
 )
 
 type Channels struct {
-	Req  chan *discovery.DiscoveryRequest
-	Res  chan *discovery.DiscoveryResponse
-	Err  chan error
-	Done chan bool
+	Req       chan *discovery.DiscoveryRequest
+	Res       chan *discovery.DiscoveryResponse
+	Delta_Req chan *discovery.DeltaDiscoveryRequest
+	Delta_Res chan *discovery.DeltaDiscoveryResponse
+	Err       chan error
+	Done      chan bool
 }
 
 type ServiceCache struct {
-	InitResource []string
-	Requests     []*discovery.DiscoveryRequest
-	Responses    []*discovery.DiscoveryResponse
+	InitResource    []string
+	Requests        []*discovery.DiscoveryRequest
+	Responses       []*discovery.DiscoveryResponse
+	Delta_Requests  []*discovery.DeltaDiscoveryRequest
+	Delta_Responses []*discovery.DeltaDiscoveryResponse
 }
 
 type Context struct {
@@ -36,17 +40,24 @@ type Stream interface {
 	CloseSend() error
 }
 
+type DeltaStream interface {
+	Send(*discovery.DeltaDiscoveryRequest) error
+	Recv() (*discovery.DeltaDiscoveryResponse, error)
+	CloseSend() error
+}
+
 type XDSService struct {
 	Name     string
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta    DeltaStream
 	Context  Context
 }
 
 type serviceBuilder interface {
 	openChannels()
-	setStream(conn *grpc.ClientConn) error
+	setStreams(conn *grpc.ClientConn) error
 	setInitResources([]string)
 	getService(srv string) *XDSService
 }
@@ -56,6 +67,7 @@ type LDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta    DeltaStream
 	Context  Context
 }
 
@@ -63,12 +75,14 @@ func (b *LDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
 }
 
-func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
+func (b *LDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := lds.NewListenerDiscoveryServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	stream, err := client.StreamListeners(ctx)
@@ -76,9 +90,15 @@ func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
 		defer cancel()
 		return err
 	}
+	delta, err := client.DeltaListeners(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
 	b.Context.context = ctx
 	b.Context.cancel = cancel
 	b.Stream = stream
+	b.Delta = delta
 	return nil
 }
 
@@ -93,6 +113,7 @@ func (b *LDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
+		Delta:    b.Delta,
 	}
 }
 
@@ -101,6 +122,7 @@ type CDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta DeltaStream
 	Context  Context
 }
 
@@ -108,12 +130,14 @@ func (b *CDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
 }
 
-func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
+func (b *CDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := cds.NewClusterDiscoveryServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	stream, err := client.StreamClusters(ctx)
@@ -121,9 +145,15 @@ func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
 		defer cancel()
 		return err
 	}
+	delta, err := client.DeltaClusters(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
 	b.Context.context = ctx
 	b.Context.cancel = cancel
 	b.Stream = stream
+	b.Delta = delta
 	return nil
 }
 
@@ -138,6 +168,7 @@ func (b *CDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
+		Delta: b.Delta,
 	}
 }
 
@@ -146,6 +177,7 @@ type RDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta DeltaStream
 	Context  Context
 }
 
@@ -153,12 +185,14 @@ func (b *RDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
 }
 
-func (b *RDSBuilder) setStream(conn *grpc.ClientConn) error {
+func (b *RDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := rds.NewRouteDiscoveryServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	stream, err := client.StreamRoutes(ctx)
@@ -166,9 +200,15 @@ func (b *RDSBuilder) setStream(conn *grpc.ClientConn) error {
 		defer cancel()
 		return err
 	}
+	delta, err := client.DeltaRoutes(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
 	b.Context.context = ctx
 	b.Context.cancel = cancel
 	b.Stream = stream
+	b.Delta = delta
 	return nil
 }
 
@@ -183,6 +223,7 @@ func (b *RDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
+		Delta: b.Delta,
 	}
 }
 
@@ -191,6 +232,7 @@ type EDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta DeltaStream
 	Context  Context
 }
 
@@ -198,12 +240,14 @@ func (b *EDSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
 }
 
-func (b *EDSBuilder) setStream(conn *grpc.ClientConn) error {
+func (b *EDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := eds.NewEndpointDiscoveryServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	stream, err := client.StreamEndpoints(ctx)
@@ -211,9 +255,15 @@ func (b *EDSBuilder) setStream(conn *grpc.ClientConn) error {
 		defer cancel()
 		return err
 	}
+	delta, err := client.DeltaEndpoints(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
 	b.Context.context = ctx
 	b.Context.cancel = cancel
 	b.Stream = stream
+	b.Delta = delta
 	return nil
 }
 
@@ -228,6 +278,7 @@ func (b *EDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
+		Delta: b.Delta,
 	}
 }
 
@@ -236,6 +287,7 @@ type ADSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
+	Delta DeltaStream
 	Context  Context
 }
 
@@ -243,12 +295,14 @@ func (b *ADSBuilder) openChannels() {
 	b.Channels = &Channels{
 		Req:  make(chan *discovery.DiscoveryRequest, 2),
 		Res:  make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
 }
 
-func (b *ADSBuilder) setStream(conn *grpc.ClientConn) error {
+func (b *ADSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := discovery.NewAggregatedDiscoveryServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	stream, err := client.StreamAggregatedResources(ctx)
@@ -256,9 +310,15 @@ func (b *ADSBuilder) setStream(conn *grpc.ClientConn) error {
 		defer cancel()
 		return err
 	}
+	delta, err := client.DeltaAggregatedResources(ctx)
+	if err != nil {
+		defer cancel()
+		return err
+	}
 	b.Context.context = ctx
 	b.Context.cancel = cancel
 	b.Stream = stream
+	b.Delta = delta
 	return nil
 }
 
@@ -273,9 +333,9 @@ func (b *ADSBuilder) getService(service string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
+		Delta: b.Delta,
 	}
 }
-
 
 func getBuilder(builderType string) serviceBuilder {
 	switch builderType {
