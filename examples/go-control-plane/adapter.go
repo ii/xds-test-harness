@@ -29,7 +29,17 @@ import (
 var (
 	xdsCache  cache.SnapshotCache
 	localhost = "127.0.0.1"
+	XDSCache cache.LinearCache
 )
+
+const (
+	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
+	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
+	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
+)
+
+
 
 type Clusters map[string]*cluster.Cluster
 type Listeners map[string]*listener.Listener
@@ -247,7 +257,7 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 			resource.RouteType: routes,
 			resource.ListenerType: listeners,
 			resource.RuntimeType: runtimes,
-			resource.SecretType: []types.Resource{},
+			resource.SecretType: {},
 		},
 	)
 	if err != nil {
@@ -263,6 +273,7 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
+
 	newSnapshot, err := xdsCache.GetSnapshot(state.Node)
 	prettySnap, _ := json.Marshal(newSnapshot)
 	fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
@@ -282,6 +293,27 @@ func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*p
 		Message: response.Message,
 	}
 	return updateResponse, err
+}
+
+func (a *adapterServer) SetResources(ctx context.Context, req *pb.SetResourcesRequest) (response *pb.SetResourcesResponse, err error) {
+	XDSCache = *cache.NewLinearCache(req.TypeURL)
+	resources := makeXdsResources(req.TypeURL, req.Resources)
+
+	XDSCache.SetResources(resources)
+
+	// TODO find better response, confirm that it worked basically.
+	response = &pb.SetResourcesResponse{
+		Version: "1",
+		Message: "it worked, but this a dummy message.",
+	}
+	return response, nil
+}
+
+func (a *adapterServer) UpdateResource (ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
+	linear := cache.NewLinearCache(request.TypeURL)
+	fmt.Printf("The resources: %v\n", linear.GetResources())
+
+	return nil, fmt.Errorf("Zach is very cool!")
 }
 
 func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
@@ -306,3 +338,49 @@ func RunAdapter(port uint, cache cache.SnapshotCache) {
 		log.Fatalf("Adapter failed to serve: %v", err)
 	}
 }
+
+func makeXdsResources(typeURL string, resources []*pb.Resource) map[string]types.Resource {
+	xdsResources := make(map[string]types.Resource)
+
+	switch typeURL {
+	case TypeUrlCDS:
+		for _, resource := range resources {
+			xdsResources[resource.Name] = MakeCluster(resource.Name,  "test-id")
+		}
+	case TypeUrlLDS:
+		for _, resource := range resources {
+			xdsResources[resource.Name] = MakeRouteHTTPListener("test-id", resource.Name, "gagagagagaga.com", 180000, resource.Name)
+		}
+	case TypeUrlRDS:
+		for _, resource := range resources {
+			xdsResources[resource.Name] = MakeRoute(resource.Name, resource.Name)
+		}
+	case TypeUrlEDS:
+		for _, resource := range resources {
+			xdsResources[resource.Name] = MakeEndpoint(resource.Name, resource.Name, 18000)
+		}
+	}
+	return xdsResources
+}
+	// endpoints := make([]types.Resource, len(state.Endpoints.Items))
+	// for i, endpoint := range state.Endpoints.Items {
+	// 	endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
+	// }
+
+	// routes := make([]types.Resource, len(state.Routes.Items))
+	// for i, route := range state.Routes.Items {
+	// 	cluster := state.Clusters.Items[i]
+	// 	routes[i] = MakeRoute(route.Name, cluster.Name)
+	// }
+
+	// listeners := make([]types.Resource, len(state.Listeners.Items))
+	// for i, listener := range state.Listeners.Items {
+	// 	port := uint32(11000 + i)
+	// 	route := state.Routes.Items[i]
+	// 	listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
+	// }
+
+	// runtimes := make([]types.Resource, len(state.Runtimes.Items))
+	// for i, runtime := range state.Runtimes.Items {
+	// 	runtimes[i] = MakeRuntime(runtime.Name)
+	// }

@@ -64,6 +64,32 @@ message Snapshot {
   Secrets secrets = 8;
 }
 
+message Resource {
+  string name = 1;
+}
+
+message ResourceRequest {
+  string node = 1;
+  string typeURL = 2;
+  string resourceName = 3;
+  string version = 4;
+}
+
+message UpdateResourceResponse {
+  string message = 1;
+}
+
+message SetResourcesRequest {
+  string typeURL  = 1;
+  repeated Resource resources = 2;
+  string node = 3;
+}
+
+message SetResourcesResponse {
+  string version = 1;
+  string message = 2;
+}
+
 message SetStateResponse {
   string message = 1;
 }
@@ -71,6 +97,7 @@ message SetStateResponse {
 message UpdateStateResponse {
   string message = 1;
 }
+
 
 message clearRequest {
   string node = 1;
@@ -80,8 +107,11 @@ message clearResponse {
   string response = 1;
 }
 
+
 service Adapter {
   rpc SetState(Snapshot) returns (SetStateResponse){}
+  rpc SetResources(SetResourcesRequest) returns (SetResourcesResponse) {}
   rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
   rpc ClearState(clearRequest) returns (clearResponse) {}
+  rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
 }
