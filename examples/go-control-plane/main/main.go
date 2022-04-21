@@ -54,12 +54,13 @@ func main() {
 	flag.Parse()
 
 	// Create a cache
-	cache := cache.NewSnapshotCache(false, cache.IDHash{}, l)
+	simple := cache.NewSnapshotCache(false, cache.IDHash{}, l)
+
 
 	// Run the xDS server
 	ctx := context.Background()
 	cb := &test.Callbacks{Debug: l.Debug}
-	srv := server.NewServer(ctx, cache, cb)
-	go example.RunAdapter(adapter, cache)
+	srv := server.NewServer(ctx, simple, cb)
+	go example.RunAdapter(adapter, simple)
 	example.RunServer(ctx, srv, port)
 }
