@@ -34,8 +34,8 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
-    ctx.Step(`^i can do incremental updates$`, r.ICanDoIncrementalUpdates)
-
+	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for service$`, r.ClientReceivesOnlyTheResourceAndVersionForService)
+	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -517,8 +517,12 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 	}
 }
 
-func (r *Runner) ICanDoIncrementalUpdates() error {
+func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
 	return godog.ErrPending
+}
+
+func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForService(resource, version string) error {
+        return godog.ErrPending
 }
 
 func resourcesMatch(expected []string, actual []string) bool {
