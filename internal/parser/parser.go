@@ -108,7 +108,7 @@ func ToSecrets(resourceNames []string) *pb.Secrets {
 	return secrets
 }
 
-func ServiceToTypeURL(service string) (err error, typeURL string) {
+func ServiceToTypeURL(service string) (typeURL string, err error) {
 	typeURLs := map[string]string{
 		"lds": TypeUrlLDS,
 		"cds": TypeUrlCDS,
@@ -120,9 +120,9 @@ func ServiceToTypeURL(service string) (err error, typeURL string) {
 	typeURL, ok := typeURLs[service]
 	if !ok {
 		err = fmt.Errorf("Cannot find type URL for given service: %v", service)
-		return err, typeURL
+		return typeURL, err
 	}
-	return nil, typeURL
+	return typeURL, nil
 }
 
 func ResourceNames(res *envoy_service_discovery_v3.DiscoveryResponse) (resourceNames []string, err error) {

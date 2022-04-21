@@ -184,14 +184,14 @@ func TestServiceToTypeURL(t *testing.T) {
 	yah2 := "CdS"
 	nah := "zds"
 
-	if _, v := ServiceToTypeURL(yah); v != TypeUrlLDS {
+	if v, _ := ServiceToTypeURL(yah); v != TypeUrlLDS {
 		t.Errorf("Incorrect service given back(expected, actual): %v %v", TypeUrlLDS, v)
 	}
 
-	if _, v := ServiceToTypeURL(yah2); v != TypeUrlCDS {
+	if v, _ := ServiceToTypeURL(yah2); v != TypeUrlCDS {
 		t.Errorf("Incorrect service given back(expected, actual): %v %v", TypeUrlLDS, v)
 	}
-	if err, v := ServiceToTypeURL(nah); err == nil {
+	if v, err := ServiceToTypeURL(nah); err == nil {
 		t.Errorf("Unknown type urls should return err. Instead received %v", v)
 	}
 }
