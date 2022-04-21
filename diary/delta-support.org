@@ -1,0 +1,30 @@
+#+TITLE: Incremental Support
+#+DATE: 2022-04-19
+
+* Goal
+- Implement the incremental tests outline in our [[https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E/edit#heading=h.wqd2pke9zr54][xDS Test Cases.]] Right now, am having difficulty implementing test 3 with my current example target server.
+* Test 3
+** Description of test
+- Server has resources A (version 1) and B (version 1).
+- Client subscribes to A and B in a single request.
+- Server sends A (version 1) and B (version 1) (either both in a single response or in two separate responses) with a nonce (if split into multiple responses, each one will have its own nonce).
+- For each response, client sends an ACK with that nonce.
+- Server gets an updated version of A (version 2).
+- Server sends the updated version of A (version 2) with a new nonce.  (The response should not contain B, since B has not changed.)
+- Client sends an ACK with that nonce.
+** Current Understanding
+- My GCP implementation currently uses the simple cache. This works with single-versioned snapshots of the entire instance.
+- with Simple, it seems like I can update a resource type to a new version which applies to all resources of that type. It does not appear possible to only update individual resources of a type.
+  - The methods to set the snapshot uses a [[file:~/go/pkg/mod/github.com/envoyproxy/go-control-plane@v0.10.1/pkg/cache/v3/snapshot.go::type Snapshot struct {][snapshot struct]] , which includes the [[file:~/go/pkg/mod/github.com/envoyproxy/go-control-plane@v0.10.1/pkg/cache/v3/resources.go::type Resources struct {][resources type.]]  This resources type is made up of version and then items.
+  - I believe this means all items are set to the same version?.
+- A linear cache is available that seems closer to what i want, as it gives you, for a resource type, a vector of version and resources of that version.
+- I can use setResources and getResources with linear cache, but I get no response when sending out a discovery request.
+  - I believe this is due to not being able to set the node when setting resources.
+  - I cannot verify that the resources for the linear cache are being set on the node I am making requests to.
+  - it doesn't look like node is in the [[file:~/go/pkg/mod/github.com/envoyproxy/go-control-plane@v0.10.1/pkg/cache/v3/linear.go::type LinearCache struct {][linear cache struct]], nor in the function signature for setting resources.
+  - it also doesn't seem to be in the [[file:~/go/pkg/mod/github.com/envoyproxy/go-control-plane@v0.10.1/pkg/cache/v3/linear.go::type LinearCacheOption func(*LinearCache)][options you can pass]] to setResources
+** Questions
+- Can you update individual resources using the simple cache?
+  + If not, what is the best way to set and update state for individual resources?
+- How do you set the node you are working on with linear cache?
+- If using linear cache, do I need to guarantee the same instance constistency as the simple cache(routes have listeners, endpoints have clusters...)
