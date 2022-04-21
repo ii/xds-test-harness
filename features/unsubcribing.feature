@@ -21,7 +21,7 @@ Feature: Unsubscribing to Resources
 
     Examples:
       | service | starting version | resources   | subset of resources | resource from subset |   next version  |
-      | "CDS"   | "1"              | "F,A,B,C,D" | "C,A,B"             | "A,C"                |   "2"           |
+      | "CDS"   | "1"              | "F,A,B,C,D" | "C,A,B"             | "A"                |   "2"           |
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
