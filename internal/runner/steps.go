@@ -130,7 +130,7 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 // for the given service. This is the heart of a test, as it sets up
 // the request/response loops that verify the service is working properly.
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	err, typeURL := parser.ServiceToTypeURL(srv)
+	typeURL, err := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 }
 
 func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	err, typeURL := parser.ServiceToTypeURL(srv)
+	typeURL, err := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (r *Runner) CheckResources(resources, version, service string) error {
 	stream := r.Service
 	actualResources := []string{}
 
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -246,7 +246,7 @@ func (r *Runner) CheckResources(resources, version, service string) error {
 					if !reflect.DeepEqual(version, response.VersionInfo) {
 						continue
 					}
-					if !reflect.DeepEqual(typeUrl, response.TypeUrl) {
+					if !reflect.DeepEqual(typeURL, response.TypeUrl) {
 						continue
 					}
 					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
@@ -271,7 +271,7 @@ func (r *Runner) DeltaCheckResources(resources, version, service string) error {
 	stream := r.Service
 	actualResources := []string{}
 
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -293,7 +293,7 @@ func (r *Runner) DeltaCheckResources(resources, version, service string) error {
 					if !reflect.DeepEqual(version, response.SystemVersionInfo) {
 						continue
 					}
-					if !reflect.DeepEqual(typeUrl, response.TypeUrl) {
+					if !reflect.DeepEqual(typeURL, response.TypeUrl) {
 						continue
 					}
 					actualResources = append(actualResources, resourceNames...)
@@ -443,7 +443,7 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
-	err, typeURL := parser.ServiceToTypeURL(service)
+	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -466,7 +466,7 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	// version := r.Cache.StartState.Version
-	err, typeURL := parser.ServiceToTypeURL(service)
+	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
