@@ -1,13 +1,17 @@
 package runner
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/ii/xds-test-harness/internal/db"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -35,15 +39,16 @@ type Cache struct {
 }
 
 type Runner struct {
-	Adapter          *ClientConfig
-	Target           *ClientConfig
-	NodeID           string
-	Cache            *Cache
-	Aggregated       bool
-	Incremental      bool
-	Service          *XDSService
-	SubscribeRequest *discovery.DiscoveryRequest
+	Adapter                *ClientConfig
+	Target                 *ClientConfig
+	NodeID                 string
+	Cache                  *Cache
+	Aggregated             bool
+	Incremental            bool
+	Service                *XDSService
+	SubscribeRequest       *discovery.DiscoveryRequest
 	Delta_SubscribeRequest *discovery.DeltaDiscoveryRequest
+	DB                     *db.SQLiteRepository
 }
 
 func FreshRunner(current ...*Runner) *Runner {
@@ -93,6 +98,24 @@ func (r *Runner) ConnectClient(server, address string) error {
 		return err
 	}
 	client.Conn = conn
+	return nil
+}
+
+func (r *Runner) StartDB() error {
+	dbFile := "xds.db"
+	os.Remove(dbFile)
+
+	conn, err := sql.Open("sqlite3", dbFile)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Could not open database connection: %v", err))
+	}
+
+	DB := db.NewSqliteRepository(conn)
+	if err := DB.Migrate(); err != nil {
+		return errors.New(fmt.Sprintf("Could not migrate schemas for db: %v", err))
+	}
+
+	r.DB = DB
 	return nil
 }
 
@@ -243,16 +266,16 @@ func delta_newAckFromResponse(res *discovery.DeltaDiscoveryResponse, initReq *di
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
 	request := &discovery.DeltaDiscoveryRequest{
-		TypeUrl:                  initReq.TypeUrl,
-		ResponseNonce:            res.Nonce,
+		TypeUrl:       initReq.TypeUrl,
+		ResponseNonce: res.Nonce,
 	}
 	return request
 }
 
 func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.DiscoveryRequest {
 	return &discovery.DiscoveryRequest{
-		VersionInfo: "",
-		Node: &core.Node{Id: nodeID},
+		VersionInfo:   "",
+		Node:          &core.Node{Id: nodeID},
 		ResourceNames: resourceNames,
 		TypeUrl:       typeURL,
 	}
@@ -260,8 +283,8 @@ func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.Disco
 
 func newDeltaRequest(resourceNames []string, typeURL, nodeID string) *discovery.DeltaDiscoveryRequest {
 	return &discovery.DeltaDiscoveryRequest{
-		Node:                     &core.Node{Id: nodeID},
-		TypeUrl:                  typeURL,
-		ResourceNamesSubscribe:   resourceNames,
+		Node:                   &core.Node{Id: nodeID},
+		TypeUrl:                typeURL,
+		ResourceNamesSubscribe: resourceNames,
 	}
 }

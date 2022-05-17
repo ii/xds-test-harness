@@ -25,6 +25,7 @@ type Suite struct {
 	TestSuite   godog.TestSuite
 }
 
+
 func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner = FreshRunner()
 	s.Runner.NodeID = node
@@ -39,7 +40,11 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	}
 	log.Info().
 		Msgf("Connected to target at %s and adapter at %s\n", target, adapter)
-
+	if err := s.Runner.StartDB(); err != nil {
+		return fmt.Errorf("Cannot start db: %v", err)
+	}
+	log.Info().
+		Msg("New database started for runner")
 	return nil
 }
 
@@ -84,6 +89,7 @@ func (s *Suite) ConfigureSuite() {
 		})
 		s.Runner.LoadSteps(ctx)
 	}
+
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
