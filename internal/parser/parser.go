@@ -11,11 +11,35 @@ import (
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/ii/xds-test-harness/internal/types"
 	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/known/anypb"
 )
+
+// mustRegisterMessage registers the provided message type in the typeRegistry, and panics
+// if there is an error.
+// gleaned from the prometheus source code
+func mustRegisterMessage(typeRegistry *protoregistry.Types, mt protoreflect.MessageType) {
+	if err := typeRegistry.RegisterMessage(mt); err != nil {
+		panic(err)
+	}
+}
+func init () {
+	mustRegisterMessage(protoTypes, (&discovery.DiscoveryRequest{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&discovery.DiscoveryResponse{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&discovery.DeltaDiscoveryRequest{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&discovery.DeltaDiscoveryResponse{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&hcm.HttpConnectionManager{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&cluster.Cluster{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&listener.Listener{}).ProtoReflect().Type())
+}
 
 const (
 	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
@@ -23,6 +47,18 @@ const (
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
+
+var (
+	protoTypes = new(protoregistry.Types)
+	protoJSONMarshalOptions = protojson.MarshalOptions{
+		UseProtoNames: true,
+		Resolver:      protoTypes, // Only want known types.
+	}
+)
+
+func ProtoJSONMarshal(m protoreflect.ProtoMessage) ([]byte, error) {
+	return protoJSONMarshalOptions.Marshal(m)
+}
 
 func RandomAddress() string {
 	var (
@@ -125,8 +161,13 @@ func ServiceToTypeURL(service string) (typeURL string, err error) {
 	return typeURL, nil
 }
 
-func ResourceNames(res *envoy_service_discovery_v3.DiscoveryResponse) (resourceNames []string, err error) {
-	typeUrl := res.TypeUrl
+type xdsResponse interface {
+	GetResources() []*anypb.Any
+	GetTypeUrl() string
+}
+
+func ResourceNames[R xdsResponse](res R) (resourceNames []string, err error) {
+	typeUrl := res.GetTypeUrl()
 	switch typeUrl {
 	case TypeUrlLDS:
 		for _, resource := range res.GetResources() {
