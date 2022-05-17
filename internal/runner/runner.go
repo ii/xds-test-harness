@@ -58,6 +58,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		nodeID      = ""
 		aggregated  = false
 		incremental = false
+		DB = &db.SQLiteRepository{}
 	)
 
 	if len(current) > 0 {
@@ -66,6 +67,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		nodeID = current[0].NodeID
 		aggregated = current[0].Aggregated
 		incremental = current[0].Incremental
+		DB = current[0].DB
 
 	}
 
@@ -77,6 +79,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Service:     &XDSService{},
 		Aggregated:  aggregated,
 		Incremental: incremental,
+		DB: DB,
 	}
 }
 
@@ -183,6 +186,9 @@ func (r *Runner) Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
+			if err = r.DB.InsertResponse(in); err != nil {
+				service.Channels.Err <- fmt.Errorf("Could not insert response into db: %v", err)
+			}
 			service.Channels.Res <- in
 		}
 	}()
@@ -192,6 +198,9 @@ func (r *Runner) Stream(service *XDSService) error {
 			log.Err(err).
 				Msg("Error sending discovery request")
 			service.Channels.Err <- err
+		}
+		if err := r.DB.InsertRequest(req); err != nil {
+			service.Channels.Err <- fmt.Errorf("Could not insert request into db: %v", err)
 		}
 	}
 	service.Stream.CloseSend()
