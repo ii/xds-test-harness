@@ -7,6 +7,7 @@ require (
 	github.com/envoyproxy/go-control-plane v0.10.1
 	github.com/golang/protobuf v1.5.0
 	github.com/kylelemons/go-gypsy v1.0.0
+	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/rs/zerolog v1.25.0
 	github.com/spf13/pflag v1.0.5
 	google.golang.org/grpc v1.40.0
