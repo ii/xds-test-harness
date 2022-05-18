@@ -25,7 +25,6 @@ type Suite struct {
 	TestSuite   godog.TestSuite
 }
 
-
 func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner = FreshRunner()
 	s.Runner.NodeID = node
@@ -70,9 +69,12 @@ func (s *Suite) SetTags(base string) error {
 func (s *Suite) ConfigureSuite() {
 	initScenario := func(ctx *godog.ScenarioContext) {
 		ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-			log.Debug().
-				Msg("Creating Fresh Runner!")
+			log.Debug().Msg("Creating Fresh Runner!")
 			s.Runner = FreshRunner(s.Runner)
+			if err := s.Runner.DB.DeleteAll(); err != nil {
+				log.Err(err).Msg("Couldn't delete db")
+			}
+			log.Debug().Msg("Fresh DB, ready to go.")
 			return ctx, nil
 		})
 		ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
@@ -89,7 +91,6 @@ func (s *Suite) ConfigureSuite() {
 		})
 		s.Runner.LoadSteps(ctx)
 	}
-
 
 	godogOpts := godog.Options{
 		ShowStepDefinitions: false,
