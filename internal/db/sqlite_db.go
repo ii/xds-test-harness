@@ -66,6 +66,7 @@ func (s *SQLiteRepository) InsertResponse(res *discovery.DiscoveryResponse) erro
 	}
 	return err
 }
+
 func (s *SQLiteRepository) DeleteAll() error {
 	_, err := s.db.Exec(DeleteAllSQL)
 	if err != nil {
@@ -74,3 +75,16 @@ func (s *SQLiteRepository) DeleteAll() error {
 	return nil
 }
 
+func (s *SQLiteRepository) CheckExpectedResources(resources []string, version, typeUrl string) (match bool, single bool, err error) {
+	var resources_match int64
+	var single_response int64
+	r, err := json.Marshal(resources)
+	if err != nil {
+		return false, false, fmt.Errorf("Had issue turning resource into valid json. Cannot run a db query: %v", err)
+	}
+	row := s.db.QueryRow(CheckExpectedResourcesSQL, r, version, typeUrl)
+	if err := row.Scan(&resources_match, &single_response); err != nil {
+		return false, false, err
+	}
+	return resources_match != 0, single_response != 0, err
+}
