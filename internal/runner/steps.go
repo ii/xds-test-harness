@@ -16,6 +16,7 @@ import (
 	utils "github.com/ii/xds-test-harness/internal/utils"
 	"github.com/rs/zerolog/log"
 )
+
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithServiceResourcesAndVersion)
 	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
@@ -121,7 +122,7 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 	if r.Incremental {
 		r.Delta_ClientSubscribesToServiceForResources(service, resources)
 	} else {
-	  r.ClientSubscribesToServiceForResources(service, resources)
+		r.ClientSubscribesToServiceForResources(service, resources)
 	}
 	return nil
 }
@@ -337,6 +338,7 @@ func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, versio
 }
 
 func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
+	r.Service.Channels.Done <- true // send signal to close the channels and service down
 	correctAmount, err := r.DB.CheckMoreRequestsThanResponses()
 	if err != nil {
 		return err
@@ -346,7 +348,6 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	}
 	return nil
 }
-
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
 	log.Debug().
@@ -416,7 +417,7 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
+	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
@@ -439,7 +440,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
+	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
@@ -452,7 +453,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 		Msgf("Sending unsubscribe request: %v", request)
 	r.Service.Channels.Req <- request
 	log.Debug().Msg("Pausing for 2 seconds, to ensure server receives unsubscribe test.")
-	time.Sleep(2 *time.Second)
+	time.Sleep(2 * time.Second)
 	log.Debug().Msg("Should now be good to update server")
 	return nil
 }
@@ -489,7 +490,7 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 }
 
 func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForService(resource, version string) error {
-        return godog.ErrPending
+	return godog.ErrPending
 }
 
 func resourcesMatch(expected []string, actual []string) bool {
