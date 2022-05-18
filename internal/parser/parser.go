@@ -10,10 +10,10 @@ import (
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	pb "github.com/ii/xds-test-harness/api/adapter"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/types"
 	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/rs/zerolog/log"
@@ -31,7 +31,7 @@ func mustRegisterMessage(typeRegistry *protoregistry.Types, mt protoreflect.Mess
 		panic(err)
 	}
 }
-func init () {
+func init() {
 	mustRegisterMessage(protoTypes, (&discovery.DiscoveryRequest{}).ProtoReflect().Type())
 	mustRegisterMessage(protoTypes, (&discovery.DiscoveryResponse{}).ProtoReflect().Type())
 	mustRegisterMessage(protoTypes, (&discovery.DeltaDiscoveryRequest{}).ProtoReflect().Type())
@@ -39,6 +39,9 @@ func init () {
 	mustRegisterMessage(protoTypes, (&hcm.HttpConnectionManager{}).ProtoReflect().Type())
 	mustRegisterMessage(protoTypes, (&cluster.Cluster{}).ProtoReflect().Type())
 	mustRegisterMessage(protoTypes, (&listener.Listener{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&route.RouteConfiguration{}).ProtoReflect().Type())
+	mustRegisterMessage(protoTypes, (&endpoint.ClusterLoadAssignment{}).ProtoReflect().Type())
+
 }
 
 const (
@@ -49,7 +52,7 @@ const (
 )
 
 var (
-	protoTypes = new(protoregistry.Types)
+	protoTypes              = new(protoregistry.Types)
 	protoJSONMarshalOptions = protojson.MarshalOptions{
 		UseProtoNames: true,
 		Resolver:      protoTypes, // Only want known types.
@@ -207,7 +210,7 @@ func ResourceNames[R xdsResponse](res R) (resourceNames []string, err error) {
 
 func DeltaResourceNames(res *envoy_service_discovery_v3.DeltaDiscoveryResponse) (resourceNames []string, err error) {
 	for _, resource := range res.GetResources() {
-			resourceNames = append(resourceNames, resource.Name)
+		resourceNames = append(resourceNames, resource.Name)
 	}
 	return resourceNames, err
 }
