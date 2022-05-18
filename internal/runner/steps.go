@@ -221,45 +221,28 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 // or we reach the deadline for the service.
 func (r *Runner) CheckResources(resources, version, service string) error {
 	expectedResources := strings.Split(resources, ",")
-	stream := r.Service
-	actualResources := []string{}
-
-	typeURL, err := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
+	done := time.After(3 * time.Second)
 	for {
 		select {
-		case err := <-stream.Channels.Err:
-			// if there isn't ane rror in a response,
-			// the error will be passed down from the stream when
-			// it reaches its context deadline.
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
-		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
-					resourceNames, err := parser.ResourceNames(response)
-					if err != nil {
-						return err
-					}
-					if !reflect.DeepEqual(version, response.VersionInfo) {
-						continue
-					}
-					if !reflect.DeepEqual(typeURL, response.TypeUrl) {
-						continue
-					}
-					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
-						actualResources = append(actualResources, resourceNames...)
-					} else {
-						actualResources = resourceNames
-					}
-					if !resourcesMatch(expectedResources, actualResources) {
-						continue
-					}
-					return nil
-				}
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("There was an issue when receiving responses", err)
+		case <-done:
+			match, single_response, err := r.DB.CheckExpectedResources(expectedResources, version, typeUrl)
+			if err != nil {
+				return err
 			}
+			if !match {
+				return fmt.Errorf("Could not find expected resources in any of the responses")
+			}
+			if (service == "CDS" || service == "LDS") && !single_response {
+				return fmt.Errorf("Found expected resources, but in multiple responses. for CDS or LDS they should be in a single response")
+			}
+			return nil
 		}
 	}
 }
@@ -354,28 +337,12 @@ func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, versio
 }
 
 func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
-	stream := r.Service
-	stream.Channels.Done <- true
-
-	// give some time for the final messages to come through, if there's any lingering responses.
-	time.Sleep(3 * time.Second)
-	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
-
-	var reqCount int
-	var resCount int
-
-	if r.Incremental {
-		reqCount = len(stream.Cache.Delta_Requests)
-		resCount = len(stream.Cache.Delta_Responses)
-	} else {
-		reqCount = len(stream.Cache.Requests)
-		resCount = len(stream.Cache.Responses)
-	}
-
-	if reqCount <= resCount {
-		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
+	correctAmount, err := r.DB.CheckMoreRequestsThanResponses()
+	if err != nil {
 		return err
+	}
+	if !correctAmount {
+		return fmt.Errorf("Responses were equal, or more, than requests. This indicates the server responded to the last ACK.")
 	}
 	return nil
 }
