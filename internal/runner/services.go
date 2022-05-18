@@ -12,6 +12,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	timeout = (20 * time.Second)
+)
+
 type Channels struct {
 	Req       chan *discovery.DiscoveryRequest
 	Res       chan *discovery.DiscoveryResponse
@@ -84,7 +88,7 @@ func (b *LDSBuilder) openChannels() {
 
 func (b *LDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := lds.NewListenerDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	stream, err := client.StreamListeners(ctx)
 	if err != nil {
 		defer cancel()
@@ -139,7 +143,7 @@ func (b *CDSBuilder) openChannels() {
 
 func (b *CDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := cds.NewClusterDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	stream, err := client.StreamClusters(ctx)
 	if err != nil {
 		defer cancel()
@@ -194,7 +198,7 @@ func (b *RDSBuilder) openChannels() {
 
 func (b *RDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := rds.NewRouteDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	stream, err := client.StreamRoutes(ctx)
 	if err != nil {
 		defer cancel()
@@ -249,7 +253,7 @@ func (b *EDSBuilder) openChannels() {
 
 func (b *EDSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := eds.NewEndpointDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	stream, err := client.StreamEndpoints(ctx)
 	if err != nil {
 		defer cancel()
@@ -304,7 +308,7 @@ func (b *ADSBuilder) openChannels() {
 
 func (b *ADSBuilder) setStreams(conn *grpc.ClientConn) error {
 	client := discovery.NewAggregatedDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	stream, err := client.StreamAggregatedResources(ctx)
 	if err != nil {
 		defer cancel()
