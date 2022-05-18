@@ -66,3 +66,11 @@ func (s *SQLiteRepository) InsertResponse(res *discovery.DiscoveryResponse) erro
 	}
 	return err
 }
+func (s *SQLiteRepository) DeleteAll() error {
+	_, err := s.db.Exec(DeleteAllSQL)
+	if err != nil {
+		return fmt.Errorf("Couldn't delete the records: %v", err)
+	}
+	return nil
+}
+
