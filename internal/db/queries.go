@@ -21,7 +21,12 @@ CREATE VIEW IF NOT EXISTS response (
   select raw_response.id,
 		 json_extract(body, '$.version_info'),
 		 json_extract(body, '$.type_url'),
-		 json_extract(value, '$.name')
+         case json_extract(body, '$.type_url')
+	       when 'type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment'
+		     then json_extract(value, '$.cluster_name')
+		   else
+		     json_extract(value, '$.name')
+         end
 	from raw_response,
 		 json_each(body,'$.resources');
 `
