@@ -90,6 +90,7 @@ func (s *SQLiteRepository) CheckExpectedResources(resources []string, version, t
 	}
 	return resources_match != 0, single_response != 0, err
 }
+
 func (s *SQLiteRepository) CheckMoreRequestsThanResponses() (bool, error) {
 	var check int64
 	row := s.db.QueryRow(CheckMoreRequestsThanResponseSQL)
