@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	// "strings"
 
 	"github.com/cucumber/godog"
 	"github.com/ii/xds-test-harness/internal/parser"
