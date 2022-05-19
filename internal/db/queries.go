@@ -54,9 +54,9 @@ with expected as (
 ), actual as (
   select resource, id
 	from response
-	 where version = $2
-	   and type_url = $3
-	  and resource in (select resource from expected)
+   where version = $2
+	 and type_url = $3
+	 and resource in (select resource from expected)
 )
 	select ((select count(*) from expected) = (select count(*) from actual)),
 		   (count(distinct id) = 1)
