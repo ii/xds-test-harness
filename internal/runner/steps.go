@@ -231,7 +231,7 @@ func (r *Runner) CheckResources(resources, version, service string) error {
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
-			return fmt.Errorf("There was an issue when receiving responses", err)
+			return fmt.Errorf("There was an issue when receiving responses: %v", err)
 		case <-done:
 			match, single_response, err := r.DB.CheckExpectedResources(expectedResources, version, typeUrl)
 			if err != nil {
@@ -296,43 +296,25 @@ func (r *Runner) DeltaCheckResources(resources, version, service string) error {
 // The response you reeceive should only have a single entry in its resources, otherwise we fail.
 // Won't work for LDS/CDS where it is conformant to pass along more than you need.
 func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
-	stream := r.Service
-	log.Debug().Msgf("Resource: %v, version: %v", resource, version)
-
+	expectedResources := strings.Split(resource, ",")
+	done := time.After(3 * time.Second)
+	typeUrl, err := parser.ServiceToTypeURL(r.Service.Name)
+	if err != nil {
+		return fmt.Errorf("Could not parse service name to its type: %v", err)
+	}
 	for {
 		select {
-		case err := <-stream.Channels.Err:
-			log.Err(err).Msg("From our step")
-			return errors.New("Could not find expected response within grace period of 10 seconds.")
-		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
-					resourceNames, err := parser.ResourceNames(response)
-					if err != nil {
-						return fmt.Errorf("Could not parse resource names from response. cannot validate response. response:%v\nerr: %v", response, err)
-					}
-					if err != nil {
-						log.Error().Err(err).Msg("can't parse discovery response ")
-						return err
-					}
-					if !reflect.DeepEqual(version, response.VersionInfo) {
-						continue
-					}
-					// we set our subscription to a single resource, and the services should only send a single resource.
-					// If the resources slice is empty or more than one, it is incorrect and we can continue.
-					// (this fn is not designed for LDS or CDS tests)
-					if len(resourceNames) != 1 {
-						// log.Debug().
-						// 	Msgf("Got right version, but too many resources: %v", stream.Cache.Requests)
-						continue
-					}
-					if !resourcesMatch([]string{resource}, resourceNames) {
-						log.Debug().Msgf("resources don't match: %v", resourceNames)
-						continue
-					}
-					return nil
-				}
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
+		case <-done:
+			passed, err := r.DB.CheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			if err != nil {
+				return err
 			}
+			if !passed {
+				return fmt.Errorf("Did not receive only the resource we wanted")
+			}
+			return nil
 		}
 	}
 }
