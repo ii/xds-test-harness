@@ -91,6 +91,19 @@ func (s *SQLiteRepository) CheckExpectedResources(resources []string, version, t
 	return resources_match != 0, single_response != 0, err
 }
 
+func (s *SQLiteRepository) CheckOnlyExpectedResources(resources []string, version, typeUrl string) (passed bool, err error) {
+	var valid int64
+	r, err := json.Marshal(resources)
+	if err != nil {
+		return false, fmt.Errorf("Had issue turning resource into valid json. Cannot run a db query: %v", err)
+	}
+	row := s.db.QueryRow(CheckOnlyExpectedResourcesSQL, r, version, typeUrl)
+	if err := row.Scan(&valid); err != nil {
+		return false, err
+	}
+	return valid != 0, err
+}
+
 func (s *SQLiteRepository) CheckMoreRequestsThanResponses() (bool, error) {
 	var check int64
 	row := s.db.QueryRow(CheckMoreRequestsThanResponseSQL)

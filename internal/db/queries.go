@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS raw_request(
   sent_at timestamp default current_timestamp,
   body  JSON
 );
+
 CREATE TABLE IF NOT EXISTS raw_response(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   received_at timestamp default current_timestamp,
@@ -61,6 +62,24 @@ with expected as (
 	select ((select count(*) from expected) = (select count(*) from actual)),
 		   (count(distinct id) = 1)
 	  from actual;
+`
+
+var CheckOnlyExpectedResourcesSQL = `
+with expected as (
+  select value as resource
+	from json_each($1)
+), match_version as (
+  select distinct version
+    from response
+   where version  = $2
+     and type_url = $3
+     and resource in (select resource from expected)
+), all_for_version as(
+  select *
+    from response
+    join match_version on response.version = match_version.version
+)
+select ((select count(*) from expected) = (select count(*) from all_for_version));
 `
 
 var CheckMoreRequestsThanResponseSQL = `
