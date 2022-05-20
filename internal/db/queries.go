@@ -90,3 +90,8 @@ select ((select count(*) from expected) = (select count(*) from all_for_version)
 var CheckMoreRequestsThanResponseSQL = `
 select (select count(*) from raw_request) > (select count(*) from raw_response);
 `
+var CheckNoResponsesForVersionSQL = `
+select (count(*) = 0)
+  from response
+ where version = $1;
+`

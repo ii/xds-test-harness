@@ -112,3 +112,11 @@ func (s *SQLiteRepository) CheckMoreRequestsThanResponses() (bool, error) {
 	}
 	return check != 0, nil
 }
+func (s *SQLiteRepository) CheckNoResponsesForVersion(version string) (bool, error) {
+	var check int64
+	row := s.db.QueryRow(CheckNoResponsesForVersionSQL, version)
+	if err := row.Scan(&check); err != nil {
+		return false, err
+	}
+	return check != 0, nil
+}
