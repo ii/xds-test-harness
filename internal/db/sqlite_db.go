@@ -33,7 +33,7 @@ func (s *SQLiteRepository) Migrate() error {
 	return err
 }
 
-func (s *SQLiteRepository) InsertRequest(req *discovery.DiscoveryRequest) error {
+func (s *SQLiteRepository) InsertRequest(req protoreflect.ProtoMessage) error {
 	b, err := parser.ProtoJSONMarshal(req)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (s *SQLiteRepository) InsertRequest(req *discovery.DiscoveryRequest) error 
 	return err
 }
 
-func (s *SQLiteRepository) InsertResponse(res *discovery.DiscoveryResponse) error {
+func (s *SQLiteRepository) InsertResponse(res protoreflect.ProtoMessage) error {
 	b, err := parser.ProtoJSONMarshal(res)
 	if err != nil {
 		return err
