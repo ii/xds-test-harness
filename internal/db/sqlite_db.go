@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/ii/xds-test-harness/internal/parser"
 	"github.com/mattn/go-sqlite3"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var (
