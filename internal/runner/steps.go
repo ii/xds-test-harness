@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -35,7 +34,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
-	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for service$`, r.ClientReceivesOnlyTheResourceAndVersionForService)
+	ctx.Step(`^the Delta Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.DeltaClientReceivesOnlyTheResourceAndVersion)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
 }
 
@@ -206,21 +205,8 @@ func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resourc
 	}
 }
 
-// Loop through the service's response cache until we get the expected response
-// or we reach the deadline for the service.
+// Run db query expectin true value, err if anything but.
 func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version, service string) error {
-	if r.Incremental {
-		err := r.DeltaCheckResources(resources, version, service)
-		return err
-	} else {
-		err := r.CheckResources(resources, version, service)
-		return err
-	}
-}
-
-// Loop through the service's response cache until we get the expected response
-// or we reach the deadline for the service.
-func (r *Runner) CheckResources(resources, version, service string) error {
 	expectedResources := strings.Split(resources, ",")
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
@@ -244,49 +230,6 @@ func (r *Runner) CheckResources(resources, version, service string) error {
 				return fmt.Errorf("Found expected resources, but in multiple responses. for CDS or LDS they should be in a single response")
 			}
 			return nil
-		}
-	}
-}
-
-// Loop through the service's response cache until we get the expected response
-// or we reach the deadline for the service.
-func (r *Runner) DeltaCheckResources(resources, version, service string) error {
-	expectedResources := strings.Split(resources, ",")
-	stream := r.Service
-	actualResources := []string{}
-
-	typeURL, err := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-	for {
-		select {
-		case err := <-stream.Channels.Err:
-			// if there isn't ane rror in a response,
-			// the error will be passed down from the stream when
-			// it reaches its context deadline.
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
-		default:
-			if len(stream.Cache.Delta_Responses) > 0 {
-				for _, response := range stream.Cache.Delta_Responses {
-					resourceNames, err := parser.DeltaResourceNames(response)
-					if err != nil {
-						return err
-					}
-					if !reflect.DeepEqual(version, response.SystemVersionInfo) {
-						continue
-					}
-					if !reflect.DeepEqual(typeURL, response.TypeUrl) {
-						continue
-					}
-					actualResources = append(actualResources, resourceNames...)
-					if !resourcesMatch(expectedResources, actualResources) {
-						continue
-					}
-					return nil
-				}
-			}
 		}
 	}
 }
@@ -441,38 +384,24 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 }
 
 func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
+	done := time.After(4 * time.Second)
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return err
-		default:
-			if len(r.Service.Cache.Responses) > 0 {
-				for _, response := range r.Service.Cache.Responses {
-					currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots)-1]
-					if response.VersionInfo != currentState.Version {
-						continue
-					}
-					// a matching version with no resources implies that it responded
-					// correctly to an unsubscribe request?
-					// if len(response.Resources) == 0 {
-					// 	return nil
-					// }
-					err := errors.New("Received a response when we expected no response")
-					log.Err(err).
-						Msgf("Response: %v", response)
-					return err
-				}
+		case <-done:
+			currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots)-1]
+			passed, err := r.DB.CheckNoResponsesForVersion(currentState.Version)
+			if err != nil {
+				err = fmt.Errorf("Error validating with db: %v", err)
 			}
+			if !passed {
+				err = fmt.Errorf("Received a response for current version when we expected no response")
+			}
+			r.Service.Channels.Done <- true // send signal to close the channels and service down
+			return err
 		}
 	}
-}
-
-func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
-	return godog.ErrPending
-}
-
-func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForService(resource, version string) error {
-	return godog.ErrPending
 }
 
 func resourcesMatch(expected []string, actual []string) bool {
@@ -486,4 +415,52 @@ func resourcesMatch(expected []string, actual []string) bool {
 		}
 	}
 	return true
+}
+
+func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersion(resource, version string) error {
+	expectedResources := strings.Split(resource, ",")
+	done := time.After(3 * time.Second)
+	typeUrl, err := parser.ServiceToTypeURL(r.Service.Name)
+	if err != nil {
+		return fmt.Errorf("Could not parse service name to its type: %v", err)
+	}
+	for {
+		select {
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
+		case <-done:
+			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			if err != nil {
+				return err
+			}
+			if !passed {
+				return fmt.Errorf("Did not receive only the resource we wanted")
+			}
+			return nil
+		}
+	}
+}
+
+func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
+	typeUrl, err := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeURL:      typeUrl,
+		ResourceName: resource,
+		Version:      version,
+	}
+
+	_, err = c.UpdateResource(context.Background(), in)
+	if err != nil {
+		msg := "Cannot uppdate resource using adapter"
+		log.Error().
+			Err(err).
+			Msg(msg)
+		return errors.New(msg)
+	}
+	return nil
 }

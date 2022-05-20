@@ -58,7 +58,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		nodeID      = ""
 		aggregated  = false
 		incremental = false
-		DB = &db.SQLiteRepository{}
+		DB          = &db.SQLiteRepository{}
 	)
 
 	if len(current) > 0 {
@@ -79,7 +79,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Service:     &XDSService{},
 		Aggregated:  aggregated,
 		Incremental: incremental,
-		DB: DB,
+		DB:          DB,
 	}
 }
 
@@ -230,6 +230,9 @@ func (r *Runner) Delta_Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received delta discovery response: %v", in)
+			if err := r.DB.InsertResponse(in); err != nil {
+				service.Channels.Err <- fmt.Errorf("ya screwed up zach")
+			}
 			service.Channels.Delta_Res <- in
 		}
 	}()
@@ -239,6 +242,9 @@ func (r *Runner) Delta_Stream(service *XDSService) error {
 			log.Err(err).
 				Msg("Error sending delta discovery request")
 			service.Channels.Err <- err
+		}
+		if err := r.DB.InsertRequest(req); err != nil {
+			service.Channels.Err <- fmt.Errorf("[DELTA] Could not insert request into db: %v", err)
 		}
 	}
 	service.Delta.CloseSend()
