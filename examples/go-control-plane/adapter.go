@@ -2,7 +2,6 @@ package example
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -22,14 +21,16 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 var (
 	xdsCache  cache.SnapshotCache
 	localhost = "127.0.0.1"
-	XDSCache cache.LinearCache
+	XDSCache  cache.LinearCache
 )
 
 const (
@@ -38,8 +39,6 @@ const (
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
-
-
 
 type Clusters map[string]*cluster.Cluster
 type Listeners map[string]*listener.Listener
@@ -92,6 +91,10 @@ func MakeCluster(clusterName string, node string) *cluster.Cluster {
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_EDS},
 		EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 			EdsConfig: edsSource,
+		},
+		DnsRefreshRate: &durationpb.Duration{
+			Seconds: 5,
+			Nanos:   0,
 		},
 	}
 }
@@ -165,7 +168,8 @@ func makeListener(listenerName string, address string, port uint32, filterChains
 				},
 			},
 		},
-		FilterChains: filterChains,
+		FilterChains:   filterChains,
+		TcpBacklogSize: &wrappers.UInt32Value{Value: 5},
 	}
 }
 
@@ -253,11 +257,11 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 		state.Version,
 		map[resource.Type][]types.Resource{
 			resource.EndpointType: endpoints,
-			resource.ClusterType: clusters,
-			resource.RouteType: routes,
+			resource.ClusterType:  clusters,
+			resource.RouteType:    routes,
 			resource.ListenerType: listeners,
-			resource.RuntimeType: runtimes,
-			resource.SecretType: {},
+			resource.RuntimeType:  runtimes,
+			resource.SecretType:   {},
 		},
 	)
 	if err != nil {
@@ -274,9 +278,9 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 		os.Exit(1)
 	}
 
-	newSnapshot, err := xdsCache.GetSnapshot(state.Node)
-	prettySnap, _ := json.Marshal(newSnapshot)
-	fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
+	// newSnapshot, err := xdsCache.GetSnapshot(state.Node)
+	// prettySnap, _ := json.Marshal(newSnapshot)
+	// fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
 	response = &pb.SetStateResponse{
 		Message: "Success",
 	}
@@ -295,25 +299,64 @@ func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*p
 	return updateResponse, err
 }
 
-func (a *adapterServer) SetResources(ctx context.Context, req *pb.SetResourcesRequest) (response *pb.SetResourcesResponse, err error) {
-	XDSCache = *cache.NewLinearCache(req.TypeURL)
-	resources := makeXdsResources(req.TypeURL, req.Resources)
+// func (a *adapterServer) SetResources(ctx context.Context, req *pb.SetResourcesRequest) (response *pb.SetResourcesResponse, err error) {
+// 	XDSCache = *cache.NewLinearCache(req.TypeURL)
+// 	resources := makeXdsResources(req.TypeURL, req.Resources)
 
-	XDSCache.SetResources(resources)
+// 	XDSCache.SetResources(resources)
 
-	// TODO find better response, confirm that it worked basically.
-	response = &pb.SetResourcesResponse{
-		Version: "1",
-		Message: "it worked, but this a dummy message.",
+// 	// TODO find better response, confirm that it worked basically.
+// 	response = &pb.SetResourcesResponse{
+// 		Version: "1",
+// 		Message: "it worked, but this a dummy message.",
+// 	}
+// 	return response, nil
+// }
+
+func updateForType(res types.Resource) (uppedRes types.Resource) {
+	switch v := res.(type) {
+	case *cluster.Cluster:
+		v.DnsRefreshRate.Seconds = v.DnsRefreshRate.Seconds + 5
+	case *listener.Listener:
+		v.TcpBacklogSize.Value = v.TcpBacklogSize.Value + 5
 	}
-	return response, nil
+	return res
 }
 
-func (a *adapterServer) UpdateResource (ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
-	linear := cache.NewLinearCache(request.TypeURL)
-	fmt.Printf("The resources: %v\n", linear.GetResources())
+func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
+	// cds := cache.NewLinearCache(TypeUrlCDS)
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, fmt.Errorf("Zach is very cool!")
+	resources := []types.Resource{}
+
+	for name, res := range snapshot.GetResources(request.TypeURL) {
+		if name != request.ResourceName {
+			resources = append(resources, res)
+		} else {
+			uppedRes := updateForType(res)
+			fmt.Println("uppedRes", res)
+			resources = append(resources, uppedRes)
+		}
+	}
+
+	switch request.TypeURL {
+	case TypeUrlCDS:
+		snapshot.Resources[types.Cluster] = cache.NewResources("2", resources)
+	case TypeUrlLDS:
+		snapshot.Resources[types.Listener] = cache.NewResources("2", resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+
+	response := &pb.UpdateResourceResponse{
+		Message: "Updated Resource!",
+	}
+	return response, nil
 }
 
 func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
@@ -345,7 +388,7 @@ func makeXdsResources(typeURL string, resources []*pb.Resource) map[string]types
 	switch typeURL {
 	case TypeUrlCDS:
 		for _, resource := range resources {
-			xdsResources[resource.Name] = MakeCluster(resource.Name,  "test-id")
+			xdsResources[resource.Name] = MakeCluster(resource.Name, "test-id")
 		}
 	case TypeUrlLDS:
 		for _, resource := range resources {
@@ -362,25 +405,26 @@ func makeXdsResources(typeURL string, resources []*pb.Resource) map[string]types
 	}
 	return xdsResources
 }
-	// endpoints := make([]types.Resource, len(state.Endpoints.Items))
-	// for i, endpoint := range state.Endpoints.Items {
-	// 	endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
-	// }
 
-	// routes := make([]types.Resource, len(state.Routes.Items))
-	// for i, route := range state.Routes.Items {
-	// 	cluster := state.Clusters.Items[i]
-	// 	routes[i] = MakeRoute(route.Name, cluster.Name)
-	// }
+// endpoints := make([]types.Resource, len(state.Endpoints.Items))
+// for i, endpoint := range state.Endpoints.Items {
+// 	endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
+// }
 
-	// listeners := make([]types.Resource, len(state.Listeners.Items))
-	// for i, listener := range state.Listeners.Items {
-	// 	port := uint32(11000 + i)
-	// 	route := state.Routes.Items[i]
-	// 	listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
-	// }
+// routes := make([]types.Resource, len(state.Routes.Items))
+// for i, route := range state.Routes.Items {
+// 	cluster := state.Clusters.Items[i]
+// 	routes[i] = MakeRoute(route.Name, cluster.Name)
+// }
 
-	// runtimes := make([]types.Resource, len(state.Runtimes.Items))
-	// for i, runtime := range state.Runtimes.Items {
-	// 	runtimes[i] = MakeRuntime(runtime.Name)
-	// }
+// listeners := make([]types.Resource, len(state.Listeners.Items))
+// for i, listener := range state.Listeners.Items {
+// 	port := uint32(11000 + i)
+// 	route := state.Routes.Items[i]
+// 	listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
+// }
+
+// runtimes := make([]types.Resource, len(state.Runtimes.Items))
+// for i, runtime := range state.Runtimes.Items {
+// 	runtimes[i] = MakeRuntime(runtime.Name)
+// }

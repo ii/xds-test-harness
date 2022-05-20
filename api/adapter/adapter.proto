@@ -79,17 +79,6 @@ message UpdateResourceResponse {
   string message = 1;
 }
 
-message SetResourcesRequest {
-  string typeURL  = 1;
-  repeated Resource resources = 2;
-  string node = 3;
-}
-
-message SetResourcesResponse {
-  string version = 1;
-  string message = 2;
-}
-
 message SetStateResponse {
   string message = 1;
 }
@@ -107,10 +96,8 @@ message clearResponse {
   string response = 1;
 }
 
-
 service Adapter {
   rpc SetState(Snapshot) returns (SetStateResponse){}
-  rpc SetResources(SetResourcesRequest) returns (SetResourcesResponse) {}
   rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
   rpc ClearState(clearRequest) returns (clearResponse) {}
   rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
