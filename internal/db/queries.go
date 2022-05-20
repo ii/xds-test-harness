@@ -20,7 +20,12 @@ CREATE VIEW IF NOT EXISTS response (
   resource
 )as
   select raw_response.id,
-		 json_extract(body, '$.version_info'),
+		 case
+           when json_extract(body, '$.version_info') is null
+             then json_extract(body, '$.system_version_info')
+           else
+             json_extract(value,'$.version_info')
+         end,
 		 json_extract(body, '$.type_url'),
          case json_extract(body, '$.type_url')
 	       when 'type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment'
