@@ -34,7 +34,15 @@ Feature: Delta
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <resources> and version <v1> for <service>
     When the resource <r1> of service <service> is updated to version <v2>
-    Then the Client receives only the resource <r1> and version <v2> for service
+    Then the Client receives only the resource <r1> and version <v2>
+    And the service never responds more than necessary
+
+    Examples:
+      | service | resources | r1  | v1  | v2  |
+      | "CDS"   | "A,B,C"   | "A" | "1" | "2" |
+      | "LDS"   | "A,B,C"   | "A" | "1" | "2" |
+
+
     And the service never responds more than necessary
     # And the Client never received resource <r1> at version <v2>
 

@@ -36,6 +36,9 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the Delta Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.DeltaClientReceivesOnlyTheResourceAndVersion)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
+	ctx.Step(`^the Delta Client receives notice that resource "([^"]*)" was removed$`, r.DeltaClientReceivesNoticeThatResourceWasRemoved)
+	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" at version "([^"]*)"$`, r.ResourceIsAddedToTheServiceAtVersion)
+	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -431,4 +434,16 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 		return errors.New(msg)
 	}
 	return nil
+}
+
+func (r *Runner) DeltaClientReceivesNoticeThatResourceWasRemoved(arg1 string) error {
+	return godog.ErrPending
+}
+
+func (r *Runner) ResourceIsAddedToTheServiceAtVersion(arg1, arg2, arg3 string) error {
+	return godog.ErrPending
+}
+
+func (r *Runner) ResourceIsRemovedFromTheService(arg1, arg2 string) error {
+	return godog.ErrPending
 }
