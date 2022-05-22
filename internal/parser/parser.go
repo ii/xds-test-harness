@@ -147,7 +147,7 @@ func ToSecrets(resourceNames []string) *pb.Secrets {
 	return secrets
 }
 
-func ServiceToTypeURL(service string) (typeURL string, err error) {
+func ServiceToTypeURL(service string) (typeURL string) {
 	typeURLs := map[string]string{
 		"lds": TypeUrlLDS,
 		"cds": TypeUrlCDS,
@@ -156,12 +156,8 @@ func ServiceToTypeURL(service string) (typeURL string, err error) {
 	}
 	service = strings.ToLower(service)
 
-	typeURL, ok := typeURLs[service]
-	if !ok {
-		err = fmt.Errorf("Cannot find type URL for given service: %v", service)
-		return typeURL, err
-	}
-	return typeURL, nil
+	typeURL, _ = typeURLs[service]
+	return typeURL
 }
 
 type xdsResponse interface {

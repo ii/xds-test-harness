@@ -130,13 +130,10 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 // for the given service. This is the heart of a test, as it sets up
 // the request/response loops that verify the service is working properly.
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	typeURL, err := parser.ServiceToTypeURL(srv)
-	if err != nil {
-		return err
-	}
 	// check if we are updating existing stream or starting a new one.
+	typeUrl := parser.ServiceToTypeURL(srv)
 	if r.Service.Stream != nil {
-		request := newRequest(resources, typeURL, r.NodeID)
+		request := newRequest(resources, typeUrl, r.NodeID)
 		r.Service.Channels.Req <- request
 		log.Debug().
 			Msgf("Sent new subscribing request: %v\n", request)
@@ -156,7 +153,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 		}
 		r.Service = builder.getService(srv)
 
-		request := newRequest(r.Service.Cache.InitResource, typeURL, r.NodeID)
+		request := newRequest(r.Service.Cache.InitResource, typeUrl, r.NodeID)
 		r.SubscribeRequest = request
 
 		log.Debug().
@@ -168,13 +165,10 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 }
 
 func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	typeURL, err := parser.ServiceToTypeURL(srv)
-	if err != nil {
-		return err
-	}
 	// check if we are updating existing stream or starting a new one.
+	typeUrl := parser.ServiceToTypeURL(srv)
 	if r.Service.Delta != nil {
-		request := newDeltaRequest(resources, typeURL, r.NodeID)
+		request := newDeltaRequest(resources, typeUrl, r.NodeID)
 		r.Service.Channels.Delta_Req <- request
 		log.Debug().
 			Msgf("[delta] Sent new subscribing request: %v\n", request)
@@ -194,7 +188,7 @@ func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resourc
 		}
 		r.Service = builder.getService(srv)
 
-		request := newDeltaRequest(r.Service.Cache.InitResource, typeURL, r.NodeID)
+		request := newDeltaRequest(r.Service.Cache.InitResource, typeUrl, r.NodeID)
 		r.Delta_SubscribeRequest = request
 
 		log.Debug().
@@ -208,12 +202,8 @@ func (r *Runner) Delta_ClientSubscribesToServiceForResources(srv string, resourc
 // Run db query expectin true value, err if anything but.
 func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version, service string) error {
 	expectedResources := strings.Split(resources, ",")
-	typeUrl, err := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
 	done := time.After(3 * time.Second)
+	typeUrl := parser.ServiceToTypeURL(service)
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
@@ -241,16 +231,12 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
 	expectedResources := strings.Split(resource, ",")
 	done := time.After(3 * time.Second)
-	typeUrl, err := parser.ServiceToTypeURL(r.Service.Name)
-	if err != nil {
-		return fmt.Errorf("Could not parse service name to its type: %v", err)
-	}
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
 		case <-done:
-			passed, err := r.DB.CheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			passed, err := r.DB.CheckOnlyExpectedResources(expectedResources, version, r.Service.TypeUrl)
 			if err != nil {
 				return err
 			}
@@ -336,18 +322,12 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
-	typeURL, err := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-
 	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
-
+	typeUrl := parser.ServiceToTypeURL(service)
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
 		ResourceNames: []string{resource},
-		TypeUrl:       typeURL,
+		TypeUrl:       typeUrl,
 		ResponseNonce: lastResponse.Nonce,
 	}
 	r.SubscribeRequest = request
@@ -359,18 +339,13 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	// version := r.Cache.StartState.Version
-	typeURL, err := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-
 	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
+	typeUrl := parser.ServiceToTypeURL(service)
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
 		ResourceNames: []string{""},
-		TypeUrl:       typeURL,
+		TypeUrl:       typeUrl,
 		ResponseNonce: lastResponse.Nonce,
 	}
 	r.SubscribeRequest = request
@@ -420,16 +395,12 @@ func resourcesMatch(expected []string, actual []string) bool {
 func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersion(resource, version string) error {
 	expectedResources := strings.Split(resource, ",")
 	done := time.After(3 * time.Second)
-	typeUrl, err := parser.ServiceToTypeURL(r.Service.Name)
-	if err != nil {
-		return fmt.Errorf("Could not parse service name to its type: %v", err)
-	}
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
 		case <-done:
-			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, r.Service.TypeUrl)
 			if err != nil {
 				return err
 			}
@@ -442,10 +413,7 @@ func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersion(resource, version 
 }
 
 func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
-	typeUrl, err := parser.ServiceToTypeURL(service)
-	if err != nil {
-		return err
-	}
+	typeUrl := parser.ServiceToTypeURL(service)
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 	in := &pb.ResourceRequest{
 		Node:         r.NodeID,
@@ -454,7 +422,7 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 		Version:      version,
 	}
 
-	_, err = c.UpdateResource(context.Background(), in)
+	_, err := c.UpdateResource(context.Background(), in)
 	if err != nil {
 		msg := "Cannot uppdate resource using adapter"
 		log.Error().
