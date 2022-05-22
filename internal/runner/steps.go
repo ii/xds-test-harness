@@ -23,9 +23,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
-	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.ClientReceivesOnlyTheCorrectResourceAndVersionForService)
-	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for service "([^"]*)"$`, r.ClientReceivesOnlyTheCorrectResourceAndVersionForService)
-	ctx.Step(`^the Client receives only the correct resource "([^"]*)" and version "([^"]*)" for service "([^"]*)"$`, r.ClientReceivesOnlyTheCorrectResourceAndVersionForService)
+	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.ClientReceivesOnlyTheCorrectResourceAndVersion)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
@@ -36,12 +34,11 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
-	ctx.Step(`^the Delta Client receives only the correct resource "([^"]*)" and version "([^"]*)" for service "([^"]*)"$`, r.DeltaClientReceivesOnlyTheResourceAndVersionForService)
+	ctx.Step(`^the Delta Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.DeltaClientReceivesOnlyTheResourceAndVersion)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
 	ctx.Step(`^the Delta Client receives notice that resource "([^"]*)" was removed$`, r.DeltaClientReceivesNoticeThatResourceWasRemoved)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" at version "([^"]*)"$`, r.ResourceIsAddedToTheServiceAtVersion)
 	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
-
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -234,17 +231,15 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 // The test is itended for when you update a subscription to now only care about a single resource.
 // The response you reeceive should only have a single entry in its resources, otherwise we fail.
 // Won't work for LDS/CDS where it is conformant to pass along more than you need.
-func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersionForService(resource, version, service string) error {
+func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
 	expectedResources := strings.Split(resource, ",")
 	done := time.After(3 * time.Second)
-
-	typeUrl := parser.ServiceToTypeURL(service)
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
 		case <-done:
-			passed, err := r.DB.CheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			passed, err := r.DB.CheckOnlyExpectedResources(expectedResources, version, r.Service.TypeUrl)
 			if err != nil {
 				return err
 			}
@@ -400,16 +395,15 @@ func resourcesMatch(expected []string, actual []string) bool {
 	return true
 }
 
-func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersionForService(resource, version, service string) error {
+func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersion(resource, version string) error {
 	expectedResources := strings.Split(resource, ",")
 	done := time.After(3 * time.Second)
-	typeUrl := parser.ServiceToTypeURL(service)
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
 		case <-done:
-			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, typeUrl)
+			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, r.Service.TypeUrl)
 			if err != nil {
 				return err
 			}

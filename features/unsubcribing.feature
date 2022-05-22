@@ -26,7 +26,7 @@ Feature: Unsubscribing to Resources
 
 
   @sotw @non-aggregated @aggregated @active
-  Scenario: [<service>] Client can unsubscribe from some resources
+  Scenario: [<service>] Client can unsubcribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     # This currently does not pass for go-control-plane
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
