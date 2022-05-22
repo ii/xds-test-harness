@@ -24,7 +24,7 @@ CREATE VIEW IF NOT EXISTS response (
            when json_extract(body, '$.version_info') is null
              then json_extract(body, '$.system_version_info')
            else
-             json_extract(value,'$.version_info')
+             json_extract(body,'$.version_info')
          end,
 		 json_extract(body, '$.type_url'),
          case json_extract(body, '$.type_url')
