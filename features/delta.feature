@@ -35,7 +35,7 @@ Feature: Delta
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <resources> and version <v1> for <service>
     When the resource <r1> of service <service> is updated to version <v2>
-    Then the Client receives only the resource <r1> and version <v2>
+    Then the Client receives only the resource <r1> and version <v2> for service <service>
     And the service never responds more than necessary
 
     Examples:
@@ -48,10 +48,10 @@ Feature: Delta
   Scenario: Client is told if resource does not exist, and is notified if it is created
     Given a target setup with service <service>, resources <r1>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
-    Then the Delta Client receives only the resource <r1> and version <v1>
+    Then the Delta Client receives only the resource <r1> and version <v1> for service <service>
     # And the Delta Client is told <r2> does not exist
     When the resource <r2> is added to the <service> with version <v1>
-    Then the Delta Client receives only the resource <r2> and version <v1>
+    Then the Delta Client receives only the resource <r2> and version <v1> for service <service>
     And the service never responds more than necessary
 
     Examples:
@@ -68,7 +68,7 @@ Feature: Delta
     When the resource <r1> is removed from the <service>
     Then the Delta Client receives notice that resource <r1> was removed
     When the resource <r1> is added to the <service> at version <v2>
-    Then the Delta Client receives only the resource <r1> and version <v2>
+    Then the Delta Client receives only the resource <r1> and version <v2> for service <service>
     And the service never responds more than necessary
 
     Examples:

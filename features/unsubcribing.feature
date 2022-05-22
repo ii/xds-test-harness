@@ -25,7 +25,7 @@ Feature: Unsubscribing to Resources
       | "LDS"   | "1"              | "G,B,L,D"   | "B,D"               | "B"                  |   "2"           |
 
 
-  @sotw @non-aggregated @aggregated @active
+  @sotw @non-aggregated @aggregated
   Scenario: [<service>] Client can unsubscribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     # This currently does not pass for go-control-plane
@@ -34,7 +34,7 @@ Feature: Unsubscribing to Resources
     Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the Client updates subscription to a resource(<resource from subset>) of <service> with version <starting version>
     And  the resources <resource from subset> of the <service> is updated to version <next version>
-    Then the Client receives only the resource <resource from subset> and version <next version>
+    Then the Client receives only the resource <resource from subset> and version <next version> for service <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
