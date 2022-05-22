@@ -62,18 +62,3 @@ Feature: Unsubscribing to Resources
       | "EDS"   | "1"              | "A,B,C,D"   | "A,B"               | "2"          |
 
 
-    @sotw @aggregated
-    Scenario: [<service>] Client can subscribe to multiple services via ADS
-      Given a target setup with service <service>, resources <resources>, and starting version <starting version>
-      When the Client subscribes to a subset of resources,<subset of resources>, for <service>
-      Then the Client receives the resources <subset of resources> and version <starting version> for <service>
-      When the Client subscribes to a subset of resources, <subset of resources>, for <other service>
-      Then the Client receives the resources <subset of resources> and version <starting version> for <other service>
-      When the resources <subset of resources> of the <service> is updated to version <next version>
-      Then the Client receives the resources <subset of resources> and version <next version> for <service>
-      And the service never responds more than necessary
-
-      Examples:
-        | service | other service | starting version | resources | subset of resources | next version |
-        | "CDS"   | "LDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
-        | "RDS"   | "EDS"         | "1"              | "A,B,C"   | "B"                 | "2"          |
