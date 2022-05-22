@@ -43,10 +43,18 @@ Feature: Delta
       | "LDS"   | "A,B,C"   | "A" | "1" | "2" |
 
 
+  @incremental @non-aggregated
+  Scenario: Client is told if resource does not exist, and is notified if it is created
+    Given a target setup with service <service>, resources <r1>, and starting version <v1>
+    When the Client subscribes to resources <resources> for <service>
+    Then the Delta Client receives only the resource <r1> and version <v1>
+    # And the Delta Client is told <r2> does not exist
+    When the resource <r2> is added to the <service> with version <v1>
+    Then the Delta Client receives only the resource <r2> and version <v1>
     And the service never responds more than necessary
-    # And the Client never received resource <r1> at version <v2>
 
     Examples:
-      | service | resources | r1  | r2  | v1  | v2  |
-      | "CDS"   | "A,B,C"   | "A" | "B" | "1" | "2" |
-      | "LDS"   | "A,B,C"   | "A" | "B" | "1" | "2" |
+      | service | v1  | resources | r1  | r2  |
+      | "CDS"   | "1" | "A,B"     | "A" | "B" |
+      | "LDS"   | "1" | "D,E"     | "D" | "E" |
+
