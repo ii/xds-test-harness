@@ -1,8 +1,8 @@
 Feature: Delta
   Delta works!
 
-  @wip @incremental @non-aggregated
-  Scenario Outline: Subscribe to resources this is cool stuff
+  @incremental @non-aggregated
+  Scenario Outline: Client can subscribe to resources using incremental variant
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <resources> and version <starting version> for <service>
@@ -27,6 +27,7 @@ Feature: Delta
       | service | starting version | resources | r1  | r2  |
       | "CDS"   | "1"              | "A,B,C"   | "A" | "B" |
       | "LDS"   | "1"              | "D,E,F"   | "D" | "E" |
+
 
   @incremental @non-aggregated
   Scenario Outline: When a resource is updated, receive response for only that resource
@@ -58,3 +59,19 @@ Feature: Delta
       | "CDS"   | "1" | "A,B"     | "A" | "B" |
       | "LDS"   | "1" | "D,E"     | "D" | "E" |
 
+
+  @incremental @non-aggregated @z
+  Scenario: Client is told when a resource is removed via removed_resources field
+    Given a target setup with service <service>, resources <resources>, and starting version <v1>
+    When the Client subscribes to resources <resources> for <service>
+    Then the Client receives the resources <resources> and version <v1> for <service>
+    When the resource <r1> is removed from the <service>
+    Then the Delta Client receives notice that resource <r1> was removed
+    When the resource <r1> is added to the <service> at version <v2>
+    Then the Delta Client receives only the resource <r1> and version <v2>
+    And the service never responds more than necessary
+
+    Examples:
+      | service | resources | r1  | v1  | v2  |
+      | "CDS"   | "A,B"     | "B" | "1" | "2" |
+      | "LDS"   | "D,E"     | "E" | "1" | "2" |
