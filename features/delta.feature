@@ -13,6 +13,7 @@ Feature: Delta
       | "CDS"   | "1"              | "A,B,C"   |
       | "LDS"   | "1"              | "D,E,F"   |
 
+
   @incremental @non-aggregated
   Scenario Outline: Subscribe to resources one after the other
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
