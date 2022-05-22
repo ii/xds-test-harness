@@ -71,7 +71,6 @@ Feature: Unsubscribing to Resources
       Then the Client receives the resources <subset of resources> and version <starting version> for <other service>
       When the resources <subset of resources> of the <service> is updated to version <next version>
       Then the Client receives the resources <subset of resources> and version <next version> for <service>
-      # trying out different language for server not responding to acks
       And the service never responds more than necessary
 
       Examples:
