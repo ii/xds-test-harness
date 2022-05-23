@@ -36,7 +36,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the Delta Client receives only the resource "([^"]*)" and version "([^"]*)" for service "([^"]*)"$`, r.DeltaClientReceivesOnlyTheResourceAndVersionForService)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
-	ctx.Step(`^the Delta Client receives notice that resource "([^"]*)" was removed$`, r.DeltaClientReceivesNoticeThatResourceWasRemoved)
+	ctx.Step(`^the Delta Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.DeltaClientReceivesNoticeThatResourceWasRemovedForService)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" at version "([^"]*)"$`, r.ResourceIsAddedToTheServiceAtVersion)
 	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
 }
@@ -252,6 +252,28 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForService(resource, ver
 	}
 }
 
+func (r *Runner) DeltaClientReceivesNoticeThatResourceWasRemovedForService(resource, service string) error {
+	resources := strings.Split(resource, ",")
+	done := time.After(3 * time.Second)
+	typeUrl := parser.ServiceToTypeURL(service)
+
+	for {
+		select {
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("Error receiving responses, could not validate: %v", err)
+		case <-done:
+			passed, err := r.DB.DeltaCheckRemovedResources(resources, typeUrl)
+			if err != nil {
+				return err
+			}
+			if !passed {
+				return fmt.Errorf("Did not receive notice the given resources were removed")
+			}
+			return nil
+		}
+	}
+}
+
 func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	r.Service.Channels.Done <- true // send signal to close the channels and service down
 	correctAmount, err := r.DB.CheckMoreRequestsThanResponses()
@@ -437,15 +459,38 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 	}
 	return nil
 }
+func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
+	typeUrl := parser.ServiceToTypeURL(service)
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeURL:      typeUrl,
+		ResourceName: resource,
+		Version:      "1",
+	}
 
-func (r *Runner) DeltaClientReceivesNoticeThatResourceWasRemoved(arg1 string) error {
-	return godog.ErrPending
+	_, err := c.RemoveResource(context.Background(), in)
+	if err != nil {
+		msg := "Cannnot remove resource using adapter"
+		log.Error().Err(err).Msg(msg)
+	}
+	return nil
 }
 
-func (r *Runner) ResourceIsAddedToTheServiceAtVersion(arg1, arg2, arg3 string) error {
-	return godog.ErrPending
-}
+func (r *Runner) ResourceIsAddedToTheServiceAtVersion(resource, service, version string) error {
+	typeUrl := parser.ServiceToTypeURL(service)
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeURL:      typeUrl,
+		ResourceName: resource,
+		Version:      version,
+	}
 
-func (r *Runner) ResourceIsRemovedFromTheService(arg1, arg2 string) error {
-	return godog.ErrPending
+	_, err := c.AddResource(context.Background(), in)
+	if err != nil {
+		msg := "Cannnot add resource using adapter"
+		log.Error().Err(err).Msg(msg)
+	}
+	return nil
 }
