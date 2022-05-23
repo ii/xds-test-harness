@@ -130,6 +130,15 @@ func (s *SQLiteRepository) DeltaCheckRemovedResources(resources []string, typeUr
 	return valid != 0, err
 }
 
+func (s *SQLiteRepository) DeltaCheckNoResource(resource, version, typeUrl string) (passed bool, err error) {
+	var valid int64
+	row := s.db.QueryRow(DeltaCheckNoResourceSql, resource, version, typeUrl)
+	if err := row.Scan(&valid); err != nil {
+		return false, err
+	}
+	return valid != 0, err
+}
+
 func (s *SQLiteRepository) CheckMoreRequestsThanResponses() (bool, error) {
 	var check int64
 	row := s.db.QueryRow(CheckMoreRequestsThanResponseSQL)

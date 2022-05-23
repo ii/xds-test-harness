@@ -118,6 +118,14 @@ var DeltaCheckRemovedResourcesSql = `
 select ((select count(*) from expected) = (select count(*) from latest_match));
 `
 
+var DeltaCheckNoResourceSql = `
+select count(*) = 0
+  from response
+  where resource = ($1)
+    and version = ($2)
+    and type_url = ($3);
+`
+
 var CheckMoreRequestsThanResponseSQL = `
 select (select count(*) from raw_request) > (select count(*) from raw_response);
 `
