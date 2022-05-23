@@ -104,6 +104,20 @@ with expected as (
 select ((select count(*) from expected) = (select count(*) from latest_match));
 `
 
+var DeltaCheckRemovedResourcesSql = `
+  with expected as (
+    select value as resource
+      from json_each($1)
+), latest_match as (
+    select removed_resource
+      from response
+     where type_url = ($2)
+       and id = (select max(id) from raw_response)
+)
+
+select ((select count(*) from expected) = (select count(*) from latest_match));
+`
+
 var CheckMoreRequestsThanResponseSQL = `
 select (select count(*) from raw_request) > (select count(*) from raw_response);
 `
