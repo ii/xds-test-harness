@@ -39,6 +39,8 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Delta Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.DeltaClientReceivesNoticeThatResourceWasRemovedForService)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" at version "([^"]*)"$`, r.ResourceIsAddedToTheServiceAtVersion)
 	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
+	ctx.Step(`^the Client unsubscribes from resource "([^"]*)" for service "([^"]*)"$`, r.ClientUnsubscribesFromResourceForService)
+	ctx.Step(`^the Delta client does not receive resource "([^"]*)" of service "([^"]*)" at version "([^"]*)"$`, r.DeltaClientDoesNotReceiveResourceOfServiceAtVersion)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -425,7 +427,7 @@ func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersionForService(resource
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
-			return fmt.Errorf("Err receiving responses, coult not validate: %v", err)
+			return fmt.Errorf("Err receiving responses, could not validate: %v", err)
 		case <-done:
 			passed, err := r.DB.DeltaCheckOnlyExpectedResources(expectedResources, version, typeUrl)
 			if err != nil {
@@ -434,6 +436,30 @@ func (r *Runner) DeltaClientReceivesOnlyTheResourceAndVersionForService(resource
 			if !passed {
 				return fmt.Errorf("Did not receive only the resource we wanted")
 			}
+			return nil
+		}
+	}
+}
+
+func (r *Runner) DeltaClientDoesNotReceiveResourceOfServiceAtVersion(resource, service, version string) error {
+	done := time.After(15 * time.Second)
+	typeUrl := parser.ServiceToTypeURL(service)
+	log.Debug().
+		Msg("Beginning 15 second grace period to check no updates are sent along the wire")
+	for {
+		select {
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("Err receiving responses, could not validate: %v", err)
+		case <-done:
+			passed, err := r.DB.DeltaCheckNoResource(resource, version, typeUrl)
+			if err != nil {
+				return err
+			}
+			if !passed {
+				return fmt.Errorf("Expected no responses, but got responses matching resource and version")
+			}
+			log.Debug().
+				Msg("No responses received within grace period")
 			return nil
 		}
 	}
@@ -457,6 +483,8 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 			Msg(msg)
 		return errors.New(msg)
 	}
+	log.Debug().
+		Msgf("Updating resource %v to version %v", resource, version)
 	return nil
 }
 func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
@@ -492,5 +520,18 @@ func (r *Runner) ResourceIsAddedToTheServiceAtVersion(resource, service, version
 		msg := "Cannnot add resource using adapter"
 		log.Error().Err(err).Msg(msg)
 	}
+	return nil
+}
+
+func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
+	resources := strings.Split(resource, ",")
+	typeUrl := parser.ServiceToTypeURL(service)
+	request := &discovery.DeltaDiscoveryRequest{
+		ResourceNamesUnsubscribe: resources,
+		TypeUrl:                  typeUrl,
+	}
+	log.Debug().
+		Msgf("Sending Unsubscribe Request: %v", request)
+	r.Service.Channels.Delta_Req <- request
 	return nil
 }
