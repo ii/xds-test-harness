@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	timeout = (20 * time.Second)
+	timeout = (60 * time.Second)
 )
 
 type Channels struct {
@@ -77,12 +77,12 @@ type LDSBuilder struct {
 
 func (b *LDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan *discovery.DiscoveryRequest, 2),
-		Res:  make(chan *discovery.DiscoveryResponse, 2),
-		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
-		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
-		Err:  make(chan error, 2),
-		Done: make(chan bool),
+		Req:       make(chan *discovery.DiscoveryRequest, 2),
+		Res:       make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req: make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res: make(chan *discovery.DeltaDiscoveryResponse, 2),
+		Err:       make(chan error, 2),
+		Done:      make(chan bool),
 	}
 }
 
@@ -126,18 +126,18 @@ type CDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
-	Delta DeltaStream
+	Delta    DeltaStream
 	Context  Context
 }
 
 func (b *CDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan *discovery.DiscoveryRequest, 2),
-		Res:  make(chan *discovery.DiscoveryResponse, 2),
-		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
-		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
-		Err:  make(chan error, 2),
-		Done: make(chan bool),
+		Req:       make(chan *discovery.DiscoveryRequest, 2),
+		Res:       make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req: make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res: make(chan *discovery.DeltaDiscoveryResponse, 2),
+		Err:       make(chan error, 2),
+		Done:      make(chan bool),
 	}
 }
 
@@ -172,7 +172,7 @@ func (b *CDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
-		Delta: b.Delta,
+		Delta:    b.Delta,
 	}
 }
 
@@ -181,18 +181,18 @@ type RDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
-	Delta DeltaStream
+	Delta    DeltaStream
 	Context  Context
 }
 
 func (b *RDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan *discovery.DiscoveryRequest, 2),
-		Res:  make(chan *discovery.DiscoveryResponse, 2),
-		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
-		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
-		Err:  make(chan error, 2),
-		Done: make(chan bool),
+		Req:       make(chan *discovery.DiscoveryRequest, 2),
+		Res:       make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req: make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res: make(chan *discovery.DeltaDiscoveryResponse, 2),
+		Err:       make(chan error, 2),
+		Done:      make(chan bool),
 	}
 }
 
@@ -227,7 +227,7 @@ func (b *RDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
-		Delta: b.Delta,
+		Delta:    b.Delta,
 	}
 }
 
@@ -236,18 +236,18 @@ type EDSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
-	Delta DeltaStream
+	Delta    DeltaStream
 	Context  Context
 }
 
 func (b *EDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan *discovery.DiscoveryRequest, 2),
-		Res:  make(chan *discovery.DiscoveryResponse, 2),
-		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
-		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
-		Err:  make(chan error, 2),
-		Done: make(chan bool),
+		Req:       make(chan *discovery.DiscoveryRequest, 2),
+		Res:       make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req: make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res: make(chan *discovery.DeltaDiscoveryResponse, 2),
+		Err:       make(chan error, 2),
+		Done:      make(chan bool),
 	}
 }
 
@@ -282,7 +282,7 @@ func (b *EDSBuilder) getService(srv string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
-		Delta: b.Delta,
+		Delta:    b.Delta,
 	}
 }
 
@@ -291,18 +291,18 @@ type ADSBuilder struct {
 	Channels *Channels
 	Cache    *ServiceCache
 	Stream   Stream
-	Delta DeltaStream
+	Delta    DeltaStream
 	Context  Context
 }
 
 func (b *ADSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan *discovery.DiscoveryRequest, 2),
-		Res:  make(chan *discovery.DiscoveryResponse, 2),
-		Delta_Req:  make(chan *discovery.DeltaDiscoveryRequest, 2),
-		Delta_Res:  make(chan *discovery.DeltaDiscoveryResponse, 2),
-		Err:  make(chan error, 2),
-		Done: make(chan bool),
+		Req:       make(chan *discovery.DiscoveryRequest, 2),
+		Res:       make(chan *discovery.DiscoveryResponse, 2),
+		Delta_Req: make(chan *discovery.DeltaDiscoveryRequest, 2),
+		Delta_Res: make(chan *discovery.DeltaDiscoveryResponse, 2),
+		Err:       make(chan error, 2),
+		Done:      make(chan bool),
 	}
 }
 
@@ -337,7 +337,7 @@ func (b *ADSBuilder) getService(service string) *XDSService {
 		Channels: b.Channels,
 		Cache:    b.Cache,
 		Stream:   b.Stream,
-		Delta: b.Delta,
+		Delta:    b.Delta,
 	}
 }
 
