@@ -17,9 +17,10 @@ CREATE VIEW IF NOT EXISTS response (
   id,
   version,
   type_url,
-  resource
+  resource,
+  removed_resource
 )as
-  select raw_response.id,
+  select raw.id,
 		 case
            when json_extract(body, '$.version_info') is null
              then json_extract(body, '$.system_version_info')
@@ -29,12 +30,14 @@ CREATE VIEW IF NOT EXISTS response (
 		 json_extract(body, '$.type_url'),
          case json_extract(body, '$.type_url')
 	       when 'type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment'
-		     then json_extract(value, '$.cluster_name')
+		     then json_extract(a.value, '$.cluster_name')
 		   else
-		     json_extract(value, '$.name')
-         end
-	from raw_response,
-		 json_each(body,'$.resources');
+		     json_extract(a.value, '$.name')
+         end,
+         x.value
+	from raw_response raw
+		 left join json_each(body,'$.resources') a
+         left join json_each(body, '$.removed_resources') x;
 `
 
 var InsertRequestSQL = `
