@@ -75,7 +75,16 @@ message ResourceRequest {
   string version = 4;
 }
 
+
+message AddResourceResponse {
+  string message = 1;
+}
+
 message UpdateResourceResponse {
+  string message = 1;
+}
+
+message RemoveResourceResponse {
   string message = 1;
 }
 
@@ -101,4 +110,6 @@ service Adapter {
   rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
   rpc ClearState(clearRequest) returns (clearResponse) {}
   rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
+  rpc AddResource(ResourceRequest) returns (AddResourceResponse){}
+  rpc RemoveResource(ResourceRequest) returns (RemoveResourceResponse){}
 }

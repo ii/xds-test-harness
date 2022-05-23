@@ -359,6 +359,66 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 	return response, nil
 }
 
+func (a *adapterServer) RemoveResource(ctx context.Context, request *pb.ResourceRequest) (*pb.RemoveResourceResponse, error) {
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	version := snapshot.GetVersion(request.TypeURL)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []types.Resource{}
+
+	for name, res := range snapshot.GetResources(request.TypeURL) {
+		if name != request.ResourceName {
+			resources = append(resources, res)
+		} else {
+			fmt.Printf("Removing this resource: %v\n", name)
+		}
+	}
+
+	switch request.TypeURL {
+	case TypeUrlCDS:
+		snapshot.Resources[types.Cluster] = cache.NewResources(version, resources)
+	case TypeUrlLDS:
+		snapshot.Resources[types.Listener] = cache.NewResources(version, resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+	response := &pb.RemoveResourceResponse{Message: "Removed request resource!"}
+	return response, nil
+}
+
+func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceRequest) (*pb.AddResourceResponse, error) {
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []types.Resource{}
+	for _, res := range snapshot.GetResources(request.TypeURL) {
+		resources = append(resources, res)
+	}
+
+	switch request.TypeURL {
+	case TypeUrlCDS:
+		newResource := MakeCluster(request.ResourceName, request.Node)
+		resources = append(resources, newResource)
+		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
+	case TypeUrlLDS:
+		newResource := makeListener(request.ResourceName, "https://funfunfun.com", 11223, []*listener.FilterChain{})
+		resources = append(resources, newResource)
+		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+	response := &pb.AddResourceResponse{Message: "Added requested resource!"}
+	return response, nil
+}
+
 func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
 	log.Printf("Clearing Cache")
 	xdsCache.ClearSnapshot(req.Node)
@@ -405,26 +465,3 @@ func makeXdsResources(typeURL string, resources []*pb.Resource) map[string]types
 	}
 	return xdsResources
 }
-
-// endpoints := make([]types.Resource, len(state.Endpoints.Items))
-// for i, endpoint := range state.Endpoints.Items {
-// 	endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
-// }
-
-// routes := make([]types.Resource, len(state.Routes.Items))
-// for i, route := range state.Routes.Items {
-// 	cluster := state.Clusters.Items[i]
-// 	routes[i] = MakeRoute(route.Name, cluster.Name)
-// }
-
-// listeners := make([]types.Resource, len(state.Listeners.Items))
-// for i, listener := range state.Listeners.Items {
-// 	port := uint32(11000 + i)
-// 	route := state.Routes.Items[i]
-// 	listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
-// }
-
-// runtimes := make([]types.Resource, len(state.Runtimes.Items))
-// for i, runtime := range state.Runtimes.Items {
-// 	runtimes[i] = MakeRuntime(runtime.Name)
-// }
