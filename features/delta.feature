@@ -60,7 +60,7 @@ Feature: Delta
       | "LDS"   | "1" | "D,E"     | "D" | "E" |
 
 
-  @incremental @non-aggregated @z
+  @incremental @non-aggregated
   Scenario: Client is told when a resource is removed via removed_resources field
     Given a target setup with service <service>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
@@ -75,3 +75,21 @@ Feature: Delta
       | service | resources | r1  | v1  | v2  |
       | "CDS"   | "A,B"     | "B" | "1" | "2" |
       | "LDS"   | "D,E"     | "E" | "1" | "2" |
+
+  @incremental @non-aggregated @z2
+  Scenario: Client can incrementally unsubscribe from resources
+    Given a target setup with service <service>, resources <resources>, and starting version <v1>
+    When the Client subscribes to resources <resources> for <service>
+    Then the Client receives the resources <resources> and version <v1> for <service>
+    When the Client unsubscribes from resource <r1> for service <service>
+    And the resource <r1> of service <service> is updated to version <v2>
+    Then the Delta client does not receive resource <r1> of service <service> at version <v2>
+    When the Client unsubscribes from resource <r2> for service <service>
+    And the resource <r2> of service <service> is updated to version <v2>
+    Then the Delta client does not receive resource <r2> of service <service> at version <v2>
+    And the service never responds more than necessary
+
+    Examples:
+      | service | resources | r1  | r2  | v1  | v2  |
+      | "CDS"   | "A,B"     | "B" | "A" | "1" | "2" |
+      | "LDS"   | "D,E"     | "E" | "D" | "1" | "2" |
