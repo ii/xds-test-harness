@@ -5,12 +5,12 @@ Feature: Subscribing to Resources
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
-  @sotw @non-aggregated @aggregated @active
+  @sotw @non-aggregated @aggregated @active @z2
   Scenario Outline: [<service>] The service should send all resources on a wildcard request.
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client does a wildcard subscription to <service>
     Then the Client receives the resources <expected resources> and version <starting version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources | expected resources |
@@ -25,7 +25,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <expected resources> and version <starting version> for <service>
     When  the resources <chosen resource> of the <service> is updated to version <next version>
     Then the Client receives the resources <expected resources> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | next version | resources | expected resources | chosen resource |
@@ -40,7 +40,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <resources> and version <starting version> for <service>
     When the resource <new resource> is added to the <service> with version <next version>
     Then the Client receives the resources <expected resources> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources | new resource | expected resources | next version |
@@ -53,7 +53,7 @@ Feature: Subscribing to Resources
     Given a target setup with service <service>, resources <resources>, and starting version <starting version>
     When the Client subscribes to resources <subset of resources> for <service>
     Then the Client receives the resources <subset of resources> and version <starting version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources | subset of resources |
@@ -70,7 +70,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the resources <subscribed resource> of the <service> is updated to version <next version>
     Then the Client receives the resources <subset of resources> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources   | subset of resources | subscribed resource | next version |
@@ -85,7 +85,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the resources <subscribed resource> of the <service> is updated to version <next version>
     Then the Client receives the resources <subscribed resource> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources   | subset of resources | subscribed resource | next version |
@@ -100,7 +100,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <existing subset> and version <starting version> for <service>
     When the resource <chosen resource> is added to the <service> with version <next version>
     Then the Client receives the resources <subset of resources> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources   | subset of resources | existing subset | chosen resource | next version |
@@ -115,7 +115,7 @@ Feature: Subscribing to Resources
     Then the Client receives the resources <existing subset> and version <starting version> for <service>
     When the resource <chosen resource> is added to the <service> with version <next version>
     Then the Client receives the resources <chosen resource> and version <next version> for <service>
-    And the Client sends an ACK to which the <service> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | service | starting version | resources   | subset of resources | existing subset | chosen resource | next version |
