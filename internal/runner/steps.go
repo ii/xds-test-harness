@@ -263,14 +263,13 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	// give some time for the final messages to come through, if there's any lingering responses.
 	time.Sleep(3 * time.Second)
 	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
-	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
+		Msgf("Request Count: %v Response Count: %v", r.Validate.RequestCount, r.Validate.ResponseCount)
+	if r.Validate.RequestCount <= r.Validate.ResponseCount {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		return err
 	}
 	return nil
 }
-
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
 	log.Debug().
@@ -340,7 +339,7 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
+	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
@@ -363,7 +362,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
+	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
 
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   lastResponse.VersionInfo,
@@ -376,7 +375,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 		Msgf("Sending unsubscribe request: %v", request)
 	r.Service.Channels.Req <- request
 	log.Debug().Msg("Pausing for 2 seconds, to ensure server receives unsubscribe test.")
-	time.Sleep(2 *time.Second)
+	time.Sleep(2 * time.Second)
 	log.Debug().Msg("Should now be good to update server")
 	return nil
 }
