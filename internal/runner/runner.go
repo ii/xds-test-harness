@@ -41,6 +41,15 @@ type Validate struct {
 	Resources     map[string]map[string]string
 }
 
+func NewValidate() *Validate {
+	resources := make(map[string]map[string]string)
+	return &Validate{
+		RequestCount:  0,
+		ResponseCount: 0,
+		Resources:     resources,
+	}
+}
+
 type Runner struct {
 	Adapter          *ClientConfig
 	Target           *ClientConfig
@@ -68,6 +77,8 @@ func FreshRunner(current ...*Runner) *Runner {
 
 	}
 
+	validate := NewValidate()
+
 	return &Runner{
 		Adapter:    adapter,
 		Target:     target,
@@ -75,7 +86,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Cache:      &Cache{},
 		Service:    &XDSService{},
 		Aggregated: aggregated,
-		Validate:   &Validate{},
+		Validate:   validate,
 	}
 }
 
