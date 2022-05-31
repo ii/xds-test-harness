@@ -34,14 +34,21 @@ type Cache struct {
 	FinalResponse  *discovery.DiscoveryResponse
 }
 
+type Validate struct {
+	RequestCount  int
+	ResponseCount int
+	Resources     map[string]map[string]string
+}
+
 type Runner struct {
-	Adapter    *ClientConfig
-	Target     *ClientConfig
-	NodeID     string
-	Cache      *Cache
-	Aggregated bool
-	Service    *XDSService
+	Adapter          *ClientConfig
+	Target           *ClientConfig
+	NodeID           string
+	Cache            *Cache
+	Aggregated       bool
+	Service          *XDSService
 	SubscribeRequest *discovery.DiscoveryRequest
+	Validate         *Validate
 }
 
 func FreshRunner(current ...*Runner) *Runner {
@@ -67,6 +74,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Cache:      &Cache{},
 		Service:    &XDSService{},
 		Aggregated: aggregated,
+		Validate:   &Validate{},
 	}
 }
 
@@ -134,6 +142,7 @@ func (r *Runner) Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
+			r.Validate.ResponseCount++
 			service.Channels.Res <- in
 		}
 	}()
@@ -144,6 +153,7 @@ func (r *Runner) Stream(service *XDSService) error {
 				Msg("Error sending discovery request")
 			service.Channels.Err <- err
 		}
+		r.Validate.RequestCount++
 	}
 	service.Stream.CloseSend()
 	wg.Wait()
@@ -160,7 +170,6 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 		Msgf("Runner connected to %v", server)
 	return conn, nil
 }
-
 
 func newAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
 	// Only the first request should need the node ID,
@@ -185,5 +194,3 @@ func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.Disco
 		TypeUrl:       typeURL,
 	}
 }
-
-
