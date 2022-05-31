@@ -154,6 +154,15 @@ func (r *Runner) Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
+			resources, err := parser.ResourceNames(in)
+			if err != nil {
+				log.Err(err).Msg("Could not gather resource names from response")
+				service.Channels.Err <- err
+				return
+			}
+			for _, resource := range resources {
+				r.Validate.Resources[in.TypeUrl][resource] = in.VersionInfo
+			}
 			r.Validate.ResponseCount++
 			service.Channels.Res <- in
 		}
