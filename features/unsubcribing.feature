@@ -34,7 +34,7 @@ Feature: Unsubscribing to Resources
     Then the Client receives the resources <subset of resources> and version <starting version> for <service>
     When the Client updates subscription to a resource(<resource from subset>) of <service> with version <starting version>
     And  the resources <resource from subset> of the <service> is updated to version <next version>
-    Then the Client receives only the resource <resource from subset> and version <next version>
+    Then the Client receives only the resource <resource from subset> and version <next version> for the service <service>
     And the Client sends an ACK to which the <service> does not respond
 
     Examples:
