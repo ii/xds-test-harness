@@ -152,14 +152,13 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 			builder = getBuilder(srv)
 		}
 		builder.openChannels()
-		builder.setInitResources(resources)
 		err := builder.setStream(r.Target.Conn)
 		if err != nil {
 			return err
 		}
 		r.Service = builder.getService(srv)
 
-		request := newRequest(r.Service.Cache.InitResource, typeUrl, r.NodeID)
+		request := newRequest(resources, typeUrl, r.NodeID)
 		r.SubscribeRequest = request
 
 		log.Debug().
@@ -337,7 +336,6 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 }
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
-	// version := r.Cache.StartState.Version
 	err, typeURL := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)

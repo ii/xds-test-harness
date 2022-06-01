@@ -118,16 +118,16 @@ func (r *Runner) ConnectClient(server, address string) error {
 
 func (r *Runner) Ack(service *XDSService) {
 	service.Channels.Req <- r.SubscribeRequest
-	service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
+	// service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
 	for {
 		select {
 		case res := <-service.Channels.Res:
-			service.Cache.Responses = append(service.Cache.Responses, res)
+			// service.Cache.Responses = append(service.Cache.Responses, res)
 			ack := newAckFromResponse(res, r.SubscribeRequest)
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
-			service.Cache.Requests = append(service.Cache.Requests, ack)
+			// service.Cache.Requests = append(service.Cache.Requests, ack)
 		case <-service.Channels.Done:
 			log.Debug().
 				Msg("Received Done signal, shutting down request channel")
