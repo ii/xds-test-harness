@@ -82,6 +82,7 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(service, resources, v
 // nothing changes about the resources themselves, but the new version
 // should still trigger a response.
 func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, version string) error {
+	log.Debug().Msgf("Updated resource %v to version %v", resource, version)
 	snapshot := &adapter.Snapshot{
 		Version: version,
 	}
