@@ -130,9 +130,9 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 		return err
 	}
 
-	r.Validate.Resources[typeUrl] = make(map[string]string)
+	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
 	for _, resource := range resources {
-		r.Validate.Resources[typeUrl][resource] = ""
+		r.Validate.Resources[typeUrl][resource] = ValidateResource{}
 	}
 
 	// check if we are updating existing stream or starting a new one.
@@ -190,12 +190,12 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 		case <-done:
 			actualResources := r.Validate.Resources[typeUrl]
 			for _, resource := range expectedResources {
-				actualVersion, ok := actualResources[resource]
+				actual, ok := actualResources[resource]
 				if !ok {
 					return fmt.Errorf("Could not find resource from responses")
 				}
-				if actualVersion != version {
-					return fmt.Errorf("Found resource, but not correct version. Expected: %v, Actual: %v", version, actualVersion)
+				if actual.Version != version {
+					return fmt.Errorf("Found resource, but not correct version. Expected: %v, Actual: %v", version, actual.Version)
 				}
 			}
 			return nil
@@ -219,9 +219,10 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, 
 				return fmt.Errorf("Issue converting service to typeUrl, was it written correctly?")
 			}
 			resources := r.Validate.Resources[typeUrl]
-			for r, v := range resources {
-				if r != resource || v != version {
-					return fmt.Errorf("Received a resource, or a version, we should not have. Expected resource/version: %v/%v. Got: %v/%v", resource, version, r, v)
+			for name, info := range resources {
+				if name != resource || info.Version != version {
+					return fmt.Errorf("Received a resource, or a version, we should not have. Expected resource/version: %v/%v. Got: %v/%v",
+						resource, version, name, info.Version)
 				}
 			}
 			return nil
@@ -320,8 +321,9 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 		TypeUrl:       typeURL,
 		ResponseNonce: lastResponse.Nonce,
 	}
-	r.Validate.Resources[typeURL] = make(map[string]string)
-	r.Validate.Resources[typeURL][resource] = version
+	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
+	vr := ValidateResource{Version: version}
+	r.Validate.Resources[typeURL][resource] = vr
 	r.SubscribeRequest = request
 	log.Debug().
 		Msgf("Sending Request To Update Subscription: %v", request)
