@@ -25,6 +25,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for the service "([^"]*)"$`, r.ClientReceivesOnlyTheResourceAndVersionForTheService)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
+	ctx.Step(`^the resources "([^"]*)" and version "([^"]*)" for "([^"]*)" came in a single response$`, r.ResourcesAndVersionForServiceCameInASingleResponse)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
@@ -395,4 +396,26 @@ func resourcesMatch(expected []string, actual []string) bool {
 		}
 	}
 	return true
+}
+
+func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, version, service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	expected := strings.Split(resources, ",")
+	actual := r.Validate.Resources[typeUrl]
+
+	responses := make(map[int]bool)
+	for _, resource := range expected {
+		info, ok := actual[resource]
+		if !ok || info.Version != version {
+			return fmt.Errorf("Could not find correct resource in validation struct. This is rare; perhaps recheck how the test was written.")
+		}
+		responses[info.Response] = true
+	}
+	if len(responses) != 1 {
+		return fmt.Errorf("Resources came via multiple responses. This is not conformant for CDS and  LDS tests")
+	}
+	return nil
 }

@@ -6,16 +6,17 @@ Feature: Subscribing to Resources
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
   @sotw @non-aggregated @aggregated @active @z2
-  Scenario Outline: [<service>] The service should send all resources on a wildcard request.
-    Given a target setup with service <service>, resources <resources>, and starting version <starting version>
-    When the Client does a wildcard subscription to <service>
-    Then the Client receives the resources <expected resources> and version <starting version> for <service>
+  Scenario Outline: [<xDS>] The service should send all resources on a wildcard request.
+    Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
+    When the Client does a wildcard subscription to <xDS>
+    Then the Client receives the resources <expected> and version <v1> for <xDS>
+    And the resources <expected> and version <v1> for <xDS> came in a single response
     And the service never responds more than necessary
 
     Examples:
-      | service | starting version | resources | expected resources |
-      | "CDS"   | "1"              | "A,B,C"   | "C,A,B"            |
-      | "LDS"   | "1"              | "D,E,F"   | "F,D,E"            |
+      | xDS   | v1  | resources | expected |
+      | "CDS" | "1" | "A,B,C"   | "C,A,B"  |
+      | "LDS" | "1" | "D,E,F"   | "F,D,E"  |
 
 
   @sotw @non-aggregated @aggregated @active
