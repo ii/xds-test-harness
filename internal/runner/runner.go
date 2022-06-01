@@ -35,14 +35,19 @@ type Cache struct {
 	FinalResponse  *discovery.DiscoveryResponse
 }
 
+type ValidateResource struct {
+	Version  string
+	Response int
+}
+
 type Validate struct {
 	RequestCount  int
 	ResponseCount int
-	Resources     map[string]map[string]string
+	Resources     map[string]map[string]ValidateResource
 }
 
 func NewValidate() *Validate {
-	resources := make(map[string]map[string]string)
+	resources := make(map[string]map[string]ValidateResource)
 	return &Validate{
 		RequestCount:  0,
 		ResponseCount: 0,
@@ -154,6 +159,9 @@ func (r *Runner) Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
+
+			r.Validate.ResponseCount++
+
 			resources, err := parser.ResourceNames(in)
 			if err != nil {
 				log.Err(err).Msg("Could not gather resource names from response")
@@ -161,9 +169,9 @@ func (r *Runner) Stream(service *XDSService) error {
 				return
 			}
 			for _, resource := range resources {
-				r.Validate.Resources[in.TypeUrl][resource] = in.VersionInfo
+				vr := ValidateResource{Version: in.VersionInfo, Response: r.Validate.ResponseCount}
+				r.Validate.Resources[in.TypeUrl][resource] = vr
 			}
-			r.Validate.ResponseCount++
 			service.Channels.Res <- in
 		}
 	}()
