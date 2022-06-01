@@ -309,26 +309,29 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
-	err, typeURL := parser.ServiceToTypeURL(service)
+	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses)-1]
+	current := r.Validate.Resources[typeUrl][resource]
 
 	request := &discovery.DiscoveryRequest{
-		VersionInfo:   lastResponse.VersionInfo,
+		VersionInfo:   current.Version,
 		ResourceNames: []string{resource},
-		TypeUrl:       typeURL,
-		ResponseNonce: lastResponse.Nonce,
+		TypeUrl:       typeUrl,
+		ResponseNonce: current.Nonce,
 	}
-	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
-	vr := ValidateResource{Version: version}
-	r.Validate.Resources[typeURL][resource] = vr
+
+	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
+	r.Validate.Resources[typeUrl][resource] = ValidateResource{
+		Version: current.Version,
+		Nonce:   current.Nonce,
+	}
 	r.SubscribeRequest = request
-	log.Debug().
-		Msgf("Sending Request To Update Subscription: %v", request)
+
+	log.Debug().Msgf("Sending Request To Update Subscription: %v", request)
 	r.Service.Channels.Req <- request
 	return nil
 }
