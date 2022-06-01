@@ -36,8 +36,8 @@ type Cache struct {
 }
 
 type ValidateResource struct {
-	Version  string
-	Response int
+	Version string
+	Nonce   string
 }
 
 type Validate struct {
@@ -160,8 +160,6 @@ func (r *Runner) Stream(service *XDSService) error {
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
 
-			r.Validate.ResponseCount++
-
 			resources, err := parser.ResourceNames(in)
 			if err != nil {
 				log.Err(err).Msg("Could not gather resource names from response")
@@ -169,9 +167,12 @@ func (r *Runner) Stream(service *XDSService) error {
 				return
 			}
 			for _, resource := range resources {
-				vr := ValidateResource{Version: in.VersionInfo, Response: r.Validate.ResponseCount}
-				r.Validate.Resources[in.TypeUrl][resource] = vr
+				r.Validate.Resources[in.TypeUrl][resource] = ValidateResource{
+					Version: in.VersionInfo,
+					Nonce:   in.Nonce,
+				}
 			}
+			r.Validate.ResponseCount++
 			service.Channels.Res <- in
 		}
 	}()
@@ -200,14 +201,17 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 	return conn, nil
 }
 
-func newAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
+// Using the last response and current subscribing request, create a new DiscoveryRequest to ACK that response.
+// We use the current subscribing request for the cases where the client is subscribing to A,B,C but only A,B
+// exist.  In that case, we want to ack that we've received A,B but that we are STILL subscribing to A,B,C.
+func newAckFromResponse(res *discovery.DiscoveryResponse, subscribingReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   res.VersionInfo,
-		ResourceNames: initReq.ResourceNames,
-		TypeUrl:       initReq.TypeUrl,
+		ResourceNames: subscribingReq.ResourceNames,
+		TypeUrl:       subscribingReq.TypeUrl,
 		ResponseNonce: res.Nonce,
 	}
 	return request
