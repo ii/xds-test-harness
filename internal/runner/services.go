@@ -12,17 +12,15 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	connectTimeout = (60 * time.Second)
+)
+
 type Channels struct {
 	Req  chan *discovery.DiscoveryRequest
 	Res  chan *discovery.DiscoveryResponse
 	Err  chan error
 	Done chan bool
-}
-
-type ServiceCache struct {
-	InitResource []string
-	Requests     []*discovery.DiscoveryRequest
-	Responses    []*discovery.DiscoveryResponse
 }
 
 type Context struct {
@@ -39,7 +37,6 @@ type Stream interface {
 type XDSService struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -47,14 +44,12 @@ type XDSService struct {
 type serviceBuilder interface {
 	openChannels()
 	setStream(conn *grpc.ClientConn) error
-	setInitResources([]string)
 	getService(srv string) *XDSService
 }
 
 type LDSBuilder struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -70,7 +65,7 @@ func (b *LDSBuilder) openChannels() {
 
 func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := lds.NewListenerDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	stream, err := client.StreamListeners(ctx)
 	if err != nil {
 		defer cancel()
@@ -82,16 +77,10 @@ func (b *LDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *LDSBuilder) setInitResources(res []string) {
-	b.Cache = &ServiceCache{}
-	b.Cache.InitResource = res
-}
-
 func (b *LDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "LDS",
 		Channels: b.Channels,
-		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
@@ -99,7 +88,6 @@ func (b *LDSBuilder) getService(srv string) *XDSService {
 type CDSBuilder struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -115,7 +103,7 @@ func (b *CDSBuilder) openChannels() {
 
 func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := cds.NewClusterDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	stream, err := client.StreamClusters(ctx)
 	if err != nil {
 		defer cancel()
@@ -127,16 +115,10 @@ func (b *CDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *CDSBuilder) setInitResources(res []string) {
-	b.Cache = &ServiceCache{}
-	b.Cache.InitResource = res
-}
-
 func (b *CDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "CDS",
 		Channels: b.Channels,
-		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
@@ -144,7 +126,6 @@ func (b *CDSBuilder) getService(srv string) *XDSService {
 type RDSBuilder struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -160,7 +141,7 @@ func (b *RDSBuilder) openChannels() {
 
 func (b *RDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := rds.NewRouteDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	stream, err := client.StreamRoutes(ctx)
 	if err != nil {
 		defer cancel()
@@ -172,16 +153,10 @@ func (b *RDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *RDSBuilder) setInitResources(res []string) {
-	b.Cache = &ServiceCache{}
-	b.Cache.InitResource = res
-}
-
 func (b *RDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "RDS",
 		Channels: b.Channels,
-		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
@@ -189,7 +164,6 @@ func (b *RDSBuilder) getService(srv string) *XDSService {
 type EDSBuilder struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -205,7 +179,7 @@ func (b *EDSBuilder) openChannels() {
 
 func (b *EDSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := eds.NewEndpointDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	stream, err := client.StreamEndpoints(ctx)
 	if err != nil {
 		defer cancel()
@@ -217,16 +191,10 @@ func (b *EDSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *EDSBuilder) setInitResources(res []string) {
-	b.Cache = &ServiceCache{}
-	b.Cache.InitResource = res
-}
-
 func (b *EDSBuilder) getService(srv string) *XDSService {
 	return &XDSService{
 		Name:     "EDS",
 		Channels: b.Channels,
-		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
@@ -234,7 +202,6 @@ func (b *EDSBuilder) getService(srv string) *XDSService {
 type ADSBuilder struct {
 	Name     string
 	Channels *Channels
-	Cache    *ServiceCache
 	Stream   Stream
 	Context  Context
 }
@@ -250,7 +217,7 @@ func (b *ADSBuilder) openChannels() {
 
 func (b *ADSBuilder) setStream(conn *grpc.ClientConn) error {
 	client := discovery.NewAggregatedDiscoveryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 	stream, err := client.StreamAggregatedResources(ctx)
 	if err != nil {
 		defer cancel()
@@ -262,20 +229,13 @@ func (b *ADSBuilder) setStream(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (b *ADSBuilder) setInitResources(res []string) {
-	b.Cache = &ServiceCache{}
-	b.Cache.InitResource = res
-}
-
 func (b *ADSBuilder) getService(service string) *XDSService {
 	return &XDSService{
 		Name:     "ADS",
 		Channels: b.Channels,
-		Cache:    b.Cache,
 		Stream:   b.Stream,
 	}
 }
-
 
 func getBuilder(builderType string) serviceBuilder {
 	switch builderType {

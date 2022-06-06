@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -24,8 +23,9 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
-	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)"$`, r.ClientReceivesOnlyTheCorrectResourceAndVersion)
+	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for the service "([^"]*)"$`, r.ClientReceivesOnlyTheResourceAndVersionForTheService)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
+	ctx.Step(`^the resources "([^"]*)" and version "([^"]*)" for "([^"]*)" came in a single response$`, r.ResourcesAndVersionForServiceCameInASingleResponse)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
@@ -82,6 +82,7 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(service, resources, v
 // nothing changes about the resources themselves, but the new version
 // should still trigger a response.
 func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, version string) error {
+	log.Debug().Msgf("Updated resource %v to version %v", resource, version)
 	snapshot := &adapter.Snapshot{
 		Version: version,
 	}
@@ -126,13 +127,19 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 // for the given service. This is the heart of a test, as it sets up
 // the request/response loops that verify the service is working properly.
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	err, typeURL := parser.ServiceToTypeURL(srv)
+	err, typeUrl := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
+
+	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
+	for _, resource := range resources {
+		r.Validate.Resources[typeUrl][resource] = ValidateResource{}
+	}
+
 	// check if we are updating existing stream or starting a new one.
 	if r.Service.Stream != nil {
-		request := newRequest(resources, typeURL, r.NodeID)
+		request := newRequest(resources, typeUrl, r.NodeID)
 		r.Service.Channels.Req <- request
 		log.Debug().
 			Msgf("Sent new subscribing request: %v\n", request)
@@ -145,14 +152,13 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 			builder = getBuilder(srv)
 		}
 		builder.openChannels()
-		builder.setInitResources(resources)
 		err := builder.setStream(r.Target.Conn)
 		if err != nil {
 			return err
 		}
 		r.Service = builder.getService(srv)
 
-		request := newRequest(r.Service.Cache.InitResource, typeURL, r.NodeID)
+		request := newRequest(resources, typeUrl, r.NodeID)
 		r.SubscribeRequest = request
 
 		log.Debug().
@@ -168,44 +174,32 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version, service string) error {
 	expectedResources := strings.Split(resources, ",")
 	stream := r.Service
-	actualResources := []string{}
 
 	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
+	done := time.After(3 * time.Second)
 	for {
 		select {
 		case err := <-stream.Channels.Err:
-			// if there isn't ane rror in a response,
+			// if there isn't an error in a response,
 			// the error will be passed down from the stream when
 			// it reaches its context deadline.
 			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
-		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
-					resourceNames, err := parser.ResourceNames(response)
-					if err != nil {
-						return err
-					}
-					if !reflect.DeepEqual(version, response.VersionInfo) {
-						continue
-					}
-					if !reflect.DeepEqual(typeUrl, response.TypeUrl) {
-						continue
-					}
-					if stream.Name == "RDS" || stream.Name == "EDS" { // EDS & RDS resources can come from multiple responses.
-						actualResources = append(actualResources, resourceNames...)
-					} else {
-						actualResources = resourceNames
-					}
-					if !resourcesMatch(expectedResources, actualResources) {
-						continue
-					}
-					return nil
+		case <-done:
+			actualResources := r.Validate.Resources[typeUrl]
+			for _, resource := range expectedResources {
+				actual, ok := actualResources[resource]
+				if !ok {
+					return fmt.Errorf("Could not find resource from responses")
+				}
+				if actual.Version != version {
+					return fmt.Errorf("Found resource, but not correct version. Expected: %v, Actual: %v", version, actual.Version)
 				}
 			}
+			return nil
 		}
 	}
 }
@@ -214,44 +208,25 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 // The test is itended for when you update a subscription to now only care about a single resource.
 // The response you reeceive should only have a single entry in its resources, otherwise we fail.
 // Won't work for LDS/CDS where it is conformant to pass along more than you need.
-func (r *Runner) ClientReceivesOnlyTheCorrectResourceAndVersion(resource, version string) error {
-	stream := r.Service
-	log.Debug().Msgf("Resource: %v, version: %v", resource, version)
-
+func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, version, service string) error {
+	done := time.After(3 * time.Second)
 	for {
 		select {
-		case err := <-stream.Channels.Err:
-			log.Err(err).Msg("From our step")
-			return errors.New("Could not find expected response within grace period of 10 seconds.")
-		default:
-			if len(stream.Cache.Responses) > 0 {
-				for _, response := range stream.Cache.Responses {
-					resourceNames, err := parser.ResourceNames(response)
-					if err != nil {
-						return fmt.Errorf("Could not parse resource names from response. cannot validate response. response:%v\nerr: %v", response, err)
-					}
-					if err != nil {
-						log.Error().Err(err).Msg("can't parse discovery response ")
-						return err
-					}
-					if !reflect.DeepEqual(version, response.VersionInfo) {
-						continue
-					}
-					// we set our subscription to a single resource, and the services should only send a single resource.
-					// If the resources slice is empty or more than one, it is incorrect and we can continue.
-					// (this fn is not designed for LDS or CDS tests)
-					if len(resourceNames) != 1 {
-						// log.Debug().
-						// 	Msgf("Got right version, but too many resources: %v", stream.Cache.Requests)
-						continue
-					}
-					if !resourcesMatch([]string{resource}, resourceNames) {
-						log.Debug().Msgf("resources don't match: %v", resourceNames)
-						continue
-					}
-					return nil
+		case err := <-r.Service.Channels.Err:
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds or encountered error: %v.", err)
+		case <-done:
+			err, typeUrl := parser.ServiceToTypeURL(service)
+			if err != nil {
+				return fmt.Errorf("Issue converting service to typeUrl, was it written correctly?")
+			}
+			resources := r.Validate.Resources[typeUrl]
+			for name, info := range resources {
+				if name != resource || info.Version != version {
+					return fmt.Errorf("Received a resource, or a version, we should not have. Expected resource/version: %v/%v. Got: %v/%v",
+						resource, version, name, info.Version)
 				}
 			}
+			return nil
 		}
 	}
 }
@@ -263,14 +238,13 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	// give some time for the final messages to come through, if there's any lingering responses.
 	time.Sleep(3 * time.Second)
 	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", len(stream.Cache.Requests), len(stream.Cache.Responses))
-	if len(stream.Cache.Requests) <= len(stream.Cache.Responses) {
+		Msgf("Request Count: %v Response Count: %v", r.Validate.RequestCount, r.Validate.ResponseCount)
+	if r.Validate.RequestCount <= r.Validate.ResponseCount {
 		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
 		return err
 	}
 	return nil
 }
-
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
 	log.Debug().
@@ -334,76 +308,74 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
-	err, typeURL := parser.ServiceToTypeURL(service)
+	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
+	current := r.Validate.Resources[typeUrl][resource]
 
 	request := &discovery.DiscoveryRequest{
-		VersionInfo:   lastResponse.VersionInfo,
+		VersionInfo:   current.Version,
 		ResourceNames: []string{resource},
-		TypeUrl:       typeURL,
-		ResponseNonce: lastResponse.Nonce,
+		TypeUrl:       typeUrl,
+		ResponseNonce: current.Nonce,
+	}
+
+	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
+	r.Validate.Resources[typeUrl][resource] = ValidateResource{
+		Version: current.Version,
+		Nonce:   current.Nonce,
 	}
 	r.SubscribeRequest = request
-	log.Debug().
-		Msgf("Sending Request To Update Subscription: %v", request)
+
+	log.Debug().Msgf("Sending Request To Update Subscription: %v", request)
 	r.Service.Channels.Req <- request
 	return nil
 }
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
-	// version := r.Cache.StartState.Version
 	err, typeURL := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
 
-	lastResponse := r.Service.Cache.Responses[len(r.Service.Cache.Responses) - 1]
-
+	// we just need a nonce to tell the server we are up to dote and this is a new
+	// subscription request. Simple way to grab one from the list of 4.
+	var lastNonce string
+	for _, v := range r.Validate.Resources[typeURL] {
+		lastNonce = v.Nonce
+	}
 	request := &discovery.DiscoveryRequest{
-		VersionInfo:   lastResponse.VersionInfo,
 		ResourceNames: []string{""},
 		TypeUrl:       typeURL,
-		ResponseNonce: lastResponse.Nonce,
+		ResponseNonce: lastNonce,
 	}
+	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
 	r.SubscribeRequest = request
 	log.Debug().
 		Msgf("Sending unsubscribe request: %v", request)
 	r.Service.Channels.Req <- request
-	log.Debug().Msg("Pausing for 2 seconds, to ensure server receives unsubscribe test.")
-	time.Sleep(2 *time.Second)
-	log.Debug().Msg("Should now be good to update server")
 	return nil
 }
 
 func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	done := time.After(3 * time.Second)
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
 			return err
-		default:
-			if len(r.Service.Cache.Responses) > 0 {
-				for _, response := range r.Service.Cache.Responses {
-					currentState := r.Cache.StateSnapshots[len(r.Cache.StateSnapshots)-1]
-					if response.VersionInfo != currentState.Version {
-						continue
-					}
-					// a matching version with no resources implies that it responded
-					// correctly to an unsubscribe request?
-					// if len(response.Resources) == 0 {
-					// 	return nil
-					// }
-					err := errors.New("Received a response when we expected no response")
-					log.Err(err).
-						Msgf("Response: %v", response)
-					return err
-				}
+		case <-done:
+			if len(r.Validate.Resources[typeUrl]) > 0 {
+				return fmt.Errorf("Resources received is greater than 0: %v", r.Validate.Resources[typeUrl])
 			}
+			return nil
 		}
 	}
 }
@@ -419,4 +391,26 @@ func resourcesMatch(expected []string, actual []string) bool {
 		}
 	}
 	return true
+}
+
+func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, version, service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	expected := strings.Split(resources, ",")
+	actual := r.Validate.Resources[typeUrl]
+
+	responses := make(map[string]bool)
+	for _, resource := range expected {
+		info, ok := actual[resource]
+		if !ok || info.Version != version {
+			return fmt.Errorf("Could not find correct resource in validation struct. This is rare; perhaps recheck how the test was written.")
+		}
+		responses[info.Nonce] = true
+	}
+	if len(responses) != 1 {
+		return fmt.Errorf("Resources came via multiple responses. This is not conformant for CDS and  LDS tests")
+	}
+	return nil
 }

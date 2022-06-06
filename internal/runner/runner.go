@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/ii/xds-test-harness/api/adapter"
+	"github.com/ii/xds-test-harness/internal/parser"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -34,14 +35,35 @@ type Cache struct {
 	FinalResponse  *discovery.DiscoveryResponse
 }
 
+type ValidateResource struct {
+	Version string
+	Nonce   string
+}
+
+type Validate struct {
+	RequestCount  int
+	ResponseCount int
+	Resources     map[string]map[string]ValidateResource
+}
+
+func NewValidate() *Validate {
+	resources := make(map[string]map[string]ValidateResource)
+	return &Validate{
+		RequestCount:  0,
+		ResponseCount: 0,
+		Resources:     resources,
+	}
+}
+
 type Runner struct {
-	Adapter    *ClientConfig
-	Target     *ClientConfig
-	NodeID     string
-	Cache      *Cache
-	Aggregated bool
-	Service    *XDSService
+	Adapter          *ClientConfig
+	Target           *ClientConfig
+	NodeID           string
+	Cache            *Cache
+	Aggregated       bool
+	Service          *XDSService
 	SubscribeRequest *discovery.DiscoveryRequest
+	Validate         *Validate
 }
 
 func FreshRunner(current ...*Runner) *Runner {
@@ -60,6 +82,8 @@ func FreshRunner(current ...*Runner) *Runner {
 
 	}
 
+	validate := NewValidate()
+
 	return &Runner{
 		Adapter:    adapter,
 		Target:     target,
@@ -67,6 +91,7 @@ func FreshRunner(current ...*Runner) *Runner {
 		Cache:      &Cache{},
 		Service:    &XDSService{},
 		Aggregated: aggregated,
+		Validate:   validate,
 	}
 }
 
@@ -93,16 +118,16 @@ func (r *Runner) ConnectClient(server, address string) error {
 
 func (r *Runner) Ack(service *XDSService) {
 	service.Channels.Req <- r.SubscribeRequest
-	service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
+	// service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
 	for {
 		select {
 		case res := <-service.Channels.Res:
-			service.Cache.Responses = append(service.Cache.Responses, res)
+			// service.Cache.Responses = append(service.Cache.Responses, res)
 			ack := newAckFromResponse(res, r.SubscribeRequest)
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
-			service.Cache.Requests = append(service.Cache.Requests, ack)
+			// service.Cache.Requests = append(service.Cache.Requests, ack)
 		case <-service.Channels.Done:
 			log.Debug().
 				Msg("Received Done signal, shutting down request channel")
@@ -134,6 +159,20 @@ func (r *Runner) Stream(service *XDSService) error {
 			}
 			log.Debug().
 				Msgf("Received discovery response: %v", in)
+
+			resources, err := parser.ResourceNames(in)
+			if err != nil {
+				log.Err(err).Msg("Could not gather resource names from response")
+				service.Channels.Err <- err
+				return
+			}
+			for _, resource := range resources {
+				r.Validate.Resources[in.TypeUrl][resource] = ValidateResource{
+					Version: in.VersionInfo,
+					Nonce:   in.Nonce,
+				}
+			}
+			r.Validate.ResponseCount++
 			service.Channels.Res <- in
 		}
 	}()
@@ -144,6 +183,7 @@ func (r *Runner) Stream(service *XDSService) error {
 				Msg("Error sending discovery request")
 			service.Channels.Err <- err
 		}
+		r.Validate.RequestCount++
 	}
 	service.Stream.CloseSend()
 	wg.Wait()
@@ -161,15 +201,17 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 	return conn, nil
 }
 
-
-func newAckFromResponse(res *discovery.DiscoveryResponse, initReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
+// Using the last response and current subscribing request, create a new DiscoveryRequest to ACK that response.
+// We use the current subscribing request for the cases where the client is subscribing to A,B,C but only A,B
+// exist.  In that case, we want to ack that we've received A,B but that we are STILL subscribing to A,B,C.
+func newAckFromResponse(res *discovery.DiscoveryResponse, subscribingReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
 	request := &discovery.DiscoveryRequest{
 		VersionInfo:   res.VersionInfo,
-		ResourceNames: initReq.ResourceNames,
-		TypeUrl:       initReq.TypeUrl,
+		ResourceNames: subscribingReq.ResourceNames,
+		TypeUrl:       subscribingReq.TypeUrl,
 		ResponseNonce: res.Nonce,
 	}
 	return request
@@ -185,5 +227,3 @@ func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.Disco
 		TypeUrl:       typeURL,
 	}
 }
-
-
