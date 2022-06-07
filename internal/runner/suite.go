@@ -29,6 +29,7 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner = FreshRunner()
 	s.Runner.NodeID = node
 	s.Runner.Aggregated = s.Aggregated
+	s.Runner.Incremental = s.Incremental
 
 	if err := s.Runner.ConnectClient("target", target); err != nil {
 		return fmt.Errorf("Cannot connect to target: %v", err)

@@ -14,6 +14,8 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+	any "google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
@@ -61,17 +63,19 @@ type Runner struct {
 	NodeID           string
 	Cache            *Cache
 	Aggregated       bool
+	Incremental      bool
 	Service          *XDSService
-	SubscribeRequest *discovery.DiscoveryRequest
+	SubscribeRequest *any.Any
 	Validate         *Validate
 }
 
 func FreshRunner(current ...*Runner) *Runner {
 	var (
-		adapter    = &ClientConfig{}
-		target     = &ClientConfig{}
-		nodeID     = ""
-		aggregated = false
+		adapter     = &ClientConfig{}
+		target      = &ClientConfig{}
+		nodeID      = ""
+		aggregated  = false
+		incremental = false
 	)
 
 	if len(current) > 0 {
@@ -79,19 +83,21 @@ func FreshRunner(current ...*Runner) *Runner {
 		target = current[0].Target
 		nodeID = current[0].NodeID
 		aggregated = current[0].Aggregated
+		incremental = current[0].Incremental
 
 	}
 
 	validate := NewValidate()
 
 	return &Runner{
-		Adapter:    adapter,
-		Target:     target,
-		NodeID:     nodeID,
-		Cache:      &Cache{},
-		Service:    &XDSService{},
-		Aggregated: aggregated,
-		Validate:   validate,
+		Adapter:     adapter,
+		Target:      target,
+		NodeID:      nodeID,
+		Cache:       &Cache{},
+		Service:     &XDSService{},
+		Aggregated:  aggregated,
+		Incremental: incremental,
+		Validate:    validate,
 	}
 }
 
@@ -118,12 +124,10 @@ func (r *Runner) ConnectClient(server, address string) error {
 
 func (r *Runner) Ack(service *XDSService) {
 	service.Channels.Req <- r.SubscribeRequest
-	// service.Cache.Requests = append(service.Cache.Requests, r.SubscribeRequest)
 	for {
 		select {
 		case res := <-service.Channels.Res:
-			dr := res.(*discovery.DiscoveryResponse)
-			ack := newAckFromResponse(dr, r.SubscribeRequest)
+			ack, _ := r.newAckFromResponse(res)
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
@@ -136,12 +140,13 @@ func (r *Runner) Ack(service *XDSService) {
 	}
 }
 
-func (r *Runner) Stream(service *XDSService) error {
+func (r *Runner) SotwStream(service *XDSService) {
 	sotw := service.Sotw
 	ch := service.Channels
 	defer sotw.Context.cancel()
 	defer close(service.Channels.Err)
 
+	// Our Response loop
 	var wg sync.WaitGroup
 	go func() {
 		for {
@@ -154,6 +159,7 @@ func (r *Runner) Stream(service *XDSService) error {
 				return
 			}
 			if err != nil {
+				log.Debug().Err(err)
 				ch.Err <- err
 				return
 			}
@@ -162,8 +168,7 @@ func (r *Runner) Stream(service *XDSService) error {
 
 			resources, err := parser.ResourceNames(in)
 			if err != nil {
-				log.Err(err).Msg("Could not gather resource names from response")
-				ch.Err <- err
+				ch.Err <- fmt.Errorf("Could not gather resource names from response: %v", err)
 				return
 			}
 			for _, resource := range resources {
@@ -173,22 +178,104 @@ func (r *Runner) Stream(service *XDSService) error {
 				}
 			}
 			r.Validate.ResponseCount++
-			ch.Res <- in
+			res, err := any.New(in)
+			if err != nil {
+				ch.Err <- err
+			}
+			ch.Res <- res
 		}
 	}()
 
+	// Our requests loop
 	for req := range service.Channels.Req {
-		dr := req.(*discovery.DiscoveryRequest)
-		if err := sotw.Stream.Send(dr); err != nil {
-			log.Err(err).
-				Msg("Error sending discovery request")
-			service.Channels.Err <- err
+		var dr discovery.DiscoveryRequest
+		if err := req.UnmarshalTo(&dr); err != nil {
+			service.Channels.Err <- fmt.Errorf("Error unmarshalling from request channel: %v", err)
+			return
+		}
+		if err := sotw.Stream.Send(&dr); err != nil {
+			log.Debug().Msgf("error sending: %v", err)
+			service.Channels.Err <- fmt.Errorf("Error sending discovery request: %v", err)
 		}
 		r.Validate.RequestCount++
 	}
 	sotw.Stream.CloseSend()
 	wg.Wait()
-	return nil
+}
+
+// Bidirectioinal stream between client and server. Listens for any
+// responses from server and sends them along the response channel.
+// Listens to new requests from the request channel and sends them along to the server.
+func (r *Runner) DeltaStream(service *XDSService) {
+	delta := service.Delta
+	ch := service.Channels
+	defer delta.Context.cancel()
+	defer close(service.Channels.Err)
+
+	// Our response loop
+	var wg sync.WaitGroup
+	go func() {
+		for {
+			wg.Add(1)
+			in, err := delta.Stream.Recv()
+			if err == io.EOF {
+				log.Debug().
+					Msgf("[Delta] No more Discovery Responses from %v stream", r.Service.Name)
+				close(ch.Res)
+				return
+			}
+			if err != nil {
+				ch.Err <- fmt.Errorf("[Delta] Error receiving discovery response: %v", err)
+				return
+			}
+			log.Debug().
+				Msgf("[Delta] Received discovery response: %v", in)
+
+			resources := []string{}
+			for _, resource := range in.GetResources() {
+				resources = append(resources, resource.Name)
+			}
+			if err != nil {
+				ch.Err <- fmt.Errorf("Could not gather resource names from response: %v", err)
+				return
+			}
+			for _, resource := range resources {
+				r.Validate.Resources[in.TypeUrl][resource] = ValidateResource{
+					Version: in.SystemVersionInfo,
+					Nonce:   in.Nonce,
+				}
+			}
+			r.Validate.ResponseCount++
+			res, err := any.New(in)
+			if err != nil {
+				ch.Err <- err
+			}
+			ch.Res <- res
+		}
+	}()
+
+	// Our request loop
+	for req := range service.Channels.Req {
+		var request discovery.DeltaDiscoveryRequest
+		if err := req.UnmarshalTo(&request); err != nil {
+			service.Channels.Err <- fmt.Errorf("[Delta] Error unmarshalling request from anypb message: %v", err)
+		}
+		if err := delta.Stream.Send(&request); err != nil {
+			service.Channels.Err <- fmt.Errorf("[Delta] Error sending discovery request: %v", err)
+		}
+		r.Validate.RequestCount++
+	}
+	delta.Stream.CloseSend()
+	wg.Wait()
+	return
+}
+
+func (r *Runner) Stream(service *XDSService) {
+	if r.Incremental {
+		r.DeltaStream(service)
+	} else {
+		r.SotwStream(service)
+	}
 }
 
 func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn, err error) {
@@ -205,26 +292,63 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 // Using the last response and current subscribing request, create a new DiscoveryRequest to ACK that response.
 // We use the current subscribing request for the cases where the client is subscribing to A,B,C but only A,B
 // exist.  In that case, we want to ack that we've received A,B but that we are STILL subscribing to A,B,C.
-func newAckFromResponse(res *discovery.DiscoveryResponse, subscribingReq *discovery.DiscoveryRequest) *discovery.DiscoveryRequest {
+func (r *Runner) newAckFromResponse(res *anypb.Any) (*anypb.Any, error) {
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
-	request := &discovery.DiscoveryRequest{
-		VersionInfo:   res.VersionInfo,
-		ResourceNames: subscribingReq.ResourceNames,
-		TypeUrl:       subscribingReq.TypeUrl,
-		ResponseNonce: res.Nonce,
+	if r.Incremental {
+		var response discovery.DeltaDiscoveryResponse
+		if err := res.UnmarshalTo(&response); err != nil {
+			return nil, err
+		}
+		request := &discovery.DeltaDiscoveryRequest{
+			TypeUrl:       response.TypeUrl,
+			ResponseNonce: response.Nonce,
+		}
+		ack, err := any.New(request)
+		return ack, err
+	} else {
+		var sub discovery.DiscoveryRequest
+		var response discovery.DiscoveryResponse
+		if err := r.SubscribeRequest.UnmarshalTo(&sub); err != nil {
+			return nil, err
+		}
+		if err := res.UnmarshalTo(&response); err != nil {
+			return nil, err
+		}
+		request := &discovery.DiscoveryRequest{
+			VersionInfo:   response.VersionInfo,
+			ResourceNames: sub.ResourceNames,
+			TypeUrl:       sub.TypeUrl,
+			ResponseNonce: response.Nonce,
+		}
+		ack, err := any.New(request)
+		if err != nil {
+			return nil, err
+		}
+		return ack, err
 	}
-	return request
 }
 
-func newRequest(resourceNames []string, typeURL, nodeID string) *discovery.DiscoveryRequest {
-	return &discovery.DiscoveryRequest{
-		VersionInfo: "",
-		Node: &core.Node{
-			Id: nodeID,
-		},
-		ResourceNames: resourceNames,
-		TypeUrl:       typeURL,
+func (r *Runner) newRequest(resourceNames []string, typeURL string) *anypb.Any {
+	if r.Incremental {
+		request := &discovery.DeltaDiscoveryRequest{
+			Node:                   &core.Node{Id: r.NodeID},
+			TypeUrl:                typeURL,
+			ResourceNamesSubscribe: resourceNames,
+		}
+		any, _ := any.New(request)
+		return any
+	} else {
+		request := &discovery.DiscoveryRequest{
+			VersionInfo: "",
+			Node: &core.Node{
+				Id: r.NodeID,
+			},
+			ResourceNames: resourceNames,
+			TypeUrl:       typeURL,
+		}
+		any, _ := any.New(request)
+		return any
 	}
 }

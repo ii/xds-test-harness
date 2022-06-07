@@ -10,6 +10,7 @@ import (
 	lds "github.com/envoyproxy/go-control-plane/envoy/service/listener/v3"
 	rds "github.com/envoyproxy/go-control-plane/envoy/service/route/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 const (
@@ -17,8 +18,8 @@ const (
 )
 
 type Channels struct {
-	Req  chan interface{} // will be a discoveryRequest or a deltaDiscoveryRequest
-	Res  chan interface{} // will be a discoveryResponse or a deltadiscoveryResponse
+	Req  chan *anypb.Any // will be a discoveryRequest or a deltaDiscoveryRequest
+	Res  chan *anypb.Any // will be a discoveryResponse or a deltadiscoveryResponse
 	Err  chan error
 	Done chan bool
 }
@@ -73,8 +74,8 @@ type LDSBuilder struct {
 
 func (b *LDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan interface{}, 2),
-		Res:  make(chan interface{}, 2),
+		Req:  make(chan *anypb.Any, 2),
+		Res:  make(chan *anypb.Any, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
@@ -134,8 +135,8 @@ type CDSBuilder struct {
 
 func (b *CDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan interface{}, 2),
-		Res:  make(chan interface{}, 2),
+		Req:  make(chan *anypb.Any, 2),
+		Res:  make(chan *anypb.Any, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
@@ -195,8 +196,8 @@ type RDSBuilder struct {
 
 func (b *RDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan interface{}, 2),
-		Res:  make(chan interface{}, 2),
+		Req:  make(chan *anypb.Any, 2),
+		Res:  make(chan *anypb.Any, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
@@ -256,8 +257,8 @@ type EDSBuilder struct {
 
 func (b *EDSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan interface{}, 2),
-		Res:  make(chan interface{}, 2),
+		Req:  make(chan *anypb.Any, 2),
+		Res:  make(chan *anypb.Any, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}
@@ -317,8 +318,8 @@ type ADSBuilder struct {
 
 func (b *ADSBuilder) openChannels() {
 	b.Channels = &Channels{
-		Req:  make(chan interface{}, 2),
-		Res:  make(chan interface{}, 2),
+		Req:  make(chan *anypb.Any, 2),
+		Res:  make(chan *anypb.Any, 2),
 		Err:  make(chan error, 2),
 		Done: make(chan bool),
 	}

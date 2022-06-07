@@ -14,6 +14,7 @@ import (
 	parser "github.com/ii/xds-test-harness/internal/parser"
 	utils "github.com/ii/xds-test-harness/internal/utils"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
@@ -138,8 +139,9 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	}
 
 	// check if we are updating existing stream or starting a new one.
-	if r.Service.Sotw != nil {
-		request := newRequest(resources, typeUrl, r.NodeID)
+	if (!r.Incremental && r.Service.Sotw != nil) ||
+		(r.Incremental && r.Service.Delta != nil) {
+		request := r.newRequest(resources, typeUrl)
 		r.Service.Channels.Req <- request
 		log.Debug().
 			Msgf("Sent new subscribing request: %v\n", request)
@@ -152,17 +154,22 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 			builder = getBuilder(srv)
 		}
 		builder.openChannels()
-		err := builder.setSotwStream(r.Target.Conn)
-		if err != nil {
-			return err
+		if r.Incremental {
+			err := builder.setDeltaStream(r.Target.Conn)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := builder.setSotwStream(r.Target.Conn)
+			if err != nil {
+				return err
+			}
 		}
 		r.Service = builder.getService(srv)
-
-		request := newRequest(resources, typeUrl, r.NodeID)
+		request := r.newRequest(resources, typeUrl)
 		r.SubscribeRequest = request
-
 		log.Debug().
-			Msgf("Sending first subscribing request: %v\n", request)
+			Msgf("Sending first subscribing request: %v\n", request.String())
 		go r.Stream(r.Service)
 		go r.Ack(r.Service)
 		return nil
@@ -322,16 +329,17 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 		TypeUrl:       typeUrl,
 		ResponseNonce: current.Nonce,
 	}
+	any, _ := anypb.New(request)
 
 	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
 	r.Validate.Resources[typeUrl][resource] = ValidateResource{
 		Version: current.Version,
 		Nonce:   current.Nonce,
 	}
-	r.SubscribeRequest = request
+	r.SubscribeRequest = any
 
 	log.Debug().Msgf("Sending Request To Update Subscription: %v", request)
-	r.Service.Channels.Req <- request
+	r.Service.Channels.Req <- any
 	return nil
 }
 
@@ -354,10 +362,11 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 		ResponseNonce: lastNonce,
 	}
 	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
-	r.SubscribeRequest = request
+	any, _ := anypb.New(request)
+	r.SubscribeRequest = any
 	log.Debug().
-		Msgf("Sending unsubscribe request: %v", request)
-	r.Service.Channels.Req <- request
+		Msgf("Sending unsubscribe request: %v", request.String())
+	r.Service.Channels.Req <- any
 	return nil
 }
 
