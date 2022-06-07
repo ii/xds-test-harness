@@ -122,12 +122,11 @@ func (r *Runner) Ack(service *XDSService) {
 	for {
 		select {
 		case res := <-service.Channels.Res:
-			// service.Cache.Responses = append(service.Cache.Responses, res)
-			ack := newAckFromResponse(res, r.SubscribeRequest)
+			dr := res.(*discovery.DiscoveryResponse)
+			ack := newAckFromResponse(dr, r.SubscribeRequest)
 			log.Debug().
 				Msgf("Sending Ack: %v", ack)
 			service.Channels.Req <- ack
-			// service.Cache.Requests = append(service.Cache.Requests, ack)
 		case <-service.Channels.Done:
 			log.Debug().
 				Msg("Received Done signal, shutting down request channel")
@@ -138,23 +137,24 @@ func (r *Runner) Ack(service *XDSService) {
 }
 
 func (r *Runner) Stream(service *XDSService) error {
-	defer service.Context.cancel()
+	sotw := service.Sotw
+	ch := service.Channels
+	defer sotw.Context.cancel()
 	defer close(service.Channels.Err)
 
 	var wg sync.WaitGroup
 	go func() {
 		for {
 			wg.Add(1)
-			in, err := service.Stream.Recv()
+			in, err := sotw.Stream.Recv()
 			if err == io.EOF {
 				log.Debug().
 					Msgf("No more Discovery Responses from %v stream", r.Service.Name)
-				close(service.Channels.Res)
+				close(ch.Res)
 				return
 			}
 			if err != nil {
-				log.Err(err).Msgf("error receiving responses on %v stream", r.Service.Name)
-				service.Channels.Err <- err
+				ch.Err <- err
 				return
 			}
 			log.Debug().
@@ -163,7 +163,7 @@ func (r *Runner) Stream(service *XDSService) error {
 			resources, err := parser.ResourceNames(in)
 			if err != nil {
 				log.Err(err).Msg("Could not gather resource names from response")
-				service.Channels.Err <- err
+				ch.Err <- err
 				return
 			}
 			for _, resource := range resources {
@@ -173,19 +173,20 @@ func (r *Runner) Stream(service *XDSService) error {
 				}
 			}
 			r.Validate.ResponseCount++
-			service.Channels.Res <- in
+			ch.Res <- in
 		}
 	}()
 
 	for req := range service.Channels.Req {
-		if err := service.Stream.Send(req); err != nil {
+		dr := req.(*discovery.DiscoveryRequest)
+		if err := sotw.Stream.Send(dr); err != nil {
 			log.Err(err).
 				Msg("Error sending discovery request")
 			service.Channels.Err <- err
 		}
 		r.Validate.RequestCount++
 	}
-	service.Stream.CloseSend()
+	sotw.Stream.CloseSend()
 	wg.Wait()
 	return nil
 }

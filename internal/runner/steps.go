@@ -138,7 +138,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	}
 
 	// check if we are updating existing stream or starting a new one.
-	if r.Service.Stream != nil {
+	if r.Service.Sotw != nil {
 		request := newRequest(resources, typeUrl, r.NodeID)
 		r.Service.Channels.Req <- request
 		log.Debug().
@@ -152,7 +152,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 			builder = getBuilder(srv)
 		}
 		builder.openChannels()
-		err := builder.setStream(r.Target.Conn)
+		err := builder.setSotwStream(r.Target.Conn)
 		if err != nil {
 			return err
 		}
