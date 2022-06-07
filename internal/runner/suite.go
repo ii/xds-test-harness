@@ -38,7 +38,7 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 		return fmt.Errorf("Cannot connect to adapter: %v", err)
 	}
 	log.Info().
-		Msgf("Connected to target at %s and adapter at %s\n", target, adapter)
+		Msgf("Connected to target at %s and adapter at %s", target, adapter)
 
 	if s.Runner.Aggregated {
 		log.Info().
