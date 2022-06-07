@@ -51,7 +51,7 @@ Feature: Subscribing to Resources
       | "LDS" | "D,E,F"   | "G" | "D,E,F,G" | "1" | "2" |
 
 
-  @sotw @non-aggregated @aggregated
+  @sotw @incremental @non-aggregated @aggregated
   Scenario Outline: [<xDS>]  When subscribing to specific resources, receive only these resources
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <subset> for <xDS>
