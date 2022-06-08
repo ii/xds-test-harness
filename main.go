@@ -55,7 +55,7 @@ func main() {
 	var results types.Results
 	for _, variant := range supportedVariants {
 		log.Info().
-			Msgf("Starting Tests for %v\n", string(variant))
+			Msgf("Starting Tests for %v", string(variant))
 
 		suite := runner.NewSuite(variant, *testWriting)
 		if err = suite.StartRunner(*nodeID, *adapterAddress, *targetAddress); err != nil {

@@ -80,8 +80,30 @@ message clearResponse {
   string response = 1;
 }
 
+message ResourceRequest {
+  string node = 1;
+  string typeUrl = 2;
+  string resourceName = 3;
+  string version = 4;
+}
+
+message UpdateResourceResponse {
+  bool success = 1;
+}
+
+message AddResourceResponse {
+  bool success = 1;
+}
+
+message RemoveResourceResponse {
+  bool success = 1;
+}
+
 service Adapter {
   rpc SetState(Snapshot) returns (SetStateResponse){}
   rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
   rpc ClearState(clearRequest) returns (clearResponse) {}
+  rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
+  rpc AddResource(ResourceRequest) returns (AddResourceResponse) {}
+  rpc RemoveResource(ResourceRequest) returns (RemoveResourceResponse) {}
 }
