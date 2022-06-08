@@ -91,9 +91,14 @@ message UpdateResourceResponse {
   bool success = 1;
 }
 
+message AddResourceResponse {
+  bool success = 1;
+}
+
 service Adapter {
   rpc SetState(Snapshot) returns (SetStateResponse){}
   rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
   rpc ClearState(clearRequest) returns (clearResponse) {}
   rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
+  rpc AddResource(ResourceRequest) returns (AddResourceResponse) {}
 }
