@@ -38,6 +38,7 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same version or nonce$`, r.NoOtherResourceHasSameVersionOrNonce)
+	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same nonce$`, r.NoOtherResourceHasSameNonce)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -255,63 +256,25 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 }
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
-	log.Debug().
-		Msgf("Adding %v to %v service", resource, service)
-
-	snapshot := r.Cache.StartState
-	snapshot.Version = version
-
-	//Set endpoints
-	endpoints := snapshot.GetEndpoints()
-	endpoints.Items = append(endpoints.Items, &pb.Endpoint{
-		Name:    resource,
-		Cluster: resource,
-		Address: parser.RandomAddress(),
-	})
-	snapshot.Endpoints = endpoints
-
-	//Set clusters
-	clusters := snapshot.GetClusters()
-	clusters.Items = append(clusters.Items, &pb.Cluster{
-		Name:           resource,
-		ConnectTimeout: map[string]int32{"seconds": 5},
-	})
-	snapshot.Clusters = clusters
-
-	//Set Routes
-	routes := snapshot.GetRoutes()
-	routes.Items = append(routes.Items, &pb.Route{
-		Name: resource,
-	})
-	snapshot.Routes = routes
-
-	//Set listeners
-	listeners := snapshot.GetListeners()
-	listeners.Items = append(listeners.Items, &pb.Listener{
-		Name:    resource,
-		Address: parser.RandomAddress(),
-	})
-
-	//Set runtimes
-	runtimes := snapshot.GetRuntimes()
-	runtimes.Items = append(runtimes.Items, &pb.Runtime{
-		Name: resource,
-	})
-	snapshot.Runtimes = runtimes
-
-	c := pb.NewAdapterClient(r.Adapter.Conn)
-
-	_, err := c.UpdateState(context.Background(), snapshot)
+	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
-		msg := "Cannot update target with given state"
-		log.Error().
-			Err(err).
-			Msg(msg)
-		return errors.New(msg)
+		return err
 	}
 
-	r.Cache.StateSnapshots = append(r.Cache.StateSnapshots, snapshot)
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeUrl:      typeUrl,
+		ResourceName: resource,
+		Version:      version,
+	}
 
+	_, err = c.AddResource(context.Background(), in)
+	if err != nil {
+		return fmt.Errorf("Cannot add resource using adapter: %v", err)
+	}
+	log.Debug().
+		Msgf("Adding resource %v with version %v", resource, version)
 	return nil
 }
 
@@ -462,6 +425,23 @@ func (r *Runner) NoOtherResourceHasSameVersionOrNonce(service, resource string) 
 			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
 		} else if v.Version == chosen.Version {
 			return fmt.Errorf("Found other resource with same version: %v", r)
+		}
+	}
+	return nil
+}
+
+func (r *Runner) NoOtherResourceHasSameNonce(service, resource string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	resources := r.Validate.Resources[typeUrl]
+	chosen := resources[resource]
+	for r, v := range resources {
+		if r == resource {
+			continue
+		} else if v.Nonce == chosen.Nonce {
+			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
 		}
 	}
 	return nil
