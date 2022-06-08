@@ -96,7 +96,7 @@ Feature: Delta
      | "RDS"   | "D,E"     | "E" | "D" | "1" | "2" |
      | "EDS"   | "D,E"     | "E" | "D" | "1" | "2" |
 
-  @incremental @aggregated @zz
+  @incremental @aggregated
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
      When the Client subscribes to resources <r1> for <xDS>

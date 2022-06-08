@@ -35,7 +35,7 @@ Feature: Unsubscribing to Resources
     When the Client updates subscription to a resource(<r1>) of <xDS> with version <v1>
     And the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives only the resource <r1> and version <v2> for the service <xDS>
-    And the Client sends an ACK to which the <xDS> does not respond
+    And the service never responds more than necessary
 
     Examples:
       | xDS   | resources | subset | r1  | v1  | v2  |
