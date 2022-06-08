@@ -535,7 +535,7 @@ func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, servic
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
-	done := time.After(3 * time.Second)
+	done := time.After(15 * time.Second)
 	for {
 		select {
 		case err := <-stream.Channels.Err:
