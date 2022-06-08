@@ -366,6 +366,46 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 	return response, nil
 }
 
+func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceRequest) (*pb.AddResourceResponse, error) {
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []types.Resource{}
+	for _, res := range snapshot.GetResources(request.TypeUrl) {
+		resources = append(resources, res)
+	}
+
+	switch request.TypeUrl {
+	case TypeUrlCDS:
+		newResource := MakeCluster(request.ResourceName, request.Node)
+		resources = append(resources, newResource)
+		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
+	case TypeUrlLDS:
+		address := fmt.Sprintf("https://%viscool.resources.com", request.ResourceName)
+		newResource := makeListener(request.ResourceName, address, 11223, []*listener.FilterChain{})
+		resources = append(resources, newResource)
+		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
+	case TypeUrlRDS:
+		newResource := MakeRoute(request.ResourceName, request.ResourceName)
+		resources := append(resources, newResource)
+		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
+	case TypeUrlEDS:
+		address := fmt.Sprintf("https://%viscool.endpoints.com", request.ResourceName)
+		newResource := MakeEndpoint(request.ResourceName, address, 10000)
+		resources := append(resources, newResource)
+		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+	fmt.Println("Added Resource: ", request)
+	response := &pb.AddResourceResponse{Success: true}
+	return response, nil
+}
+
 func RunAdapter(port uint, cache cache.SnapshotCache) {
 	xdsCache = cache
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
