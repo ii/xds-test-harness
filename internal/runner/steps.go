@@ -17,29 +17,32 @@ import (
 )
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
+	// setting state
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithServiceResourcesAndVersion)
+	// client subscriptions
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.ClientDoesAWildcardSubscriptionToService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
+	ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
+	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
+	ctx.Step(`^the Client unsubscribes from resource "([^"]*)" for service "([^"]*)"$`, r.ClientUnsubscribesFromResourceForService)
+	// receiving resources
 	ctx.Step(`^the Client receives the resources "([^"]*)" and version "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the Client receives only the resource "([^"]*)" and version "([^"]*)" for the service "([^"]*)"$`, r.ClientReceivesOnlyTheResourceAndVersionForTheService)
 	ctx.Step(`^the Client does not receive any message from "([^"]*)"$`, r.ClientDoesNotReceiveAnyMessageFromService)
-	ctx.Step(`^the resources "([^"]*)" and version "([^"]*)" for "([^"]*)" came in a single response$`, r.ResourcesAndVersionForServiceCameInASingleResponse)
-	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
+	ctx.Step(`^the Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.ClientReceivesNoticeThatResourceWasRemovedForService)
+	ctx.Step(`^the client does not receive resource "([^"]*)" of service "([^"]*)" at version "([^"]*)"$`, r.ClientDoesNotReceiveResourceOfServiceAtVersion)
+	// resources are added or updated
 	ctx.Step(`^the resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^a resource "([^"]*)" is added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
 	ctx.Step(`^the resources "([^"]*)" are added to the "([^"]*)" with version "([^"]*)"$`, r.ResourceIsAddedToServiceWithVersion)
-	ctx.Step(`^the Client updates subscription to a resource\("([^"]*)"\) of "([^"]*)" with version "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion)
-	ctx.Step(`^the Client updates subscription to a "([^"]*)" of "([^"]*)" with "([^"]*)"$`, r.ClientUpdatesSubscriptionToAResourceForServiceWithVersion) // delete?
-	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
-	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
-	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
+	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
+	// misc. client server validation
+	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+	ctx.Step(`^the resources "([^"]*)" and version "([^"]*)" for "([^"]*)" came in a single response$`, r.ResourcesAndVersionForServiceCameInASingleResponse)
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same version or nonce$`, r.NoOtherResourceHasSameVersionOrNonce)
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same nonce$`, r.NoOtherResourceHasSameNonce)
-	ctx.Step(`^the Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.ClientReceivesNoticeThatResourceWasRemovedForService)
-	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
-	ctx.Step(`^the client does not receive resource "([^"]*)" of service "([^"]*)" at version "([^"]*)"$`, r.ClientDoesNotReceiveResourceOfServiceAtVersion)
-	ctx.Step(`^the Client unsubscribes from resource "([^"]*)" for service "([^"]*)"$`, r.ClientUnsubscribesFromResourceForService)
+	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
