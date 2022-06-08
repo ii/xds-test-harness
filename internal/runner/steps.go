@@ -41,6 +41,8 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same nonce$`, r.NoOtherResourceHasSameNonce)
 	ctx.Step(`^the Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.ClientReceivesNoticeThatResourceWasRemovedForService)
 	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
+	ctx.Step(`^the client does not receive resource "([^"]*)" of service "([^"]*)" at version "([^"]*)"$`, r.ClientDoesNotReceiveResourceOfServiceAtVersion)
+	ctx.Step(`^the Client unsubscribes from resource "([^"]*)" for service "([^"]*)"$`, r.ClientUnsubscribesFromResourceForService)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -501,4 +503,50 @@ func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error
 	log.Debug().
 		Msgf("Removing Resource %v", resource)
 	return nil
+}
+
+// A delta specific test, as delta can explicitly unsubscribe, whereas sotw can only update their subscription
+// set up a delta discovery request unsubscribing for given resource, and pass it along the channel.
+func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
+	request := &discovery.DeltaDiscoveryRequest{
+		TypeUrl:                  typeUrl,
+		ResourceNamesUnsubscribe: []string{resource},
+	}
+	any, _ := anypb.New(request)
+
+	delete(r.Validate.Resources[typeUrl], resource)
+	r.SubscribeRequest = any
+
+	log.Debug().Msgf("Sending Unsubscribe Request", request)
+	r.Service.Channels.Req <- any
+	return nil
+}
+
+func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, service, version string) error {
+	stream := r.Service
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	done := time.After(3 * time.Second)
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+		case <-done:
+			actual := r.Validate.Resources[typeUrl]
+			if actual, ok := actual[resource]; ok {
+				return fmt.Errorf("Was not expecting to find this resource, as we unsubscribed. This is non-conformant: %v", actual)
+
+			}
+			return nil
+		}
+	}
 }
