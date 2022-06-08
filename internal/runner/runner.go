@@ -43,17 +43,20 @@ type ValidateResource struct {
 }
 
 type Validate struct {
-	RequestCount  int
-	ResponseCount int
-	Resources     map[string]map[string]ValidateResource
+	RequestCount     int
+	ResponseCount    int
+	Resources        map[string]map[string]ValidateResource
+	RemovedResources map[string]map[string]ValidateResource
 }
 
 func NewValidate() *Validate {
 	resources := make(map[string]map[string]ValidateResource)
+	removed := make(map[string]map[string]ValidateResource)
 	return &Validate{
-		RequestCount:  0,
-		ResponseCount: 0,
-		Resources:     resources,
+		RequestCount:     0,
+		ResponseCount:    0,
+		Resources:        resources,
+		RemovedResources: removed,
 	}
 }
 
@@ -230,19 +233,18 @@ func (r *Runner) DeltaStream(service *XDSService) {
 			}
 			log.Debug().
 				Msgf("[Delta] Received discovery response: %v", in)
-
-			resources := []string{}
 			for _, resource := range in.GetResources() {
-				resources = append(resources, resource.Name)
-			}
-			if err != nil {
-				ch.Err <- fmt.Errorf("Could not gather resource names from response: %v", err)
-				return
-			}
-			for _, resource := range resources {
-				r.Validate.Resources[in.TypeUrl][resource] = ValidateResource{
+				r.Validate.Resources[in.TypeUrl][resource.Name] = ValidateResource{
 					Version: in.SystemVersionInfo,
 					Nonce:   in.Nonce,
+				}
+				if _, ok := r.Validate.RemovedResources[in.TypeUrl][resource.Name]; ok {
+					delete(r.Validate.RemovedResources[in.TypeUrl], resource.Name)
+				}
+			}
+			for _, removed := range in.GetRemovedResources() {
+				r.Validate.RemovedResources[in.TypeUrl][removed] = ValidateResource{
+					Nonce: in.Nonce,
 				}
 			}
 			r.Validate.ResponseCount++

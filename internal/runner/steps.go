@@ -136,6 +136,8 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 	}
 
 	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
+	// initiate a map for delta tests, in case we get any removed resource notifications
+	r.Validate.RemovedResources[typeUrl] = make(map[string]ValidateResource)
 	for _, resource := range resources {
 		r.Validate.Resources[typeUrl][resource] = ValidateResource{}
 	}
