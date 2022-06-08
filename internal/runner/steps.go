@@ -9,7 +9,6 @@ import (
 
 	"github.com/cucumber/godog"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	"github.com/ii/xds-test-harness/api/adapter"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	parser "github.com/ii/xds-test-harness/internal/parser"
 	utils "github.com/ii/xds-test-harness/internal/utils"
@@ -19,7 +18,6 @@ import (
 
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithServiceResourcesAndVersion)
-	ctx.Step(`^the resources "([^"]*)" of the "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfTheServiceIsUpdatedToNextVersion)
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.ClientDoesAWildcardSubscriptionToService)
 	ctx.Step(`^the Client subscribes to a subset of resources,"([^"]*)", for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
@@ -81,38 +79,6 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(service, resources, v
 	}
 
 	r.Cache.StartState = snapshot
-	return nil
-}
-
-// Uses existing snapshot to build new version.
-// All resources are updated to next version for convenience.
-// nothing changes about the resources themselves, but the new version
-// should still trigger a response.
-func (r *Runner) ResourceOfTheServiceIsUpdatedToNextVersion(resource, service, version string) error {
-	log.Debug().Msgf("Updated resource %v to version %v", resource, version)
-	snapshot := &adapter.Snapshot{
-		Version: version,
-	}
-	startState := r.Cache.StartState
-	snapshot.Node = startState.Node
-	snapshot.Endpoints = startState.Endpoints
-	snapshot.Clusters = startState.Clusters
-	snapshot.Routes = startState.Routes
-	snapshot.Listeners = startState.Listeners
-	snapshot.Runtimes = startState.Runtimes
-	snapshot.Secrets = startState.Secrets
-
-	c := pb.NewAdapterClient(r.Adapter.Conn)
-
-	_, err := c.UpdateState(context.Background(), snapshot)
-	if err != nil {
-		msg := "Cannot update target with given state"
-		log.Error().
-			Err(err).
-			Msg(msg)
-		return errors.New(msg)
-	}
-	r.Cache.StateSnapshots = append(r.Cache.StateSnapshots, snapshot)
 	return nil
 }
 

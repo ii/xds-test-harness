@@ -15,7 +15,7 @@ Feature: Unsubscribing to Resources
     When the Client subscribes to a subset of resources,<subset>, for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client updates subscription to a resource(<r1>) of <xDS> with version <v1>
-    And  the resources <r1> of the <xDS> is updated to version <v2>
+    And the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives the resources <r1> and version <v2> for <xDS>
     And the resources <r1> and version <v2> for <xDS> came in a single response
     And the service never responds more than necessary
@@ -33,7 +33,7 @@ Feature: Unsubscribing to Resources
     When the Client subscribes to a subset of resources,<subset>, for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client updates subscription to a resource(<r1>) of <xDS> with version <v1>
-    And the resources <r1> of the <xDS> is updated to version <v2>
+    And the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives only the resource <r1> and version <v2> for the service <xDS>
     And the Client sends an ACK to which the <xDS> does not respond
 
@@ -49,12 +49,12 @@ Feature: Unsubscribing to Resources
     When the Client subscribes to a subset of resources,<subset>, for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client unsubscribes from all resources for <xDS>
-    And the resources <subset> of the <xDS> is updated to version <v2>
+    And the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client does not receive any message from <xDS>
 
     Examples:
-      | xDS   | resources | subset | v1  | v2  |
-      | "CDS" | "A,B,C,D" | "A,B"  | "1" | "2" |
-      | "RDS" | "A,B,C,D" | "A,B"  | "1" | "2" |
-      | "LDS" | "A,B,C,D" | "A,B"  | "1" | "2" |
-      | "EDS" | "A,B,C,D" | "A,B"  | "1" | "2" |
+      | xDS   | resources | subset | r1  | v1  | v2  |
+      | "CDS" | "A,B,C,D" | "A,B"  | "B" | "1" | "2" |
+      | "RDS" | "A,B,C,D" | "A,B"  | "B" | "1" | "2" |
+      | "LDS" | "A,B,C,D" | "A,B"  | "B" | "1" | "2" |
+      | "EDS" | "A,B,C,D" | "A,B"  | "B" | "1" | "2" |

@@ -24,7 +24,7 @@ Feature: Subscribing to Resources
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
     When the Client does a wildcard subscription to <xDS>
     Then the Client receives the resources <resources> and version <v1> for <xDS>
-    When  the resources <r1> of the <xDS> is updated to version <v2>
+    When the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives the resources <resources> and version <v2> for <xDS>
     And the resources <resources> and version <v2> for <xDS> came in a single response
     And the service never responds more than necessary
@@ -71,7 +71,7 @@ Feature: Subscribing to Resources
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <subset> for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
-    When the resources <r1> of the <xDS> is updated to version <v2>
+    When the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives the resources <subset> and version <v2> for <xDS>
     And the resources <subset> and version <v2> for <xDS> came in a single response
     And the service never responds more than necessary
@@ -87,7 +87,7 @@ Feature: Subscribing to Resources
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <subset> for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
-    When the resources <r1> of the <xDS> is updated to version <v2>
+    When the resource <r1> of service <xDS> is updated to version <v2>
     Then the Client receives the resources <r1> and version <v2> for <xDS>
     And the service never responds more than necessary
 
@@ -131,15 +131,15 @@ Feature: Subscribing to Resources
   @sotw @aggregated
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
-    When the Client subscribes to resources <subset> for <xDS>
-    Then the Client receives the resources <subset> and version <v1> for <xDS>
-    When the Client subscribes to resources <subset> for <xds2>
-    Then the Client receives the resources <subset> and version <v1> for <xds2>
-    When the resources <subset> of the <xDS> is updated to version <v2>
-    Then the Client receives the resources <subset> and version <v2> for <xDS>
+    When the Client subscribes to resources <r1> for <xDS>
+    Then the Client receives the resources <r1> and version <v1> for <xDS>
+    When the Client subscribes to resources <r1> for <xds2>
+    Then the Client receives the resources <r1> and version <v1> for <xds2>
+    When the resource <r1> of service <xDS> is updated to version <v2>
+    Then the Client receives the resources <r1> and version <v2> for <xDS>
     And the service never responds more than necessary
 
     Examples:
-      | xDS   | xds2  | resources | subset | v1  | v2  |
-      | "CDS" | "LDS" | "A,B,C"   | "B"    | "1" | "2" |
-      | "RDS" | "EDS" | "A,B,C"   | "B"    | "1" | "2" |
+      | xDS   | xds2  | resources | r1  | v1  | v2  |
+      | "CDS" | "LDS" | "A,B,C"   | "B" | "1" | "2" |
+      | "RDS" | "EDS" | "A,B,C"   | "B" | "1" | "2" |
