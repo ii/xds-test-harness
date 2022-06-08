@@ -12,7 +12,7 @@ Feature: Unsubscribing to Resources
     # it is valid(though not desired) for a server to send more than is requested.
     # So the test will pass if client subscribes to A,B,C, unsubscribes from B,C and gets A,B,C back.
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
-    When the Client subscribes to a subset of resources,<subset>, for <xDS>
+    When the Client subscribes to resources <subset> for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client updates subscription to a resource(<r1>) of <xDS> with version <v1>
     And the resource <r1> of service <xDS> is updated to version <v2>
@@ -30,7 +30,7 @@ Feature: Unsubscribing to Resources
   Scenario: [<xDS>] Client can unsubcribe from some resources
     # difference from test above is use of the word ONLY in the final THEN step
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
-    When the Client subscribes to a subset of resources,<subset>, for <xDS>
+    When the Client subscribes to resources <subset> for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client updates subscription to a resource(<r1>) of <xDS> with version <v1>
     And the resource <r1> of service <xDS> is updated to version <v2>
@@ -46,7 +46,7 @@ Feature: Unsubscribing to Resources
   @sotw @non-aggregated @aggregated
   Scenario: [<xDS>] Client can unsubscribe from all resources
     Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
-    When the Client subscribes to a subset of resources,<subset>, for <xDS>
+    When the Client subscribes to resources <subset> for <xDS>
     Then the Client receives the resources <subset> and version <v1> for <xDS>
     When the Client unsubscribes from all resources for <xDS>
     And the resource <r1> of service <xDS> is updated to version <v2>
