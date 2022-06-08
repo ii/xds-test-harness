@@ -22,8 +22,17 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
+)
+
+const (
+	TypeUrlLDS = "type.googleapis.com/envoy.config.listener.v3.Listener"
+	TypeUrlCDS = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
+	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
+	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
 
 var (
@@ -51,6 +60,9 @@ func listenerContents(listeners Listeners) []types.Resource {
 func MakeEndpoint(clusterName string, address string, port uint32) *endpoint.ClusterLoadAssignment {
 	return &endpoint.ClusterLoadAssignment{
 		ClusterName: clusterName,
+		Policy: &endpoint.ClusterLoadAssignment_Policy{
+			EndpointStaleAfter: &durationpb.Duration{Seconds: 5, Nanos: 0},
+		},
 		Endpoints: []*endpoint.LocalityLbEndpoints{{
 			LbEndpoints: []*endpoint.LbEndpoint{{
 				HostIdentifier: &endpoint.LbEndpoint_Endpoint{
@@ -83,12 +95,17 @@ func MakeCluster(clusterName string, node string) *cluster.Cluster {
 		EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 			EdsConfig: edsSource,
 		},
+		DnsRefreshRate: &durationpb.Duration{
+			Seconds: 5,
+			Nanos:   0,
+		},
 	}
 }
 
 func MakeRoute(routeName, clusterName string) *route.RouteConfiguration {
 	return &route.RouteConfiguration{
-		Name: routeName,
+		Name:                routeName,
+		InternalOnlyHeaders: []string{},
 		VirtualHosts: []*route.VirtualHost{{
 			Name:    routeName,
 			Domains: []string{"*"},
@@ -155,7 +172,8 @@ func makeListener(listenerName string, address string, port uint32, filterChains
 				},
 			},
 		},
-		FilterChains: filterChains,
+		FilterChains:   filterChains,
+		TcpBacklogSize: &wrappers.UInt32Value{Value: 5},
 	}
 }
 
@@ -243,11 +261,11 @@ func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (respo
 		state.Version,
 		map[resource.Type][]types.Resource{
 			resource.EndpointType: endpoints,
-			resource.ClusterType: clusters,
-			resource.RouteType: routes,
+			resource.ClusterType:  clusters,
+			resource.RouteType:    routes,
 			resource.ListenerType: listeners,
-			resource.RuntimeType: runtimes,
-			resource.SecretType: []types.Resource{},
+			resource.RuntimeType:  runtimes,
+			resource.SecretType:   {},
 		},
 	)
 	if err != nil {
@@ -289,6 +307,61 @@ func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*
 	xdsCache.ClearSnapshot(req.Node)
 	response := &pb.ClearResponse{
 		Response: "All Clear",
+	}
+	return response, nil
+}
+
+func updateForType(res types.Resource) (uppedRes types.Resource) {
+	switch v := res.(type) {
+	case *cluster.Cluster:
+		v.DnsRefreshRate.Seconds = v.DnsRefreshRate.Seconds + 5
+	case *listener.Listener:
+		v.TcpBacklogSize.Value = v.TcpBacklogSize.Value + 5
+	case *route.RouteConfiguration:
+		v.InternalOnlyHeaders = []string{"Testing"}
+	case *endpoint.ClusterLoadAssignment:
+		v.Policy.EndpointStaleAfter = &durationpb.Duration{Seconds: 10, Nanos: 0}
+	default:
+		fmt.Println("HUGH?", res.ProtoReflect().Type())
+	}
+	return res
+}
+
+func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []types.Resource{}
+
+	for name, res := range snapshot.GetResources(request.TypeUrl) {
+		if name != request.ResourceName {
+			resources = append(resources, res)
+		} else {
+			uppedRes := updateForType(res)
+			fmt.Println("uppedRes", res)
+			resources = append(resources, uppedRes)
+		}
+	}
+
+	switch request.TypeUrl {
+	case TypeUrlCDS:
+		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
+	case TypeUrlLDS:
+		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
+	case TypeUrlRDS:
+		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
+	case TypeUrlEDS:
+		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+
+	response := &pb.UpdateResourceResponse{
+		Success: true,
 	}
 	return response, nil
 }
