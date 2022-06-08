@@ -36,7 +36,8 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Client unsubscribes from all resources for "([^"]*)"$`, r.ClientUnsubscribesFromAllResourcesForService)
 	ctx.Step(`^the Client receives the "([^"]*)" and "([^"]*)" for "([^"]*)"$`, r.ClientReceivesResourcesAndVersionForService)
 	ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
-
+	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
+	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same version or nonce$`, r.NoOtherResourceHasSameVersionOrNonce)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -420,6 +421,48 @@ func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, v
 	}
 	if len(responses) != 1 {
 		return fmt.Errorf("Resources came via multiple responses. This is not conformant for CDS and  LDS tests")
+	}
+	return nil
+}
+
+func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeUrl:      typeUrl,
+		ResourceName: resource,
+		Version:      version,
+	}
+
+	_, err = c.UpdateResource(context.Background(), in)
+	if err != nil {
+		return fmt.Errorf("Cannot update resource using adapter: %v", err)
+	}
+	log.Debug().
+		Msgf("Updating resource %v to version %v", resource, version)
+	return nil
+}
+
+func (r *Runner) NoOtherResourceHasSameVersionOrNonce(service, resource string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	resources := r.Validate.Resources[typeUrl]
+	chosen := resources[resource]
+	for r, v := range resources {
+		if r == resource {
+			continue
+		} else if v.Nonce == chosen.Nonce {
+			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
+		} else if v.Version == chosen.Version {
+			return fmt.Errorf("Found other resource with same version: %v", r)
+		}
 	}
 	return nil
 }
