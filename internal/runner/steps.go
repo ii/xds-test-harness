@@ -39,6 +39,8 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the resource "([^"]*)" of service "([^"]*)" is updated to version "([^"]*)"$`, r.ResourceOfServiceIsUpdatedToVersion)
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same version or nonce$`, r.NoOtherResourceHasSameVersionOrNonce)
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same nonce$`, r.NoOtherResourceHasSameNonce)
+	ctx.Step(`^the Client receives notice that resource "([^"]*)" was removed for service "([^"]*)"$`, r.ClientReceivesNoticeThatResourceWasRemovedForService)
+	ctx.Step(`^the resource "([^"]*)" is removed from the "([^"]*)"$`, r.ResourceIsRemovedFromTheService)
 }
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
@@ -204,7 +206,7 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 			for _, resource := range expectedResources {
 				actual, ok := actualResources[resource]
 				if !ok {
-					return fmt.Errorf("Could not find resource from responses")
+					return fmt.Errorf("Could not find resource from responses. Expected: %v, Actual: %v", resource, actualResources)
 				}
 				if actual.Version != version {
 					return fmt.Errorf("Found resource, but not correct version. Expected: %v, Actual: %v", version, actual.Version)
@@ -446,5 +448,57 @@ func (r *Runner) NoOtherResourceHasSameNonce(service, resource string) error {
 			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
 		}
 	}
+	return nil
+}
+
+func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, service string) error {
+	stream := r.Service
+
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	done := time.After(3 * time.Second)
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+		case <-done:
+			actualRemoved := r.Validate.RemovedResources[typeUrl]
+			if _, ok := actualRemoved[resource]; !ok {
+				return fmt.Errorf("Expected resource not in removed resources. Expected: %v, Actual removed: %v", resource, actualRemoved)
+			}
+			return nil
+		}
+	}
+}
+
+func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
+	}
+	var currentVersion string
+	for k, v := range r.Validate.Resources[typeUrl] {
+		if k == resource {
+			currentVersion = v.Version
+		}
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	request := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeUrl:      typeUrl,
+		ResourceName: resource,
+		Version:      currentVersion,
+	}
+
+	_, err = c.RemoveResource(context.Background(), request)
+	if err != nil {
+		return fmt.Errorf("Cannot remove resource using adapter: %v", err)
+	}
+	log.Debug().
+		Msgf("Removing Resource %v", resource)
 	return nil
 }
