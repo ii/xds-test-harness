@@ -2,7 +2,7 @@ Feature: Delta
   Client can subscribe and unsubscribe using the incremental variant
 
 
-  @incremental @non-aggregated @z2
+  @incremental @non-aggregated @aggregated
   Scenario Outline: Subscribe to resources one after the other
     Given a target setup with service <service>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <r1> for <service>
@@ -15,3 +15,23 @@ Feature: Delta
       | service | resources | r1  | r2  | v1  |
       | "CDS"   | "A,B,C"   | "A" | "B" | "1" |
       | "LDS"   | "D,E,F"   | "D" | "E" | "1" |
+      | "RDS"   | "D,E,F"   | "D" | "E" | "1" |
+      | "EDS"   | "D,E,F"   | "D" | "E" | "1" |
+
+
+ @incremental @non-aggregated @aggregated @zz
+  Scenario Outline: When a resource is updated, receive response for only that resource
+    Given a target setup with service <service>, resources <resources>, and starting version <v1>
+     When the Client subscribes to resources <resources> for <service>
+     Then the Client receives the resources <resources> and version <v1> for <service>
+     When the resource <r1> of service <service> is updated to version <v2>
+     Then the Client receives the resources <r1> and version <v2> for <service>
+      And for service <service>, no resource other than <r1> has same version or nonce
+      And the service never responds more than necessary
+
+    Examples:
+      | service | resources | r1  | v1  | v2  |
+      | "LDS"   | "A,B,C"   | "A" | "1" | "2" |
+      | "CDS"   | "A,B,C"   | "A" | "1" | "2" |
+      | "RDS"   | "A,B,C"   | "A" | "1" | "2" |
+      | "EDS"   | "A,B,C"   | "A" | "1" | "2" |
