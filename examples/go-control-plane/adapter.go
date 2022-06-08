@@ -406,6 +406,39 @@ func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceReq
 	return response, nil
 }
 
+func (a *adapterServer) RemoveResource(ctx context.Context, request *pb.ResourceRequest) (*pb.RemoveResourceResponse, error) {
+	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []types.Resource{}
+	for name, res := range snapshot.GetResources(request.TypeUrl) {
+		if name != request.ResourceName {
+			resources = append(resources, res)
+		} else {
+			fmt.Printf("Removing this resource: %v\n", name)
+		}
+	}
+
+	switch request.TypeUrl {
+	case TypeUrlCDS:
+		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
+	case TypeUrlLDS:
+		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
+	case TypeUrlRDS:
+		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
+	case TypeUrlEDS:
+		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
+	}
+
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
+		return nil, err
+	}
+	response := &pb.RemoveResourceResponse{Success: true}
+	return response, nil
+}
+
 func RunAdapter(port uint, cache cache.SnapshotCache) {
 	xdsCache = cache
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
