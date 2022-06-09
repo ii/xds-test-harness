@@ -11,7 +11,6 @@ import (
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	parser "github.com/ii/xds-test-harness/internal/parser"
-	utils "github.com/ii/xds-test-harness/internal/utils"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -44,6 +43,10 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^for service "([^"]*)", no resource other than "([^"]*)" has same nonce$`, r.NoOtherResourceHasSameNonce)
 	ctx.Step(`^the Client sends an ACK to which the "([^"]*)" does not respond$`, r.TheServiceNeverRespondsMoreThanNecessary)
 }
+
+///////////////////////////////////////////////////////////////////////////////////
+//# Setting State
+///////////////////////////////////////////////////////////////////////////////////
 
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
 // setting the state for the rest of the steps.
@@ -84,6 +87,10 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(service, resources, v
 	return nil
 }
 
+///////////////////////////////////////////////////////////////////////////////////
+//# Client subscriptions
+//////////////////////////////////////////////////////////////////////////////////
+
 // Wrapper to start stream, without resources, for given service
 func (r *Runner) ClientDoesAWildcardSubscriptionToService(service string) error {
 	resources := []string{}
@@ -91,7 +98,6 @@ func (r *Runner) ClientDoesAWildcardSubscriptionToService(service string) error 
 	return nil
 }
 
-// Wrapper to start stream, with given resources for given service
 func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
 	resources := strings.Split(subset, ",")
 	r.ClientSubscribesToServiceForResources(service, resources)
@@ -151,6 +157,89 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 		return nil
 	}
 }
+
+func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
+	current := r.Validate.Resources[typeUrl][resource]
+
+	request := &discovery.DiscoveryRequest{
+		VersionInfo:   current.Version,
+		ResourceNames: []string{resource},
+		TypeUrl:       typeUrl,
+		ResponseNonce: current.Nonce,
+	}
+	any, _ := anypb.New(request)
+
+	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
+	r.Validate.Resources[typeUrl][resource] = ValidateResource{
+		Version: current.Version,
+		Nonce:   current.Nonce,
+	}
+	r.SubscribeRequest = any
+
+	log.Debug().Msgf("Sending Request To Update Subscription: %v", request)
+	r.Service.Channels.Req <- any
+	return nil
+}
+
+func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
+	err, typeURL := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
+	// we just need a nonce to tell the server we are up to dote and this is a new
+	// subscription request. Simple way to grab one from the list of 4.
+	var lastNonce string
+	for _, v := range r.Validate.Resources[typeURL] {
+		lastNonce = v.Nonce
+	}
+	request := &discovery.DiscoveryRequest{
+		ResourceNames: []string{""},
+		TypeUrl:       typeURL,
+		ResponseNonce: lastNonce,
+	}
+	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
+	any, _ := anypb.New(request)
+	r.SubscribeRequest = any
+	log.Debug().
+		Msgf("Sending unsubscribe request: %v", request.String())
+	r.Service.Channels.Req <- any
+	return nil
+}
+
+// A delta specific test, as delta can explicitly unsubscribe, whereas sotw can only update their subscription
+// set up a delta discovery request unsubscribing for given resource, and pass it along the channel.
+func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+
+	request := &discovery.DeltaDiscoveryRequest{
+		TypeUrl:                  typeUrl,
+		ResourceNamesUnsubscribe: []string{resource},
+	}
+	any, _ := anypb.New(request)
+
+	delete(r.Validate.Resources[typeUrl], resource)
+	r.SubscribeRequest = any
+
+	log.Debug().Msgf("Sending Unsubscribe Request", request)
+	r.Service.Channels.Req <- any
+	return nil
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+//# Receiving resources
+///////////////////////////////////////////////////////////////////////////////////
 
 // Loop through the service's response cache until we get the expected response
 // or we reach the deadline for the service.
@@ -213,21 +302,74 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, 
 		}
 	}
 }
-
-func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
-	stream := r.Service
-	stream.Channels.Done <- true
-
-	// give some time for the final messages to come through, if there's any lingering responses.
-	time.Sleep(3 * time.Second)
-	log.Debug().
-		Msgf("Request Count: %v Response Count: %v", r.Validate.RequestCount, r.Validate.ResponseCount)
-	if r.Validate.RequestCount <= r.Validate.ResponseCount {
-		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
+func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
 		return err
 	}
-	return nil
+	done := time.After(3 * time.Second)
+	for {
+		select {
+		case err := <-r.Service.Channels.Err:
+			return err
+		case <-done:
+			if len(r.Validate.Resources[typeUrl]) > 0 {
+				return fmt.Errorf("Resources received is greater than 0: %v", r.Validate.Resources[typeUrl])
+			}
+			return nil
+		}
+	}
 }
+
+func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, service string) error {
+	stream := r.Service
+
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	done := time.After(3 * time.Second)
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+		case <-done:
+			actualRemoved := r.Validate.RemovedResources[typeUrl]
+			if _, ok := actualRemoved[resource]; !ok {
+				return fmt.Errorf("Expected resource not in removed resources. Expected: %v, Actual removed: %v", resource, actualRemoved)
+			}
+			return nil
+		}
+	}
+}
+
+func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, service, version string) error {
+	stream := r.Service
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		return err
+	}
+	done := time.After(15 * time.Second)
+	for {
+		select {
+		case err := <-stream.Channels.Err:
+			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+		case <-done:
+			actual := r.Validate.Resources[typeUrl]
+			if actual, ok := actual[resource]; ok {
+				return fmt.Errorf("Was not expecting to find this resource, as we unsubscribed. This is non-conformant: %v", actual)
+
+			}
+			return nil
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+//# Resources are added or updated
+///////////////////////////////////////////////////////////////////////////////////
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
 	err, typeUrl := parser.ServiceToTypeURL(service)
@@ -252,92 +394,76 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 	return nil
 }
 
-func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
+func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
 	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
 	}
 
-	current := r.Validate.Resources[typeUrl][resource]
-
-	request := &discovery.DiscoveryRequest{
-		VersionInfo:   current.Version,
-		ResourceNames: []string{resource},
-		TypeUrl:       typeUrl,
-		ResponseNonce: current.Nonce,
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	in := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeUrl:      typeUrl,
+		ResourceName: resource,
+		Version:      version,
 	}
-	any, _ := anypb.New(request)
 
-	r.Validate.Resources[typeUrl] = make(map[string]ValidateResource)
-	r.Validate.Resources[typeUrl][resource] = ValidateResource{
-		Version: current.Version,
-		Nonce:   current.Nonce,
-	}
-	r.SubscribeRequest = any
-
-	log.Debug().Msgf("Sending Request To Update Subscription: %v", request)
-	r.Service.Channels.Req <- any
-	return nil
-}
-
-func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
-	err, typeURL := parser.ServiceToTypeURL(service)
+	_, err = c.UpdateResource(context.Background(), in)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
+		return fmt.Errorf("Cannot update resource using adapter: %v", err)
 	}
-
-	// we just need a nonce to tell the server we are up to dote and this is a new
-	// subscription request. Simple way to grab one from the list of 4.
-	var lastNonce string
-	for _, v := range r.Validate.Resources[typeURL] {
-		lastNonce = v.Nonce
-	}
-	request := &discovery.DiscoveryRequest{
-		ResourceNames: []string{""},
-		TypeUrl:       typeURL,
-		ResponseNonce: lastNonce,
-	}
-	r.Validate.Resources[typeURL] = make(map[string]ValidateResource)
-	any, _ := anypb.New(request)
-	r.SubscribeRequest = any
 	log.Debug().
-		Msgf("Sending unsubscribe request: %v", request.String())
-	r.Service.Channels.Req <- any
+		Msgf("Updating resource %v to version %v", resource, version)
 	return nil
 }
 
-func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
+func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
 	err, typeUrl := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
-	done := time.After(3 * time.Second)
-	for {
-		select {
-		case err := <-r.Service.Channels.Err:
-			return err
-		case <-done:
-			if len(r.Validate.Resources[typeUrl]) > 0 {
-				return fmt.Errorf("Resources received is greater than 0: %v", r.Validate.Resources[typeUrl])
-			}
-			return nil
+	var currentVersion string
+	for k, v := range r.Validate.Resources[typeUrl] {
+		if k == resource {
+			currentVersion = v.Version
 		}
 	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+	request := &pb.ResourceRequest{
+		Node:         r.NodeID,
+		TypeUrl:      typeUrl,
+		ResourceName: resource,
+		Version:      currentVersion,
+	}
+
+	_, err = c.RemoveResource(context.Background(), request)
+	if err != nil {
+		return fmt.Errorf("Cannot remove resource using adapter: %v", err)
+	}
+	log.Debug().
+		Msgf("Removing Resource %v", resource)
+	return nil
 }
 
-func resourcesMatch(expected []string, actual []string) bool {
-	// Compare the resources in a discovery response to the ones we expect.
-	// It is valid for the response to give more resources than subscribed to,
-	// which is why we are not checking the equality of the two slices, only that
-	// all of expected is contained in actual.
-	for _, ec := range expected {
-		if match, _ := utils.ItemInSlice(ec, actual); match == false {
-			return false
-		}
+///////////////////////////////////////////////////////////////////////////////////
+//# Client/server validation
+///////////////////////////////////////////////////////////////////////////////////
+
+// ctx.Step(`^the service never responds more than necessary$`, r.TheServiceNeverRespondsMoreThanNecessary)
+func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
+	stream := r.Service
+	stream.Channels.Done <- true
+
+	// give some time for the final messages to come through, if there's any lingering responses.
+	time.Sleep(3 * time.Second)
+	log.Debug().
+		Msgf("Request Count: %v Response Count: %v", r.Validate.RequestCount, r.Validate.ResponseCount)
+	if r.Validate.RequestCount <= r.Validate.ResponseCount {
+		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
+		return err
 	}
-	return true
+	return nil
 }
 
 func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, version, service string) error {
@@ -359,29 +485,6 @@ func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, v
 	if len(responses) != 1 {
 		return fmt.Errorf("Resources came via multiple responses. This is not conformant for CDS and  LDS tests")
 	}
-	return nil
-}
-
-func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
-	if err != nil {
-		return err
-	}
-
-	c := pb.NewAdapterClient(r.Adapter.Conn)
-	in := &pb.ResourceRequest{
-		Node:         r.NodeID,
-		TypeUrl:      typeUrl,
-		ResourceName: resource,
-		Version:      version,
-	}
-
-	_, err = c.UpdateResource(context.Background(), in)
-	if err != nil {
-		return fmt.Errorf("Cannot update resource using adapter: %v", err)
-	}
-	log.Debug().
-		Msgf("Updating resource %v to version %v", resource, version)
 	return nil
 }
 
@@ -419,102 +522,4 @@ func (r *Runner) NoOtherResourceHasSameNonce(service, resource string) error {
 		}
 	}
 	return nil
-}
-
-func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, service string) error {
-	stream := r.Service
-
-	err, typeUrl := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-	done := time.After(3 * time.Second)
-	for {
-		select {
-		case err := <-stream.Channels.Err:
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
-		case <-done:
-			actualRemoved := r.Validate.RemovedResources[typeUrl]
-			if _, ok := actualRemoved[resource]; !ok {
-				return fmt.Errorf("Expected resource not in removed resources. Expected: %v, Actual removed: %v", resource, actualRemoved)
-			}
-			return nil
-		}
-	}
-}
-
-func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
-	if err != nil {
-		return err
-	}
-	var currentVersion string
-	for k, v := range r.Validate.Resources[typeUrl] {
-		if k == resource {
-			currentVersion = v.Version
-		}
-	}
-
-	c := pb.NewAdapterClient(r.Adapter.Conn)
-	request := &pb.ResourceRequest{
-		Node:         r.NodeID,
-		TypeUrl:      typeUrl,
-		ResourceName: resource,
-		Version:      currentVersion,
-	}
-
-	_, err = c.RemoveResource(context.Background(), request)
-	if err != nil {
-		return fmt.Errorf("Cannot remove resource using adapter: %v", err)
-	}
-	log.Debug().
-		Msgf("Removing Resource %v", resource)
-	return nil
-}
-
-// A delta specific test, as delta can explicitly unsubscribe, whereas sotw can only update their subscription
-// set up a delta discovery request unsubscribing for given resource, and pass it along the channel.
-func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-
-	request := &discovery.DeltaDiscoveryRequest{
-		TypeUrl:                  typeUrl,
-		ResourceNamesUnsubscribe: []string{resource},
-	}
-	any, _ := anypb.New(request)
-
-	delete(r.Validate.Resources[typeUrl], resource)
-	r.SubscribeRequest = any
-
-	log.Debug().Msgf("Sending Unsubscribe Request", request)
-	r.Service.Channels.Req <- any
-	return nil
-}
-
-func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, service, version string) error {
-	stream := r.Service
-	err, typeUrl := parser.ServiceToTypeURL(service)
-	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
-		return err
-	}
-	done := time.After(15 * time.Second)
-	for {
-		select {
-		case err := <-stream.Channels.Err:
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
-		case <-done:
-			actual := r.Validate.Resources[typeUrl]
-			if actual, ok := actual[resource]; ok {
-				return fmt.Errorf("Was not expecting to find this resource, as we unsubscribed. This is non-conformant: %v", actual)
-
-			}
-			return nil
-		}
-	}
 }
