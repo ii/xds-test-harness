@@ -123,7 +123,10 @@ func variantResults(results types.VariantResults) string {
 	if len(results.FailedScenarios) > 0 {
 		failedTests = "Failed Tests:\n"
 		for _, test := range results.FailedScenarios {
-			failedTests = failedTests + "  - " + test.Name + "\n"
+			failedTests = failedTests +
+				"  - " + test.Name +
+				"\n    Failed Step: " + test.FailedStep +
+				"\n    Error: " + test.Error + "\n"
 		}
 	}
 	return total + passed + failed + failedTests + skipped + undefined + pending

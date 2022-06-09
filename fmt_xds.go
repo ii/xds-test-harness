@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -93,11 +94,13 @@ func (f *xdsFmt) step(pickleStepID string, scenario *godog.Scenario) {
 
 	lastStep := isLastStep(pickleStepID, scenario)
 	if lastStep {
-		failed, failedStep := f.didScenarioFail(scenario)
+		failed, failedStep, err := f.didScenarioFail(scenario)
 		if failed {
 			log.Info().
 				Str("failed step", failedStep).
 				Msgf("| [%v]%v", colors.Red("FAILED"), scenario.Name)
+			log.Err(errors.New(err)).Msg("")
+
 		} else {
 			log.Info().
 				Msgf("| [%v]%v", colors.Green("PASSED"), scenario.Name)
@@ -106,7 +109,7 @@ func (f *xdsFmt) step(pickleStepID string, scenario *godog.Scenario) {
 	*f.Steps++
 }
 
-func (f *xdsFmt) didScenarioFail(scenario *godog.Scenario) (failed bool, failedStep string) {
+func (f *xdsFmt) didScenarioFail(scenario *godog.Scenario) (failed bool, failedStep string, err string) {
 	failed = false
 	results := f.Storage.MustGetPickleStepResultsByPickleID(scenario.Id)
 	for _, result := range results {
@@ -116,9 +119,10 @@ func (f *xdsFmt) didScenarioFail(scenario *godog.Scenario) (failed bool, failedS
 			step := feature.FindStep(pickleStep.AstNodeIds[0])
 			failed = true
 			failedStep = step.Text
+			err = result.Err.Error()
 		}
 	}
-	return failed, failedStep
+	return failed, failedStep, err
 }
 
 func (f *xdsFmt) gatherFailedScenarios() (failedScenarios []types.FailedScenario) {
@@ -133,6 +137,7 @@ func (f *xdsFmt) gatherFailedScenarios() (failedScenarios []types.FailedScenario
 			Name:       scenario.Name,
 			FailedStep: step.Text,
 			Line:       fmt.Sprintf("%v:%v", feature.Uri, step.Location.Line),
+			Error:      failure.Err.Error(),
 		}
 
 		failedScenarios = append(failedScenarios, fs)
