@@ -60,10 +60,10 @@ Feature: Subscribing to Resources
 
     Examples:
       | xDS   | resources | subset | v1  |
-      | "CDS" | "A,B,C,D" | "B,D"  | "1" |
+      # | "CDS" | "A,B,C,D" | "B,D"  | "1" |
       | "LDS" | "G,B,L,D" | "L,G"  | "1" |
-      | "RDS" | "A,B"     | "A,B"  | "1" |
-      | "EDS" | "A,B"     | "A,B"  | "1" |
+      | "RDS" | "B,A"   | "B,A"  | "1" |
+      # | "EDS" | "A,B"     | "A,B"  | "1" |
 
 
   @sotw @non-aggregated @aggregated
@@ -128,9 +128,9 @@ Feature: Subscribing to Resources
       | "EDS" | "A,B,C,D" | "A,Z"  | "A"             | "Z" | "1" | "2" |
 
 
-  @sotw @aggregated
+  @sotw @aggregated @wip
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
-    Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
+    Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
     When the Client subscribes to resources <r1> for <xDS>
     Then the Client receives the resources <r1> and version <v1> for <xDS>
     When the Client subscribes to resources <r1> for <xds2>
@@ -140,6 +140,6 @@ Feature: Subscribing to Resources
     And the service never responds more than necessary
 
     Examples:
-      | xDS   | xds2  | resources | r1  | v1  | v2  |
-      | "CDS" | "LDS" | "A,B,C"   | "B" | "1" | "2" |
-      | "RDS" | "EDS" | "A,B,C"   | "B" | "1" | "2" |
+      | services  | xDS   | xds2  | resources | r1  | v1  | v2  |
+      | "CDS,LDS" | "CDS" | "LDS" | "A,B,C"   | "B" | "1" | "2" |
+      | "RDS,EDS" | "RDS" | "EDS" | "A,B,C"   | "B" | "1" | "2" |
