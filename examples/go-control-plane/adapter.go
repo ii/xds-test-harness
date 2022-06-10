@@ -18,7 +18,6 @@ import (
 	runtime "github.com/envoyproxy/go-control-plane/envoy/service/runtime/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
@@ -227,85 +226,56 @@ func MakeRuntime(runtimeName string) *runtime.Runtime {
 	}
 }
 
-func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (response *pb.SetStateResponse, err error) {
-
-	clusters := make([]types.Resource, len(state.Clusters.Items))
-	for i, cluster := range state.Clusters.Items {
-		clusters[i] = MakeCluster(cluster.Name, state.Node)
-	}
-
-	endpoints := make([]types.Resource, len(state.Endpoints.Items))
-	for i, endpoint := range state.Endpoints.Items {
-		endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
-	}
-
-	routes := make([]types.Resource, len(state.Routes.Items))
-	for i, route := range state.Routes.Items {
-		cluster := state.Clusters.Items[i]
-		routes[i] = MakeRoute(route.Name, cluster.Name)
-	}
-
-	listeners := make([]types.Resource, len(state.Listeners.Items))
-	for i, listener := range state.Listeners.Items {
-		port := uint32(11000 + i)
-		route := state.Routes.Items[i]
-		listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
-	}
-
-	runtimes := make([]types.Resource, len(state.Runtimes.Items))
-	for i, runtime := range state.Runtimes.Items {
-		runtimes[i] = MakeRuntime(runtime.Name)
-	}
-
-	snapshot, err := cache.NewSnapshot(
-		state.Version,
-		map[resource.Type][]types.Resource{
-			resource.EndpointType: endpoints,
-			resource.ClusterType:  clusters,
-			resource.RouteType:    routes,
-			resource.ListenerType: listeners,
-			resource.RuntimeType:  runtimes,
-			resource.SecretType:   {},
-		},
-	)
+func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateRequest) (response *pb.SetStateResponse, err error) {
+	snapshot := cache.Snapshot{}
 	if err != nil {
-		log.Printf("Error creating snapshot: %v", err)
-	}
-	if err = snapshot.Consistent(); err != nil {
-		log.Printf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	// // Add the snapshot to the cache
-	if err := xdsCache.SetSnapshot(context.Background(), state.Node, snapshot); err != nil {
+	for _, resourceReq := range request.Resources {
+		resources := []types.Resource{}
+		for _, name := range resourceReq.ResourceNames {
+			switch resourceReq.TypeUrl {
+			case TypeUrlCDS:
+				newResource := MakeCluster(name, request.Node)
+				resources = append(resources, newResource)
+				snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
+			case TypeUrlLDS:
+				address := fmt.Sprintf("https://%viscool.resources.com", name)
+				newResource := makeListener(name, address, 11223, []*listener.FilterChain{})
+				resources = append(resources, newResource)
+				snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
+			case TypeUrlRDS:
+				newResource := MakeRoute(name, name)
+				resources = append(resources, newResource)
+				snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
+			case TypeUrlEDS:
+				address := fmt.Sprintf("https://%viscool.endpoints.com", name)
+				newResource := MakeEndpoint(name, address, 10000)
+				resources = append(resources, newResource)
+				snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
+			}
+		}
+	}
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
-	newSnapshot, err := xdsCache.GetSnapshot(state.Node)
+	newSnapshot, err := xdsCache.GetSnapshot(request.Node)
 	prettySnap, _ := json.Marshal(newSnapshot)
 	fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
+
 	response = &pb.SetStateResponse{
-		Message: "Success",
+		Success: true,
 	}
 	return response, nil
+
 }
 
-func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*pb.UpdateStateResponse, error) {
-	response, err := a.SetState(ctx, state)
-	if err != nil {
-		fmt.Printf("Error setting state: %v", err)
-		return nil, err
-	}
-	updateResponse := &pb.UpdateStateResponse{
-		Message: response.Message,
-	}
-	return updateResponse, err
-}
-
-func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
+func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearStateRequest) (*pb.ClearStateResponse, error) {
 	log.Printf("Clearing Cache")
 	xdsCache.ClearSnapshot(req.Node)
-	response := &pb.ClearResponse{
+	response := &pb.ClearStateResponse{
 		Response: "All Clear",
 	}
 	return response, nil
