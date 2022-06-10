@@ -18,6 +18,7 @@ import (
 func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 	// setting state
 	ctx.Step(`^a target setup with service "([^"]*)", resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithServiceResourcesAndVersion)
+	ctx.Step(`^a target setup with multiple services "([^"]*)", each with resources "([^"]*)", and starting version "([^"]*)"$`, r.TargetSetupWithMultipleServicesEachWithResourcesAndStartingVersion)
 	// client subscriptions
 	ctx.Step(`^the Client does a wildcard subscription to "([^"]*)"$`, r.ClientDoesAWildcardSubscriptionToService)
 	ctx.Step(`^the Client subscribes to resources "([^"]*)" for "([^"]*)"$`, r.ClientSubscribesToASubsetOfResourcesForService)
@@ -51,39 +52,65 @@ func (r *Runner) LoadSteps(ctx *godog.ScenarioContext) {
 // Creates a snapshot to be sent, via the adapter, to the target implementation,
 // setting the state for the rest of the steps.
 func (r *Runner) TargetSetupWithServiceResourcesAndVersion(service, resources, version string) error {
-	snapshot := &pb.Snapshot{
-		Node:    r.NodeID,
-		Version: fmt.Sprint(version),
+	err, typeUrl := parser.ServiceToTypeURL(service)
+	if err != nil {
+		return err
 	}
 	resourceNames := strings.Split(resources, ",")
 
-	//Set endpoints
-	snapshot.Endpoints = parser.ToEndpoints(resourceNames)
-
-	//Set clusters
-	snapshot.Clusters = parser.ToClusters(resourceNames)
-
-	//Set Routes
-	snapshot.Routes = parser.ToRoutes(resourceNames)
-
-	//Set listeners
-	snapshot.Listeners = parser.ToListeners(resourceNames)
-
-	//Set runtimes
-	snapshot.Runtimes = parser.ToRuntimes(resourceNames)
+	stateRequest := pb.SetStateRequest{
+		Node:    r.NodeID,
+		Version: version,
+		Resources: []*pb.SetStateRequest_Resources{
+			{
+				TypeUrl:       typeUrl,
+				ResourceNames: resourceNames,
+			},
+		},
+	}
 
 	c := pb.NewAdapterClient(r.Adapter.Conn)
 
-	_, err := c.SetState(context.Background(), snapshot)
+	_, err = c.SetState(context.Background(), &stateRequest)
 	if err != nil {
-		msg := "Cannot set target with given state"
-		log.Error().
-			Err(err).
-			Msg(msg)
-		return errors.New(msg)
+		return fmt.Errorf("Cannot set target with given state: %v", err)
 	}
 
-	r.Cache.StartState = snapshot
+	// r.Cache.StartState = snapshot
+	return nil
+}
+
+func (r *Runner) TargetSetupWithMultipleServicesEachWithResourcesAndStartingVersion(ss, rs, v string) error {
+	serviceNames := strings.Split(ss, ",")
+	resourceNames := strings.Split(rs, ",")
+
+	resources := []*pb.SetStateRequest_Resources{}
+
+	for _, srv := range serviceNames {
+		err, typeUrl := parser.ServiceToTypeURL(srv)
+		if err != nil {
+			return err
+		}
+		resources = append(resources, &pb.SetStateRequest_Resources{
+			TypeUrl:       typeUrl,
+			ResourceNames: resourceNames,
+		})
+	}
+
+	stateRequest := pb.SetStateRequest{
+		Node:      r.NodeID,
+		Version:   v,
+		Resources: resources,
+	}
+
+	c := pb.NewAdapterClient(r.Adapter.Conn)
+
+	_, err := c.SetState(context.Background(), &stateRequest)
+	if err != nil {
+		return fmt.Errorf("Cannot set target with given state: %v", err)
+	}
+
+	// r.Cache.StartState = snapshot
 	return nil
 }
 
@@ -262,6 +289,7 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
 		case <-done:
 			actualResources := r.Validate.Resources[typeUrl]
+			log.Debug().Msgf("Actual resources: %v", actualResources)
 			for _, resource := range expectedResources {
 				actual, ok := actualResources[resource]
 				if !ok {
