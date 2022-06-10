@@ -79,7 +79,7 @@ func (s *Suite) ConfigureSuite() {
 		})
 		ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 			c := pb.NewAdapterClient(s.Runner.Adapter.Conn)
-			clearRequest := &pb.ClearRequest{Node: s.Runner.NodeID}
+			clearRequest := &pb.ClearStateRequest{Node: s.Runner.NodeID}
 			clear, err := c.ClearState(context.Background(), clearRequest)
 			if err != nil {
 				log.Err(err).
