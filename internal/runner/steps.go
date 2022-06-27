@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -99,7 +98,7 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(services, resources, 
 
 	_, err := c.SetState(context.Background(), &stateRequest)
 	if err != nil {
-		return fmt.Errorf("Cannot set target with given state: %v", err)
+		return fmt.Errorf("cannot set target with given state: %v", err)
 	}
 
 	// r.Cache.StartState = snapshot
@@ -180,7 +179,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 
@@ -209,7 +208,7 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
 	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 
@@ -238,7 +237,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 
@@ -268,7 +267,7 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 	done := time.After(3 * time.Second)
@@ -278,17 +277,17 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 			// if there isn't an error in a response,
 			// the error will be passed down from the stream when
 			// it reaches its context deadline.
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+			return fmt.Errorf("could not find expected response within grace period of 10 seconds. %v", err)
 		case <-done:
 			actualResources := r.Validate.Resources[typeUrl]
 			log.Debug().Msgf("Actual resources: %v", actualResources)
 			for _, resource := range expectedResources {
 				actual, ok := actualResources[resource]
 				if !ok {
-					return fmt.Errorf("Could not find resource from responses. Expected: %v, Actual: %v", resource, actualResources)
+					return fmt.Errorf("could not find resource from responses. Expected: %v, Actual: %v", resource, actualResources)
 				}
 				if actual.Version != version {
-					return fmt.Errorf("Found resource, but not correct version. Expected: %v, Actual: %v", version, actual.Version)
+					return fmt.Errorf("found resource, but not correct version. Expected: %v, Actual: %v", version, actual.Version)
 				}
 			}
 			return nil
@@ -305,16 +304,16 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, 
 	for {
 		select {
 		case err := <-r.Service.Channels.Err:
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds or encountered error: %v.", err)
+			return fmt.Errorf("could not find expected response within grace period of 10 seconds or encountered error: %v", err)
 		case <-done:
 			typeUrl, err := parser.ServiceToTypeURL(service)
 			if err != nil {
-				return fmt.Errorf("Issue converting service to typeUrl, was it written correctly?")
+				return fmt.Errorf("issue converting service to typeUrl, was it written correctly?")
 			}
 			resources := r.Validate.Resources[typeUrl]
 			for name, info := range resources {
 				if name != resource || info.Version != version {
-					return fmt.Errorf("Received a resource, or a version, we should not have. Expected resource/version: %v/%v. Got: %v/%v",
+					return fmt.Errorf("received a resource, or a version, we should not have. Expected resource/version: %v/%v. Got: %v/%v",
 						resource, version, name, info.Version)
 				}
 			}
@@ -334,7 +333,7 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 			return err
 		case <-done:
 			if len(r.Validate.Resources[typeUrl]) > 0 {
-				return fmt.Errorf("Resources received is greater than 0: %v", r.Validate.Resources[typeUrl])
+				return fmt.Errorf("resources received is greater than 0: %v", r.Validate.Resources[typeUrl])
 			}
 			return nil
 		}
@@ -346,18 +345,18 @@ func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, 
 
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 	done := time.After(3 * time.Second)
 	for {
 		select {
 		case err := <-stream.Channels.Err:
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+			return fmt.Errorf("could not find expected response within grace period of 10 seconds. %v", err)
 		case <-done:
 			actualRemoved := r.Validate.RemovedResources[typeUrl]
 			if _, ok := actualRemoved[resource]; !ok {
-				return fmt.Errorf("Expected resource not in removed resources. Expected: %v, Actual removed: %v", resource, actualRemoved)
+				return fmt.Errorf("expected resource not in removed resources. Expected: %v, Actual removed: %v", resource, actualRemoved)
 			}
 			return nil
 		}
@@ -368,18 +367,18 @@ func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, servic
 	stream := r.Service
 	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
-		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
+		err := fmt.Errorf("cannot determine typeURL for given service: %v", service)
 		return err
 	}
 	done := time.After(15 * time.Second)
 	for {
 		select {
 		case err := <-stream.Channels.Err:
-			return fmt.Errorf("Could not find expected response within grace period of 10 seconds. %v", err)
+			return fmt.Errorf("could not find expected response within grace period of 10 seconds. %v", err)
 		case <-done:
 			actual := r.Validate.Resources[typeUrl]
 			if actual, ok := actual[resource]; ok {
-				return fmt.Errorf("Was not expecting to find this resource, as we unsubscribed. This is non-conformant: %v", actual)
+				return fmt.Errorf("was not expecting to find this resource, as we unsubscribed. This is non-conformant: %v", actual)
 
 			}
 			return nil
@@ -407,7 +406,7 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 
 	_, err = c.AddResource(context.Background(), in)
 	if err != nil {
-		return fmt.Errorf("Cannot add resource using adapter: %v", err)
+		return fmt.Errorf("cannot add resource using adapter: %v", err)
 	}
 	log.Debug().
 		Msgf("Adding resource %v with version %v", resource, version)
@@ -430,7 +429,7 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 
 	_, err = c.UpdateResource(context.Background(), in)
 	if err != nil {
-		return fmt.Errorf("Cannot update resource using adapter: %v", err)
+		return fmt.Errorf("cannot update resource using adapter: %v", err)
 	}
 	log.Debug().
 		Msgf("Updating resource %v to version %v", resource, version)
@@ -459,7 +458,7 @@ func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error
 
 	_, err = c.RemoveResource(context.Background(), request)
 	if err != nil {
-		return fmt.Errorf("Cannot remove resource using adapter: %v", err)
+		return fmt.Errorf("cannot remove resource using adapter: %v", err)
 	}
 	log.Debug().
 		Msgf("Removing Resource %v", resource)
@@ -480,7 +479,7 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 	log.Debug().
 		Msgf("Request Count: %v Response Count: %v", r.Validate.RequestCount, r.Validate.ResponseCount)
 	if r.Validate.RequestCount <= r.Validate.ResponseCount {
-		err := errors.New("There are more responses than requests.  This indicates the server responded to the last ack")
+		err := fmt.Errorf("there are more responses than requests.  This indicates the server responded to the last ack")
 		return err
 	}
 	return nil
@@ -498,12 +497,12 @@ func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, v
 	for _, resource := range expected {
 		info, ok := actual[resource]
 		if !ok || info.Version != version {
-			return fmt.Errorf("Could not find correct resource in validation struct. This is rare; perhaps recheck how the test was written.")
+			return fmt.Errorf("could not find correct resource in validation struct. This is rare; perhaps recheck how the test was written")
 		}
 		responses[info.Nonce] = true
 	}
 	if len(responses) != 1 {
-		return fmt.Errorf("Resources came via multiple responses. This is not conformant for CDS and  LDS tests")
+		return fmt.Errorf("resources came via multiple responses. This is not conformant for CDS and  LDS tests")
 	}
 	return nil
 }
@@ -519,9 +518,9 @@ func (r *Runner) NoOtherResourceHasSameVersionOrNonce(service, resource string) 
 		if r == resource {
 			continue
 		} else if v.Nonce == chosen.Nonce {
-			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
+			return fmt.Errorf("found other resource with same nonce, meaning it came back in same response: %v", r)
 		} else if v.Version == chosen.Version {
-			return fmt.Errorf("Found other resource with same version: %v", r)
+			return fmt.Errorf("found other resource with same version: %v", r)
 		}
 	}
 	return nil
@@ -538,7 +537,7 @@ func (r *Runner) NoOtherResourceHasSameNonce(service, resource string) error {
 		if r == resource {
 			continue
 		} else if v.Nonce == chosen.Nonce {
-			return fmt.Errorf("Found other resource with same nonce, meaning it came back in same response: %v", r)
+			return fmt.Errorf("found other resource with same nonce, meaning it came back in same response: %v", r)
 		}
 	}
 	return nil
