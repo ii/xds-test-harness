@@ -2,9 +2,7 @@ package parser
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
@@ -22,26 +20,6 @@ const (
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
-
-func RandomAddress() string {
-	var (
-		consonants = []rune("bcdfklmnprstwyz")
-		vowels     = []rune("aou")
-		tld        = []string{".biz", ".com", ".net", ".org"}
-
-		domain = ""
-	)
-	rand.Seed(time.Now().UnixNano())
-	length := 6 + rand.Intn(12)
-
-	for i := 0; i < length; i++ {
-		consonant := string(consonants[rand.Intn(len(consonants))])
-		vowel := string(vowels[rand.Intn(len(vowels))])
-
-		domain = domain + consonant + vowel
-	}
-	return domain + tld[rand.Intn(len(tld))]
-}
 
 func ServiceToTypeURL(service string) (err error, typeURL string) {
 	typeURLs := map[string]string{

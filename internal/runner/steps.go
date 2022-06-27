@@ -106,40 +106,6 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(services, resources, 
 	return nil
 }
 
-// func (r *Runner) TargetSetupWithMultipleServicesEachWithResourcesAndStartingVersion(ss, rs, v string) error {
-// 	serviceNames := strings.Split(ss, ",")
-// 	resourceNames := strings.Split(rs, ",")
-
-// 	resources := []*pb.SetStateRequest_Resources{}
-
-// 	for _, srv := range serviceNames {
-// 		err, typeUrl := parser.ServiceToTypeURL(srv)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		resources = append(resources, &pb.SetStateRequest_Resources{
-// 			TypeUrl:       typeUrl,
-// 			ResourceNames: resourceNames,
-// 		})
-// 	}
-
-// 	stateRequest := pb.SetStateRequest{
-// 		Node:      r.NodeID,
-// 		Version:   v,
-// 		Resources: resources,
-// 	}
-
-// 	c := pb.NewAdapterClient(r.Adapter.Conn)
-
-// 	_, err := c.SetState(context.Background(), &stateRequest)
-// 	if err != nil {
-// 		return fmt.Errorf("Cannot set target with given state: %v", err)
-// 	}
-
-// 	// r.Cache.StartState = snapshot
-// 	return nil
-// }
-
 ///////////////////////////////////////////////////////////////////////////////////
 //# Client subscriptions
 //////////////////////////////////////////////////////////////////////////////////
