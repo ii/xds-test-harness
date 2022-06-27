@@ -20,11 +20,11 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -36,8 +36,7 @@ const (
 )
 
 var (
-	xdsCache  cache.SnapshotCache
-	localhost = "127.0.0.1"
+	xdsCache cache.SnapshotCache
 )
 
 type Clusters map[string]*cluster.Cluster
@@ -46,14 +45,6 @@ type Endpoints map[string]*endpoint.ClusterLoadAssignment
 
 type adapterServer struct {
 	pb.UnimplementedAdapterServer
-}
-
-func listenerContents(listeners Listeners) []types.Resource {
-	var r []types.Resource
-	for _, l := range listeners {
-		r = append(r, l)
-	}
-	return r
 }
 
 // MakeEndpoint creates a localhost endpoint on a given port.
@@ -90,7 +81,7 @@ func MakeCluster(clusterName string, node string) *cluster.Cluster {
 	connectTimeout := 5 * time.Second
 	return &cluster.Cluster{
 		Name:                 clusterName,
-		ConnectTimeout:       ptypes.DurationProto(connectTimeout),
+		ConnectTimeout:       durationpb.New(connectTimeout),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_EDS},
 		EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 			EdsConfig: edsSource,
@@ -189,7 +180,7 @@ func MakeRouteHTTPListener(clusterName string, listenerName string, listenerAddr
 	manager := buildHttpConnectionManager()
 	manager.RouteSpecifier = routeSpecifier
 
-	pbst, err := ptypes.MarshalAny(manager)
+	pbst, err := anypb.New(manager)
 	if err != nil {
 		panic(err)
 	}
@@ -265,7 +256,7 @@ func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateReques
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
-	newSnapshot, err := xdsCache.GetSnapshot(request.Node)
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
 	prettySnap, _ := json.Marshal(newSnapshot)
 	fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
 
