@@ -4,14 +4,12 @@ option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter"
 
 package adapter;
 
+import "google/protobuf/any.proto";
+
 message SetStateRequest {
-  message Resources {
-    string typeUrl = 1;
-    repeated string resourceNames = 2;
-  }
   string node = 1;
   string version = 2;
-  repeated Resources resources = 3;
+  repeated google.protobuf.Any resources = 3;
 }
 
 message SetStateResponse {

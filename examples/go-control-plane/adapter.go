@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -231,30 +232,33 @@ func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateReques
 	if err != nil {
 		return nil, err
 	}
+	clusters := []types.Resource{}
+	listeners := []types.Resource{}
+	endpoints := []types.Resource{}
+	routes := []types.Resource{}
 
 	for _, resourceReq := range request.Resources {
-		resources := []types.Resource{}
-		for _, name := range resourceReq.ResourceNames {
-			switch resourceReq.TypeUrl {
-			case TypeUrlCDS:
-				newResource := MakeCluster(name, request.Node)
-				resources = append(resources, newResource)
-				snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
-			case TypeUrlLDS:
-				address := fmt.Sprintf("https://%viscool.resources.com", name)
-				newResource := makeListener(name, address, 11223, []*listener.FilterChain{})
-				resources = append(resources, newResource)
-				snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
-			case TypeUrlRDS:
-				newResource := MakeRoute(name, name)
-				resources = append(resources, newResource)
-				snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
-			case TypeUrlEDS:
-				address := fmt.Sprintf("https://%viscool.endpoints.com", name)
-				newResource := MakeEndpoint(name, address, 10000)
-				resources = append(resources, newResource)
-				snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
-			}
+		switch resourceReq.TypeUrl {
+		case TypeUrlCDS:
+			var c cluster.Cluster
+			err = resourceReq.UnmarshalTo(&c)
+			clusters = append(clusters, MakeCluster(c.Name, request.Node))
+			snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, clusters)
+		case TypeUrlLDS:
+			var r listener.Listener
+			err = resourceReq.UnmarshalTo(&r)
+			listeners = append(listeners, makeListener(r.Name, randomAddress(), 10000, []*listener.FilterChain{}))
+			snapshot.Resources[types.Listener] = cache.NewResources(request.Version, listeners)
+		case TypeUrlEDS:
+			var r endpoint.ClusterLoadAssignment
+			err = resourceReq.UnmarshalTo(&r)
+			endpoints = append(endpoints, MakeEndpoint(r.ClusterName, randomAddress(), 10000))
+			snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, endpoints)
+		case TypeUrlRDS:
+			var r route.RouteConfiguration
+			err = resourceReq.UnmarshalTo(&r)
+			routes = append(routes, MakeRoute(r.Name, r.Name))
+			snapshot.Resources[types.Route] = cache.NewResources(request.Version, routes)
 		}
 	}
 	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
@@ -269,7 +273,6 @@ func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateReques
 		Success: true,
 	}
 	return response, nil
-
 }
 
 func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearStateRequest) (*pb.ClearStateResponse, error) {
@@ -421,4 +424,24 @@ func RunAdapter(port uint, cache cache.SnapshotCache) {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Adapter failed to serve: %v", err)
 	}
+}
+
+func randomAddress() string {
+	var (
+		consonants = []rune("bcdfklmnprstwyz")
+		vowels     = []rune("aou")
+		tld        = []string{".biz", ".com", ".net", ".org"}
+
+		domain = ""
+	)
+	rand.Seed(time.Now().UnixNano())
+	length := 6 + rand.Intn(12)
+
+	for i := 0; i < length; i++ {
+		consonant := string(consonants[rand.Intn(len(consonants))])
+		vowel := string(vowels[rand.Intn(len(vowels))])
+
+		domain = domain + consonant + vowel
+	}
+	return domain + tld[rand.Intn(len(tld))]
 }
