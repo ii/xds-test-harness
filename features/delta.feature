@@ -96,9 +96,9 @@ Feature: Delta
      | "RDS"   | "D,E"     | "E" | "D" | "1" | "2" |
      | "EDS"   | "D,E"     | "E" | "D" | "1" | "2" |
 
-  @incremental @aggregated @zz
+  @incremental @aggregated @wip
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
-    Given a target setup with service <xDS>, resources <resources>, and starting version <v1>
+    Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
      When the Client subscribes to resources <r1> for <xDS>
       And the Client subscribes to resources <r1> for <xDS2>
      Then the Client receives the resources <r1> and version <v1> for <xDS>
@@ -108,8 +108,8 @@ Feature: Delta
       And the service never responds more than necessary
 
     Examples:
-      | xDS   | xDS2  | resources | r1  | v1  | v2  |
-      | "CDS" | "LDS" | "A,B,C"   | "B" | "1" | "2" |
-      | "LDS" | "CDS" | "A,B,C"   | "B" | "1" | "2" |
-      | "RDS" | "EDS" | "A,B,C"   | "B" | "1" | "2" |
-      | "EDS" | "RDS" | "A,B,C"   | "B" | "1" | "2" |
+      | services  | xDS   | xDS2  | resources | r1  | v1  | v2  |
+      | "CDS,LDS" | "CDS" | "LDS" | "A,B,C"   | "B" | "1" | "2" |
+      | "LDS,CDS" | "LDS" | "CDS" | "A,B,C"   | "B" | "1" | "2" |
+      | "RDS,EDS" | "RDS" | "EDS" | "A,B,C"   | "B" | "1" | "2" |
+      | "EDS,RDS" | "EDS" | "RDS" | "A,B,C"   | "B" | "1" | "2" |

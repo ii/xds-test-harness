@@ -2,16 +2,13 @@ package parser
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/types"
 	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/rs/zerolog/log"
@@ -23,90 +20,6 @@ const (
 	TypeUrlRDS = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	TypeUrlEDS = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 )
-
-func RandomAddress() string {
-	var (
-		consonants = []rune("bcdfklmnprstwyz")
-		vowels     = []rune("aou")
-		tld        = []string{".biz", ".com", ".net", ".org"}
-
-		domain = ""
-	)
-	rand.Seed(time.Now().UnixNano())
-	length := 6 + rand.Intn(12)
-
-	for i := 0; i < length; i++ {
-		consonant := string(consonants[rand.Intn(len(consonants))])
-		vowel := string(vowels[rand.Intn(len(vowels))])
-
-		domain = domain + consonant + vowel
-	}
-	return domain + tld[rand.Intn(len(tld))]
-}
-
-func ToEndpoints(resourceNames []string) *pb.Endpoints {
-	endpoints := &pb.Endpoints{}
-	for _, name := range resourceNames {
-		endpoints.Items = append(endpoints.Items, &pb.Endpoint{
-			Name:    name,
-			Cluster: name,
-			Address: RandomAddress(),
-		})
-	}
-	return endpoints
-}
-
-func ToClusters(resourceNames []string) *pb.Clusters {
-	clusters := &pb.Clusters{}
-	for _, name := range resourceNames {
-		clusters.Items = append(clusters.Items, &pb.Cluster{
-			Name:           name,
-			ConnectTimeout: map[string]int32{"seconds": 5},
-		})
-	}
-	return clusters
-}
-
-func ToRoutes(resourceNames []string) *pb.Routes {
-	routes := &pb.Routes{}
-	for _, name := range resourceNames {
-		routes.Items = append(routes.Items, &pb.Route{
-			Name: name,
-		})
-	}
-	return routes
-}
-
-func ToListeners(resourceNames []string) *pb.Listeners {
-	listeners := &pb.Listeners{}
-	for _, name := range resourceNames {
-		listeners.Items = append(listeners.Items, &pb.Listener{
-			Name:    name,
-			Address: RandomAddress(),
-		})
-	}
-	return listeners
-}
-
-func ToRuntimes(resourceNames []string) *pb.Runtimes {
-	runtimes := &pb.Runtimes{}
-	for _, name := range resourceNames {
-		runtimes.Items = append(runtimes.Items, &pb.Runtime{
-			Name: name,
-		})
-	}
-	return runtimes
-}
-
-func ToSecrets(resourceNames []string) *pb.Secrets {
-	secrets := &pb.Secrets{}
-	for _, name := range resourceNames {
-		secrets.Items = append(secrets.Items, &pb.Secret{
-			Name: name,
-		})
-	}
-	return secrets
-}
 
 func ServiceToTypeURL(service string) (err error, typeURL string) {
 	typeURLs := map[string]string{

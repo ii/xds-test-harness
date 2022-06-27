@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/ii/xds-test-harness/api/adapter"
+	// pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/parser"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -32,9 +32,9 @@ type ClientConfig struct {
 }
 
 type Cache struct {
-	StartState     *pb.Snapshot
-	StateSnapshots []*pb.Snapshot
-	FinalResponse  *discovery.DiscoveryResponse
+	// StartState     *pb.Snapshot
+	// StateSnapshots []*pb.Snapshot
+	FinalResponse *discovery.DiscoveryResponse
 }
 
 type ValidateResource struct {
@@ -174,6 +174,7 @@ func (r *Runner) SotwStream(service *XDSService) {
 				ch.Err <- fmt.Errorf("Could not gather resource names from response: %v", err)
 				return
 			}
+			log.Debug().Msgf("Verison: %v", in.VersionInfo)
 			for _, resource := range resources {
 				r.Validate.Resources[in.TypeUrl][resource] = ValidateResource{
 					Version: in.VersionInfo,

@@ -4,79 +4,23 @@ option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter"
 
 package adapter;
 
-message Endpoint {
-  string name    = 1;
-  string cluster = 2;
-  string address = 3;
-}
+import "google/protobuf/any.proto";
 
-message Cluster {
-  string name                       = 1;
-  map<string,int32> connect_timeout = 2;
-}
-message Route {
-  string name = 1;
-}
-message Listener {
-  string name    = 1;
-  string address = 2;
-}
-message Runtime {
-  string name = 1;
-}
-
-message Secret {
-  string name = 1;
-}
-
-message Endpoints {
-  repeated Endpoint items = 1;
-}
-
-message Clusters {
-  repeated Cluster items = 1;
-}
-
-message Routes {
-  repeated Route items = 1;
-}
-
-message Listeners {
-  repeated Listener items = 1;
-}
-
-message Runtimes {
-  repeated Runtime items = 1;
-}
-
-message Secrets {
-  repeated Secret items = 1;
-}
-
-message Snapshot {
+message SetStateRequest {
   string node = 1;
   string version = 2;
-  Endpoints endpoints = 3;
-  Clusters clusters = 4;
-  Routes routes = 5;
-  Listeners listeners = 6;
-  Runtimes runtimes = 7;
-  Secrets secrets = 8;
+  repeated google.protobuf.Any resources = 3;
 }
 
 message SetStateResponse {
-  string message = 1;
+  bool success = 1;
 }
 
-message UpdateStateResponse {
-  string message = 1;
-}
-
-message clearRequest {
+message clearStateRequest {
   string node = 1;
 }
 
-message clearResponse {
+message clearStateResponse {
   string response = 1;
 }
 
@@ -100,9 +44,8 @@ message RemoveResourceResponse {
 }
 
 service Adapter {
-  rpc SetState(Snapshot) returns (SetStateResponse){}
-  rpc UpdateState(Snapshot) returns (UpdateStateResponse){}
-  rpc ClearState(clearRequest) returns (clearResponse) {}
+  rpc SetState(SetStateRequest) returns (SetStateResponse){}
+  rpc ClearState(clearStateRequest) returns (clearStateResponse) {}
   rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
   rpc AddResource(ResourceRequest) returns (AddResourceResponse) {}
   rpc RemoveResource(ResourceRequest) returns (RemoveResourceResponse) {}
