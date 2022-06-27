@@ -1,20 +1,19 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"sync"
 	"time"
 
-	// pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/parser"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -22,7 +21,6 @@ var (
 	opts []grpc.DialOption = []grpc.DialOption{
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
-		grpc.WithTimeout(time.Second * 10),
 	}
 )
 
@@ -171,7 +169,7 @@ func (r *Runner) SotwStream(service *XDSService) {
 
 			resources, err := parser.ResourceNames(in)
 			if err != nil {
-				ch.Err <- fmt.Errorf("Could not gather resource names from response: %v", err)
+				ch.Err <- fmt.Errorf("could not gather resource names from response: %v", err)
 				return
 			}
 			log.Debug().Msgf("Verison: %v", in.VersionInfo)
@@ -194,12 +192,12 @@ func (r *Runner) SotwStream(service *XDSService) {
 	for req := range service.Channels.Req {
 		var dr discovery.DiscoveryRequest
 		if err := req.UnmarshalTo(&dr); err != nil {
-			service.Channels.Err <- fmt.Errorf("Error unmarshalling from request channel: %v", err)
+			service.Channels.Err <- fmt.Errorf("error unmarshalling from request channel: %v", err)
 			return
 		}
 		if err := sotw.Stream.Send(&dr); err != nil {
 			log.Debug().Msgf("error sending: %v", err)
-			service.Channels.Err <- fmt.Errorf("Error sending discovery request: %v", err)
+			service.Channels.Err <- fmt.Errorf("error sending discovery request: %v", err)
 		}
 		r.Validate.RequestCount++
 	}
@@ -239,9 +237,7 @@ func (r *Runner) DeltaStream(service *XDSService) {
 					Version: in.SystemVersionInfo,
 					Nonce:   in.Nonce,
 				}
-				if _, ok := r.Validate.RemovedResources[in.TypeUrl][resource.Name]; ok {
-					delete(r.Validate.RemovedResources[in.TypeUrl], resource.Name)
-				}
+				delete(r.Validate.RemovedResources[in.TypeUrl], resource.Name)
 			}
 			for _, removed := range in.GetRemovedResources() {
 				r.Validate.RemovedResources[in.TypeUrl][removed] = ValidateResource{
@@ -270,7 +266,6 @@ func (r *Runner) DeltaStream(service *XDSService) {
 	}
 	delta.Stream.CloseSend()
 	wg.Wait()
-	return
 }
 
 func (r *Runner) Stream(service *XDSService) {
@@ -282,9 +277,11 @@ func (r *Runner) Stream(service *XDSService) {
 }
 
 func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn, err error) {
-	conn, err = grpc.Dial(client.Port, opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	conn, err = grpc.DialContext(ctx, client.Port, opts...)
+	cancel()
 	if err != nil {
-		err = fmt.Errorf("Cannot connect at %v: %v\n", client.Port, err)
+		err = fmt.Errorf("cannot connect at %v: %v", client.Port, err)
 		return nil, err
 	}
 	log.Debug().
@@ -295,7 +292,7 @@ func connectViaGRPC(client *ClientConfig, server string) (conn *grpc.ClientConn,
 // Using the last response and current subscribing request, create a new DiscoveryRequest to ACK that response.
 // We use the current subscribing request for the cases where the client is subscribing to A,B,C but only A,B
 // exist.  In that case, we want to ack that we've received A,B but that we are STILL subscribing to A,B,C.
-func (r *Runner) newAckFromResponse(res *anypb.Any) (*anypb.Any, error) {
+func (r *Runner) newAckFromResponse(res *any.Any) (*any.Any, error) {
 	// Only the first request should need the node ID,
 	// so we do not include it in the followups.  If this
 	// causes an error, it's a non-conformant error.
@@ -333,7 +330,7 @@ func (r *Runner) newAckFromResponse(res *anypb.Any) (*anypb.Any, error) {
 	}
 }
 
-func (r *Runner) newRequest(resourceNames []string, typeURL string) *anypb.Any {
+func (r *Runner) newRequest(resourceNames []string, typeURL string) *any.Any {
 	if r.Incremental {
 		request := &discovery.DeltaDiscoveryRequest{
 			Node:                   &core.Node{Id: r.NodeID},
