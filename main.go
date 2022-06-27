@@ -43,7 +43,7 @@ func main() {
 	}
 
 	// default to using CLI Flag for settings
-	err, supportedVariants := parser.ParseSupportedVariants(*variant)
+	supportedVariants, err := parser.ParseSupportedVariants(*variant)
 	if err != nil {
 		log.Fatal().Msgf("Cannot parse variants from CLI: %v\n", err)
 	}

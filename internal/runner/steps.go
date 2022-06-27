@@ -61,7 +61,7 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(services, resources, 
 	anyResources := []*anypb.Any{}
 
 	for _, service := range serviceNames {
-		err, typeUrl := parser.ServiceToTypeURL(service)
+		typeUrl, err := parser.ServiceToTypeURL(service)
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service 
 // for the given service. This is the heart of a test, as it sets up
 // the request/response loops that verify the service is working properly.
 func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []string) error {
-	err, typeUrl := parser.ServiceToTypeURL(srv)
+	typeUrl, err := parser.ServiceToTypeURL(srv)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (r *Runner) ClientSubscribesToServiceForResources(srv string, resources []s
 }
 
 func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resource, service, version string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -207,7 +207,7 @@ func (r *Runner) ClientUpdatesSubscriptionToAResourceForServiceWithVersion(resou
 }
 
 func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) error {
-	err, typeURL := parser.ServiceToTypeURL(service)
+	typeURL, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -236,7 +236,7 @@ func (r *Runner) ClientUnsubscribesFromAllResourcesForService(service string) er
 // A delta specific test, as delta can explicitly unsubscribe, whereas sotw can only update their subscription
 // set up a delta discovery request unsubscribing for given resource, and pass it along the channel.
 func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -266,7 +266,7 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 	expectedResources := strings.Split(resources, ",")
 	stream := r.Service
 
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -307,7 +307,7 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, 
 		case err := <-r.Service.Channels.Err:
 			return fmt.Errorf("Could not find expected response within grace period of 10 seconds or encountered error: %v.", err)
 		case <-done:
-			err, typeUrl := parser.ServiceToTypeURL(service)
+			typeUrl, err := parser.ServiceToTypeURL(service)
 			if err != nil {
 				return fmt.Errorf("Issue converting service to typeUrl, was it written correctly?")
 			}
@@ -323,7 +323,7 @@ func (r *Runner) ClientReceivesOnlyTheResourceAndVersionForTheService(resource, 
 	}
 }
 func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -344,7 +344,7 @@ func (r *Runner) ClientDoesNotReceiveAnyMessageFromService(service string) error
 func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, service string) error {
 	stream := r.Service
 
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -366,7 +366,7 @@ func (r *Runner) ClientReceivesNoticeThatResourceWasRemovedForService(resource, 
 
 func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, service, version string) error {
 	stream := r.Service
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		err := fmt.Errorf("Cannot determine typeURL for given service: %v\n", service)
 		return err
@@ -392,7 +392,7 @@ func (r *Runner) ClientDoesNotReceiveResourceOfServiceAtVersion(resource, servic
 ///////////////////////////////////////////////////////////////////////////////////
 
 func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func (r *Runner) ResourceIsAddedToServiceWithVersion(resource, service, version 
 }
 
 func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 }
 
 func (r *Runner) ResourceIsRemovedFromTheService(resource, service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -487,7 +487,7 @@ func (r *Runner) TheServiceNeverRespondsMoreThanNecessary() error {
 }
 
 func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, version, service string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -509,7 +509,7 @@ func (r *Runner) ResourcesAndVersionForServiceCameInASingleResponse(resources, v
 }
 
 func (r *Runner) NoOtherResourceHasSameVersionOrNonce(service, resource string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
@@ -528,7 +528,7 @@ func (r *Runner) NoOtherResourceHasSameVersionOrNonce(service, resource string) 
 }
 
 func (r *Runner) NoOtherResourceHasSameNonce(service, resource string) error {
-	err, typeUrl := parser.ServiceToTypeURL(service)
+	typeUrl, err := parser.ServiceToTypeURL(service)
 	if err != nil {
 		return err
 	}
