@@ -16,6 +16,7 @@ package main
 import (
 	"context"
 	"flag"
+
 	// "os"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
@@ -25,14 +26,10 @@ import (
 )
 
 var (
-	l example.Logger
-
-	port     uint
-	adapter  uint
-	basePort uint
-	mode     string
-
-	nodeID string
+	l       example.Logger
+	port    uint
+	adapter uint
+	nodeID  string
 )
 
 func init() {
