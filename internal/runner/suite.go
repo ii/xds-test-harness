@@ -32,10 +32,10 @@ func (s *Suite) StartRunner(node, adapter, target string) error {
 	s.Runner.Incremental = s.Incremental
 
 	if err := s.Runner.ConnectClient("target", target); err != nil {
-		return fmt.Errorf("Cannot connect to target: %v", err)
+		return fmt.Errorf("cannot connect to target: %v", err)
 	}
 	if err := s.Runner.ConnectClient("adapter", adapter); err != nil {
-		return fmt.Errorf("Cannot connect to adapter: %v", err)
+		return fmt.Errorf("cannot connect to adapter: %v", err)
 	}
 	log.Info().
 		Msgf("Connected to target at %s and adapter at %s", target, adapter)
@@ -55,7 +55,7 @@ func (s *Suite) SetTags(base string) error {
 	variants := strings.Split(string(s.Variant), " ")
 
 	if len(variants) < 1 {
-		err := fmt.Errorf("No variant type found to create tags from. This means the suite was not initialized properly.")
+		err := fmt.Errorf("no variant type found to create tags from. This means the suite was not initialized properly")
 		return err
 	}
 	for _, tag := range variants {
@@ -78,6 +78,9 @@ func (s *Suite) ConfigureSuite() {
 			return ctx, nil
 		})
 		ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+			if err != nil {
+				log.Err(err).Msg("error passed in scenario After hook")
+			}
 			c := pb.NewAdapterClient(s.Runner.Adapter.Conn)
 			clearRequest := &pb.ClearStateRequest{Node: s.Runner.NodeID}
 			clear, err := c.ClearState(context.Background(), clearRequest)
@@ -124,8 +127,8 @@ func (s *Suite) Run() (results types.VariantResults, err error) {
 		return results, err
 	}
 
-	if err = json.Unmarshal([]byte(s.Buffer.String()), &results); err != nil {
-		err = fmt.Errorf("Error unmarshalling test results: %v\n", err)
+	if err = json.Unmarshal(s.Buffer.Bytes(), &results); err != nil {
+		err = fmt.Errorf("error unmarshalling test results: %v", err)
 		return results, err
 	}
 
