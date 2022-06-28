@@ -112,14 +112,14 @@ func (r *Runner) TargetSetupWithServiceResourcesAndVersion(services, resources, 
 // Wrapper to start stream, without resources, for given service
 func (r *Runner) ClientDoesAWildcardSubscriptionToService(service string) error {
 	resources := []string{}
-	r.ClientSubscribesToServiceForResources(service, resources)
-	return nil
+	err := r.ClientSubscribesToServiceForResources(service, resources)
+	return err
 }
 
 func (r *Runner) ClientSubscribesToASubsetOfResourcesForService(subset, service string) error {
 	resources := strings.Split(subset, ",")
-	r.ClientSubscribesToServiceForResources(service, resources)
-	return nil
+	err := r.ClientSubscribesToServiceForResources(service, resources)
+	return err
 }
 
 // Takes service and creates a runner.Service with a fresh xDS stream
@@ -250,7 +250,7 @@ func (r *Runner) ClientUnsubscribesFromResourceForService(resource, service stri
 	delete(r.Validate.Resources[typeUrl], resource)
 	r.SubscribeRequest = any
 
-	log.Debug().Msgf("Sending Unsubscribe Request", request)
+	log.Debug().Msgf("Sending Unsubscribe Request: %v", request)
 	r.Service.Channels.Req <- any
 	return nil
 }

@@ -201,7 +201,9 @@ func (r *Runner) SotwStream(service *XDSService) {
 		}
 		r.Validate.RequestCount++
 	}
-	sotw.Stream.CloseSend()
+	if err := sotw.Stream.CloseSend(); err != nil {
+		ch.Err <- err
+	}
 	wg.Wait()
 }
 
@@ -264,7 +266,9 @@ func (r *Runner) DeltaStream(service *XDSService) {
 		}
 		r.Validate.RequestCount++
 	}
-	delta.Stream.CloseSend()
+	if err := delta.Stream.CloseSend(); err != nil {
+		ch.Err <- err
+	}
 	wg.Wait()
 }
 
