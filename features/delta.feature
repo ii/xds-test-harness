@@ -36,7 +36,7 @@ Feature: Delta
       | "RDS"   | "A,B,C"   | "A" | "1" | "2" |
       | "EDS"   | "A,B,C"   | "A" | "1" | "2" |
 
- @incremental @non-aggregated @aggregated
+ @incremental @non-aggregated @aggregated @wip
  Scenario: Client is told if resource does not exist, and is notified if it is created
    Given a target setup with service <service>, resources <r1>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
@@ -44,7 +44,7 @@ Feature: Delta
      And for service <service>, no resource other than <r1> has same version or nonce
     # And the Delta Client is told <r2> does not exist
     When the resource <r2> is added to the <service> with version <v1>
-    Then the Client receives the resources <r1> and version <v1> for <service>
+    Then the Client receives the resources <r2> and version <v1> for <service>
      And for service <service>, no resource other than <r2> has same nonce
      And the service never responds more than necessary
 
