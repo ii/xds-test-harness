@@ -36,7 +36,7 @@ Feature: Delta
       | "RDS"   | "A,B,C"   | "A" | "1" | "2" |
       | "EDS"   | "A,B,C"   | "A" | "1" | "2" |
 
- @incremental @non-aggregated @aggregated @wip
+ @incremental @non-aggregated @aggregated
  Scenario: Client is told if resource does not exist, and is notified if it is created
    Given a target setup with service <service>, resources <r1>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
@@ -96,7 +96,7 @@ Feature: Delta
      | "RDS"   | "D,E"     | "E" | "D" | "1" | "2" |
      | "EDS"   | "D,E"     | "E" | "D" | "1" | "2" |
 
-  @incremental @aggregated @wip
+  @incremental @aggregated
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
     Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
      When the Client subscribes to resources <r1> for <xDS>

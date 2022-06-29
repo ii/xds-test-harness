@@ -128,7 +128,7 @@ Feature: Subscribing to Resources
       | "EDS" | "A,B,C,D" | "A,Z"  | "A"             | "Z" | "1" | "2" |
 
 
-  @sotw @aggregated @wip
+  @sotw @aggregated
   Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
     Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
     When the Client subscribes to resources <r1> for <xDS>
