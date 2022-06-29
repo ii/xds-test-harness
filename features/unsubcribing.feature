@@ -6,7 +6,7 @@ Feature: Unsubscribing to Resources
   These features come from this list of test cases:
   https://docs.google.com/document/d/19oUEt9jSSgwNnvZjZgaFYBHZZsw52f2MwSo6LWKzg-E
 
-  @sotw @non-aggregated @aggregated
+  @sotw @non-aggregated @aggregated @zz
   Scenario: [<xDS>] Client can unsubcribe from some resources
     # This test does not check if the final results are only the subscribed resources
     # it is valid(though not desired) for a server to send more than is requested.
@@ -22,8 +22,8 @@ Feature: Unsubscribing to Resources
 
     Examples:
       | xDS   | resources   | subset  | r1    | v1  | v2  |
-      | "CDS" | "F,A,B,C,D" | "C,A,B" | "A,C" | "1" | "2" |
-      | "LDS" | "G,B,L,D"   | "B,D,L" | "B,D" | "1" | "2" |
+      | "CDS" | "F,A,B,C,D" | "C,A,B" | "A" | "1" | "2" |
+      | "LDS" | "G,B,L,D"   | "B,D,L" | "B" | "1" | "2" |
 
 
   @sotw @non-aggregated @aggregated
