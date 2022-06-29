@@ -8,190 +8,24 @@ import (
 	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	route "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
-	pb "github.com/ii/xds-test-harness/api/adapter"
 	"github.com/ii/xds-test-harness/internal/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
-
-var (
-	testResources = []string{"A", "B", "C"}
-)
-
-func TestToEndpoints(t *testing.T) {
-	expected := &pb.Endpoints{
-		Items: []*pb.Endpoint{
-			{
-				Name:    "A",
-				Cluster: "A",
-			},
-			{
-				Name:    "B",
-				Cluster: "B",
-			},
-			{
-				Name:    "C",
-				Cluster: "C",
-			},
-		},
-	}
-
-	actual := ToEndpoints(testResources)
-
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected endpoint name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-		if v.Cluster != exp.Cluster {
-			t.Errorf("Expected endpoint cluster doesn't match actual: %v, %v", v.Cluster, exp.Cluster)
-		}
-	}
-}
-
-func TestToClusters(t *testing.T) {
-	expected := &pb.Clusters{
-		Items: []*pb.Cluster{
-			{
-				Name:           "A",
-				ConnectTimeout: map[string]int32{"seconds": 5},
-			},
-			{
-				Name:           "B",
-				ConnectTimeout: map[string]int32{"seconds": 5},
-			},
-			{
-				Name:           "C",
-				ConnectTimeout: map[string]int32{"seconds": 5},
-			},
-		},
-	}
-
-	actual := ToClusters(testResources)
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected cluster name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-		if v.ConnectTimeout["seconds"] != exp.ConnectTimeout["seconds"] {
-			t.Errorf("Expected cluster timeout doesn't match actual: %v, %v", v.ConnectTimeout, exp.ConnectTimeout)
-		}
-	}
-}
-
-func TestToRoutes(t *testing.T) {
-	expected := &pb.Routes{
-		Items: []*pb.Route{
-			{
-				Name: "A",
-			},
-			{
-				Name: "B",
-			},
-			{
-				Name: "C",
-			},
-		},
-	}
-
-	actual := ToRoutes(testResources)
-
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected route name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-	}
-}
-
-func TestToListeners(t *testing.T) {
-	expected := &pb.Listeners{
-		Items: []*pb.Listener{
-			{
-				Name: "A",
-			},
-			{
-				Name: "B",
-			},
-			{
-				Name: "C",
-			},
-		},
-	}
-
-	actual := ToListeners(testResources)
-
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected listener name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-	}
-}
-
-func TestToRuntimes(t *testing.T) {
-	expected := &pb.Runtimes{
-		Items: []*pb.Runtime{
-			{
-				Name: "A",
-			},
-			{
-				Name: "B",
-			},
-			{
-				Name: "C",
-			},
-		},
-	}
-
-	actual := ToRuntimes(testResources)
-
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected runtime name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-	}
-}
-
-func TestToSecrets(t *testing.T) {
-	expected := &pb.Secrets{
-		Items: []*pb.Secret{
-			{
-				Name: "A",
-			},
-			{
-				Name: "B",
-			},
-			{
-				Name: "C",
-			},
-		},
-	}
-
-	actual := ToSecrets(testResources)
-
-	for i, v := range actual.Items {
-		exp := expected.Items[i]
-		if v.Name != exp.Name {
-			t.Errorf("Expected secret name doesn't match actual: %v, %v", v.Name, exp.Name)
-		}
-	}
-}
 
 func TestServiceToTypeURL(t *testing.T) {
 	yah := "lds"
 	yah2 := "CdS"
 	nah := "zds"
 
-	if _, v := ServiceToTypeURL(yah); v != TypeUrlLDS {
+	if v, _ := ServiceToTypeURL(yah); v != TypeUrlLDS {
 		t.Errorf("Incorrect service given back(expected, actual): %v %v", TypeUrlLDS, v)
 	}
 
-	if _, v := ServiceToTypeURL(yah2); v != TypeUrlCDS {
+	if v, _ := ServiceToTypeURL(yah2); v != TypeUrlCDS {
 		t.Errorf("Incorrect service given back(expected, actual): %v %v", TypeUrlLDS, v)
 	}
-	if err, v := ServiceToTypeURL(nah); err == nil {
+	if v, err := ServiceToTypeURL(nah); err == nil {
 		t.Errorf("Unknown type urls should return err. Instead received %v", v)
 	}
 }
@@ -342,7 +176,7 @@ func TestParseSupportedVariants(t *testing.T) {
 
 	nah := []string{"kakapo", "kea", "tui"}
 
-	err, yahVars := ParseSupportedVariants(yah)
+	yahVars, err := ParseSupportedVariants(yah)
 	if err != nil {
 		t.Errorf("Error parsing variants when expecting no err: %v", err)
 	}
@@ -352,7 +186,7 @@ func TestParseSupportedVariants(t *testing.T) {
 		}
 	}
 
-	err, _ = ParseSupportedVariants(nah)
+	_, err = ParseSupportedVariants(nah)
 	if err == nil {
 		t.Errorf("Parsing should return error when given bad variant strings. It did not.")
 	}

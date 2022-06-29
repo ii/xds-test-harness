@@ -88,6 +88,7 @@ type FailedScenario struct {
 	Name       string `json:"name"`
 	FailedStep string `json:"failedStep"`
 	Line       string `json:"line"`
+	Error      string `json:"error"`
 }
 
 type Results struct {

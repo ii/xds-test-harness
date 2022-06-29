@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -18,13 +19,12 @@ import (
 	runtime "github.com/envoyproxy/go-control-plane/envoy/service/runtime/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/golang/protobuf/ptypes"
 	pstruct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	pb "github.com/ii/xds-test-harness/api/adapter"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -36,8 +36,7 @@ const (
 )
 
 var (
-	xdsCache  cache.SnapshotCache
-	localhost = "127.0.0.1"
+	xdsCache cache.SnapshotCache
 )
 
 type Clusters map[string]*cluster.Cluster
@@ -46,14 +45,6 @@ type Endpoints map[string]*endpoint.ClusterLoadAssignment
 
 type adapterServer struct {
 	pb.UnimplementedAdapterServer
-}
-
-func listenerContents(listeners Listeners) []types.Resource {
-	var r []types.Resource
-	for _, l := range listeners {
-		r = append(r, l)
-	}
-	return r
 }
 
 // MakeEndpoint creates a localhost endpoint on a given port.
@@ -90,7 +81,7 @@ func MakeCluster(clusterName string, node string) *cluster.Cluster {
 	connectTimeout := 5 * time.Second
 	return &cluster.Cluster{
 		Name:                 clusterName,
-		ConnectTimeout:       ptypes.DurationProto(connectTimeout),
+		ConnectTimeout:       durationpb.New(connectTimeout),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_EDS},
 		EdsClusterConfig: &cluster.Cluster_EdsClusterConfig{
 			EdsConfig: edsSource,
@@ -189,7 +180,7 @@ func MakeRouteHTTPListener(clusterName string, listenerName string, listenerAddr
 	manager := buildHttpConnectionManager()
 	manager.RouteSpecifier = routeSpecifier
 
-	pbst, err := ptypes.MarshalAny(manager)
+	pbst, err := anypb.New(manager)
 	if err != nil {
 		panic(err)
 	}
@@ -227,85 +218,58 @@ func MakeRuntime(runtimeName string) *runtime.Runtime {
 	}
 }
 
-func (a *adapterServer) SetState(ctx context.Context, state *pb.Snapshot) (response *pb.SetStateResponse, err error) {
-
-	clusters := make([]types.Resource, len(state.Clusters.Items))
-	for i, cluster := range state.Clusters.Items {
-		clusters[i] = MakeCluster(cluster.Name, state.Node)
-	}
-
-	endpoints := make([]types.Resource, len(state.Endpoints.Items))
-	for i, endpoint := range state.Endpoints.Items {
-		endpoints[i] = MakeEndpoint(endpoint.Cluster, endpoint.Address, uint32(10000+i))
-	}
-
-	routes := make([]types.Resource, len(state.Routes.Items))
-	for i, route := range state.Routes.Items {
-		cluster := state.Clusters.Items[i]
-		routes[i] = MakeRoute(route.Name, cluster.Name)
-	}
-
-	listeners := make([]types.Resource, len(state.Listeners.Items))
-	for i, listener := range state.Listeners.Items {
-		port := uint32(11000 + i)
-		route := state.Routes.Items[i]
-		listeners[i] = MakeRouteHTTPListener(state.Node, listener.Name, listener.Address, port, route.Name)
-	}
-
-	runtimes := make([]types.Resource, len(state.Runtimes.Items))
-	for i, runtime := range state.Runtimes.Items {
-		runtimes[i] = MakeRuntime(runtime.Name)
-	}
-
-	snapshot, err := cache.NewSnapshot(
-		state.Version,
-		map[resource.Type][]types.Resource{
-			resource.EndpointType: endpoints,
-			resource.ClusterType:  clusters,
-			resource.RouteType:    routes,
-			resource.ListenerType: listeners,
-			resource.RuntimeType:  runtimes,
-			resource.SecretType:   {},
-		},
-	)
+func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateRequest) (response *pb.SetStateResponse, err error) {
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
 	if err != nil {
-		log.Printf("Error creating snapshot: %v", err)
+		return nil, err
 	}
-	if err = snapshot.Consistent(); err != nil {
-		log.Printf("snapshot inconsistency: %+v\n\n\n%+v", snapshot, err)
-		os.Exit(1)
-	}
+	clusters := []types.Resource{}
+	listeners := []types.Resource{}
+	endpoints := []types.Resource{}
+	routes := []types.Resource{}
 
-	// // Add the snapshot to the cache
-	if err := xdsCache.SetSnapshot(context.Background(), state.Node, snapshot); err != nil {
+	for _, resourceReq := range request.Resources {
+		switch resourceReq.TypeUrl {
+		case TypeUrlCDS:
+			var c cluster.Cluster
+			err = resourceReq.UnmarshalTo(&c)
+			clusters = append(clusters, MakeCluster(c.Name, request.Node))
+			snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, clusters)
+		case TypeUrlLDS:
+			var r listener.Listener
+			err = resourceReq.UnmarshalTo(&r)
+			listeners = append(listeners, makeListener(r.Name, randomAddress(), 10000, []*listener.FilterChain{}))
+			snapshot.Resources[types.Listener] = cache.NewResources(request.Version, listeners)
+		case TypeUrlEDS:
+			var r endpoint.ClusterLoadAssignment
+			err = resourceReq.UnmarshalTo(&r)
+			endpoints = append(endpoints, MakeEndpoint(r.ClusterName, randomAddress(), 10000))
+			snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, endpoints)
+		case TypeUrlRDS:
+			var r route.RouteConfiguration
+			err = resourceReq.UnmarshalTo(&r)
+			routes = append(routes, MakeRoute(r.Name, r.Name))
+			snapshot.Resources[types.Route] = cache.NewResources(request.Version, routes)
+		}
+	}
+	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		log.Printf("snapshot error %q for %+v", err, snapshot)
 		os.Exit(1)
 	}
-	newSnapshot, err := xdsCache.GetSnapshot(state.Node)
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
 	prettySnap, _ := json.Marshal(newSnapshot)
 	fmt.Printf("new snapshot: \n%v\n\n", string(prettySnap))
+
 	response = &pb.SetStateResponse{
-		Message: "Success",
+		Success: true,
 	}
 	return response, nil
 }
 
-func (a *adapterServer) UpdateState(ctx context.Context, state *pb.Snapshot) (*pb.UpdateStateResponse, error) {
-	response, err := a.SetState(ctx, state)
-	if err != nil {
-		fmt.Printf("Error setting state: %v", err)
-		return nil, err
-	}
-	updateResponse := &pb.UpdateStateResponse{
-		Message: response.Message,
-	}
-	return updateResponse, err
-}
-
-func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearRequest) (*pb.ClearResponse, error) {
+func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearStateRequest) (*pb.ClearStateResponse, error) {
 	log.Printf("Clearing Cache")
 	xdsCache.ClearSnapshot(req.Node)
-	response := &pb.ClearResponse{
+	response := &pb.ClearStateResponse{
 		Response: "All Clear",
 	}
 	return response, nil
@@ -328,14 +292,18 @@ func updateForType(res types.Resource) (uppedRes types.Resource) {
 }
 
 func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
 
-	for name, res := range snapshot.GetResources(request.TypeUrl) {
+	for name, res := range state.GetResources(request.TypeUrl) {
 		if name != request.ResourceName {
 			resources = append(resources, res)
 		} else {
@@ -367,13 +335,17 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 }
 
 func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceRequest) (*pb.AddResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
-	for _, res := range snapshot.GetResources(request.TypeUrl) {
+	for _, res := range state.GetResources(request.TypeUrl) {
 		resources = append(resources, res)
 	}
 
@@ -407,13 +379,17 @@ func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceReq
 }
 
 func (a *adapterServer) RemoveResource(ctx context.Context, request *pb.ResourceRequest) (*pb.RemoveResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
-	for name, res := range snapshot.GetResources(request.TypeUrl) {
+	for name, res := range state.GetResources(request.TypeUrl) {
 		if name != request.ResourceName {
 			resources = append(resources, res)
 		} else {
@@ -451,4 +427,24 @@ func RunAdapter(port uint, cache cache.SnapshotCache) {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Adapter failed to serve: %v", err)
 	}
+}
+
+func randomAddress() string {
+	var (
+		consonants = []rune("bcdfklmnprstwyz")
+		vowels     = []rune("aou")
+		tld        = []string{".biz", ".com", ".net", ".org"}
+
+		domain = ""
+	)
+	rand.Seed(time.Now().UnixNano())
+	length := 6 + rand.Intn(12)
+
+	for i := 0; i < length; i++ {
+		consonant := string(consonants[rand.Intn(len(consonants))])
+		vowel := string(vowels[rand.Intn(len(vowels))])
+
+		domain = domain + consonant + vowel
+	}
+	return domain + tld[rand.Intn(len(tld))]
 }

@@ -43,7 +43,7 @@ func main() {
 	}
 
 	// default to using CLI Flag for settings
-	err, supportedVariants := parser.ParseSupportedVariants(*variant)
+	supportedVariants, err := parser.ParseSupportedVariants(*variant)
 	if err != nil {
 		log.Fatal().Msgf("Cannot parse variants from CLI: %v\n", err)
 	}
@@ -123,7 +123,10 @@ func variantResults(results types.VariantResults) string {
 	if len(results.FailedScenarios) > 0 {
 		failedTests = "Failed Tests:\n"
 		for _, test := range results.FailedScenarios {
-			failedTests = failedTests + "  - " + test.Name + "\n"
+			failedTests = failedTests +
+				"  - " + test.Name +
+				"\n    Failed Step: " + test.FailedStep +
+				"\n    Error: " + test.Error + "\n"
 		}
 	}
 	return total + passed + failed + failedTests + skipped + undefined + pending

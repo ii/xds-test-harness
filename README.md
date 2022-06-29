@@ -57,17 +57,40 @@ cd xds-test-harness
 go run .
 ```
 
-To run it with detailed logging, add the --debug flag:
+## Run it by variant
+
+By default, it will run the test suite for all four transport protocol variants([as outlined in the envoy docs](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#variants-of-the-xds-transport-protocol)). These variants are:
+
+- sotw non-aggregated
+- sotw aggregated
+- incremental non-aggregated
+- incremental aggregated
+
+To run the suite for only a single variant, add the -V flag. To run it against a selection of variants, add multiple flags.
+```sh
+go run . -V "sotw non-aggregated"
+# run it against multiple variants
+go run . -V "sotw non-aggregated" -V "incremental aggregated"
+```
+
+## Debugging and test writing
+
+To run the suite with detailed logging, add the `--debug` flag:
 ``` sh
 go run . --debug
 ```
 
+By default, the suite will run with condensed output, generating a results.yaml file at the end. When writing tests, it can be useful to run it
+with the default godog output, that shows more detail and includes help with pending functions.  To run it with this output, use the `--testwriting` flag.
+``` sh
+go run . --testwriting
+```
 
 If you add a tag to the topline of a test in the feature file([example](https://github.com/ii/xds-test-harness/blob/update-gcp/features/subscriptions.feature#L125)), 
-you can run the harness for just this tag with the -t flag:
+you can run the harness for just this tag with the `-t` flag. This can be useful when debugging a single test, for example.
 
 ``` sh
-go run -t "@mytest"
+go run -t "@mytest" --debug --testwriting
 ```
 
 # Design
