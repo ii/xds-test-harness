@@ -9,3 +9,4 @@ api/*/*.pb.go
 results.json
 sotw-*.json
 incremental-*.json
+.ignore
