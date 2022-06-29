@@ -219,7 +219,7 @@ func MakeRuntime(runtimeName string) *runtime.Runtime {
 }
 
 func (a *adapterServer) SetState(ctx context.Context, request *pb.SetStateRequest) (response *pb.SetStateResponse, err error) {
-	snapshot := cache.Snapshot{}
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
 	if err != nil {
 		return nil, err
 	}
@@ -292,14 +292,18 @@ func updateForType(res types.Resource) (uppedRes types.Resource) {
 }
 
 func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
 
-	for name, res := range snapshot.GetResources(request.TypeUrl) {
+	for name, res := range state.GetResources(request.TypeUrl) {
 		if name != request.ResourceName {
 			resources = append(resources, res)
 		} else {
@@ -331,13 +335,17 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 }
 
 func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceRequest) (*pb.AddResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
-	for _, res := range snapshot.GetResources(request.TypeUrl) {
+	for _, res := range state.GetResources(request.TypeUrl) {
 		resources = append(resources, res)
 	}
 
@@ -371,13 +379,17 @@ func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceReq
 }
 
 func (a *adapterServer) RemoveResource(ctx context.Context, request *pb.ResourceRequest) (*pb.RemoveResourceResponse, error) {
-	snapshot, err := xdsCache.GetSnapshot(request.Node)
+	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
+	if err != nil {
+		return nil, err
+	}
+	state, err := xdsCache.GetSnapshot(request.Node)
 	if err != nil {
 		return nil, err
 	}
 
 	resources := []types.Resource{}
-	for name, res := range snapshot.GetResources(request.TypeUrl) {
+	for name, res := range state.GetResources(request.TypeUrl) {
 		if name != request.ResourceName {
 			resources = append(resources, res)
 		} else {
