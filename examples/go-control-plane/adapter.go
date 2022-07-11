@@ -291,6 +291,8 @@ func updateForType(res types.Resource) (uppedRes types.Resource) {
 	return res
 }
 
+// Set a new snapshot to the cache with everything the same as the current state, except for the requested resource updated
+// in some meaningful way.  The server will see this update and notify the client.
 func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
 	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
 	if err != nil {
@@ -301,33 +303,42 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 		return nil, err
 	}
 
-	resources := []types.Resource{}
+	// The function to return the current snapshot returns a
+	// cache.ResourceSnapshot type, while the function to set a new snapshot
+	// requires a cache.Resource type. Because of this, we do an iteration to
+	// construct a cache.Snapshot from a cache.ResourceSnapshot. Specifically,
+	// we iterate over the resources of each relevant type in the
+	// cache.ResourceSnapshot, and add each resource to our cache.Snapshot. If
+	// the iterated resource and type is the same as our passed in request, then we
+	// upgrade the resource before adding it to the cache.Snapshot
 
-	for name, res := range state.GetResources(request.TypeUrl) {
-		if name != request.ResourceName {
+	resourceTypes := map[string]types.ResponseType{
+		TypeUrlCDS: types.Cluster,
+		TypeUrlLDS: types.Listener,
+		TypeUrlRDS: types.Route,
+		TypeUrlEDS: types.Endpoint,
+	}
+
+	for typeUrl, resType := range resourceTypes {
+		resources := []types.Resource{}
+		for name, res := range state.GetResources(typeUrl) {
+			if name == request.ResourceName && typeUrl == request.TypeUrl {
+				res = updateForType(res)
+				fmt.Println("Upped Res: ", res)
+			}
 			resources = append(resources, res)
-		} else {
-			uppedRes := updateForType(res)
-			fmt.Println("uppedRes", res)
-			resources = append(resources, uppedRes)
 		}
+		snapshot.Resources[resType] = cache.NewResources(request.Version, resources)
+		// the cache is smart enough to see if the resource has changed, and set
+		// it to the given version with a notification to the client. So though we pass in a new version for all,
+		// it should only really apply when a resource has actually changed.
 	}
-
-	switch request.TypeUrl {
-	case TypeUrlCDS:
-		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
-	case TypeUrlLDS:
-		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
-	case TypeUrlRDS:
-		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
-	case TypeUrlEDS:
-		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
-	}
-
 	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		return nil, err
 	}
-
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
+	prettySnap, _ := json.Marshal(newSnapshot)
+	fmt.Printf("new snapshot after update: \n%v\n\n", string(prettySnap))
 	response := &pb.UpdateResourceResponse{
 		Success: true,
 	}
