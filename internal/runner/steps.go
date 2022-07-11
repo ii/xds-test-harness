@@ -280,7 +280,7 @@ func (r *Runner) ClientReceivesResourcesAndVersionForService(resources, version,
 			return fmt.Errorf("could not find expected response within grace period of 10 seconds. %v", err)
 		case <-done:
 			actualResources := r.Validate.Resources[typeUrl]
-			log.Debug().Msgf("Actual resources: %v", actualResources)
+			log.Debug().Msgf("Current resources: %v", r.Validate.Resources)
 			for _, resource := range expectedResources {
 				actual, ok := actualResources[resource]
 				if !ok {
@@ -426,13 +426,12 @@ func (r *Runner) ResourceOfServiceIsUpdatedToVersion(resource, service, version 
 		ResourceName: resource,
 		Version:      version,
 	}
-
+	log.Debug().
+		Msgf("Updating %v resource %v to version %v", service, resource, version)
 	_, err = c.UpdateResource(context.Background(), in)
 	if err != nil {
 		return fmt.Errorf("cannot update resource using adapter: %v", err)
 	}
-	log.Debug().
-		Msgf("Updating resource %v to version %v", resource, version)
 	return nil
 }
 

@@ -105,6 +105,8 @@ Feature: Delta
       And the Client receives the resources <r1> and version <v1> for <xDS2>
      When the resource <r1> of service <xDS> is updated to version <v2>
      Then the Client receives the resources <r1> and version <v2> for <xDS>
+     When the resource <r1> of service <xDS2> is updated to version <v2>
+     Then the Client receives the resources <r1> and version <v2> for <xDS2>
       And the service never responds more than necessary
 
     Examples:

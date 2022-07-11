@@ -36,7 +36,13 @@ const (
 )
 
 var (
-	xdsCache cache.SnapshotCache
+	xdsCache      cache.SnapshotCache
+	resourceTypes = map[string]types.ResponseType{
+		TypeUrlCDS: types.Cluster,
+		TypeUrlLDS: types.Listener,
+		TypeUrlRDS: types.Route,
+		TypeUrlEDS: types.Endpoint,
+	}
 )
 
 type Clusters map[string]*cluster.Cluster
@@ -275,6 +281,22 @@ func (a *adapterServer) ClearState(ctx context.Context, req *pb.ClearStateReques
 	return response, nil
 }
 
+func newResource(request *pb.ResourceRequest) (r types.Resource) {
+	switch request.TypeUrl {
+	case TypeUrlCDS:
+		r = MakeCluster(request.ResourceName, request.Node)
+	case TypeUrlLDS:
+		address := fmt.Sprintf("https://%viscool.resources.com", request.ResourceName)
+		r = makeListener(request.ResourceName, address, 11223, []*listener.FilterChain{})
+	case TypeUrlRDS:
+		r = MakeRoute(request.ResourceName, request.ResourceName)
+	case TypeUrlEDS:
+		address := fmt.Sprintf("https://%viscool.endpoints.com", request.ResourceName)
+		r = MakeEndpoint(request.ResourceName, address, 10000)
+	}
+	return r
+}
+
 func updateForType(res types.Resource) (uppedRes types.Resource) {
 	switch v := res.(type) {
 	case *cluster.Cluster:
@@ -291,6 +313,8 @@ func updateForType(res types.Resource) (uppedRes types.Resource) {
 	return res
 }
 
+// Set a new snapshot to the cache with everything the same as the current state, except for the requested resource updated
+// in some meaningful way.  The server will see this update and notify the client.
 func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.ResourceRequest) (*pb.UpdateResourceResponse, error) {
 	snapshot, err := cache.NewSnapshot("1", make(map[string][]types.Resource))
 	if err != nil {
@@ -301,33 +325,35 @@ func (a *adapterServer) UpdateResource(ctx context.Context, request *pb.Resource
 		return nil, err
 	}
 
-	resources := []types.Resource{}
+	// The function to return the current snapshot returns a
+	// cache.ResourceSnapshot type, while the function to set a new snapshot
+	// requires a cache.Resource type. Because of this, we do an iteration to
+	// construct a cache.Snapshot from a cache.ResourceSnapshot. Specifically,
+	// we iterate over the resources of each relevant type in the
+	// cache.ResourceSnapshot, and add each resource to our cache.Snapshot. If
+	// the iterated resource and type is the same as our passed in request, then we
+	// upgrade the resource before adding it to the cache.Snapshot
 
-	for name, res := range state.GetResources(request.TypeUrl) {
-		if name != request.ResourceName {
+	for typeUrl, resType := range resourceTypes {
+		resources := []types.Resource{}
+		for name, res := range state.GetResources(typeUrl) {
+			if name == request.ResourceName && typeUrl == request.TypeUrl {
+				res = updateForType(res)
+				fmt.Println("Upped Res: ", res)
+			}
 			resources = append(resources, res)
-		} else {
-			uppedRes := updateForType(res)
-			fmt.Println("uppedRes", res)
-			resources = append(resources, uppedRes)
 		}
+		snapshot.Resources[resType] = cache.NewResources(request.Version, resources)
+		// the cache is smart enough to see if the resource has changed, and set
+		// it to the given version with a notification to the client. So though we pass in a new version for all,
+		// it should only really apply when a resource has actually changed.
 	}
-
-	switch request.TypeUrl {
-	case TypeUrlCDS:
-		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
-	case TypeUrlLDS:
-		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
-	case TypeUrlRDS:
-		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
-	case TypeUrlEDS:
-		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
-	}
-
 	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		return nil, err
 	}
-
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
+	prettySnap, _ := json.Marshal(newSnapshot)
+	fmt.Printf("new snapshot after update: \n%v\n\n", string(prettySnap))
 	response := &pb.UpdateResourceResponse{
 		Success: true,
 	}
@@ -344,37 +370,26 @@ func (a *adapterServer) AddResource(ctx context.Context, request *pb.ResourceReq
 		return nil, err
 	}
 
-	resources := []types.Resource{}
-	for _, res := range state.GetResources(request.TypeUrl) {
-		resources = append(resources, res)
+	for typeUrl, resType := range resourceTypes {
+		resources := []types.Resource{}
+		for _, res := range state.GetResources(typeUrl) {
+			resources = append(resources, res)
+			if typeUrl == request.TypeUrl {
+				new := newResource(request)
+				resources = append(resources, new)
+			}
+		}
+		snapshot.Resources[resType] = cache.NewResources(request.Version, resources)
 	}
-
-	switch request.TypeUrl {
-	case TypeUrlCDS:
-		newResource := MakeCluster(request.ResourceName, request.Node)
-		resources = append(resources, newResource)
-		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
-	case TypeUrlLDS:
-		address := fmt.Sprintf("https://%viscool.resources.com", request.ResourceName)
-		newResource := makeListener(request.ResourceName, address, 11223, []*listener.FilterChain{})
-		resources = append(resources, newResource)
-		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
-	case TypeUrlRDS:
-		newResource := MakeRoute(request.ResourceName, request.ResourceName)
-		resources := append(resources, newResource)
-		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
-	case TypeUrlEDS:
-		address := fmt.Sprintf("https://%viscool.endpoints.com", request.ResourceName)
-		newResource := MakeEndpoint(request.ResourceName, address, 10000)
-		resources := append(resources, newResource)
-		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
-	}
-
 	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		return nil, err
 	}
-	fmt.Println("Added Resource: ", request)
-	response := &pb.AddResourceResponse{Success: true}
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
+	prettySnap, _ := json.Marshal(newSnapshot)
+	fmt.Printf("new snapshot after addition: \n%v\n\n", string(prettySnap))
+	response := &pb.AddResourceResponse{
+		Success: true,
+	}
 	return response, nil
 }
 
@@ -388,30 +403,27 @@ func (a *adapterServer) RemoveResource(ctx context.Context, request *pb.Resource
 		return nil, err
 	}
 
-	resources := []types.Resource{}
-	for name, res := range state.GetResources(request.TypeUrl) {
-		if name != request.ResourceName {
-			resources = append(resources, res)
-		} else {
-			fmt.Printf("Removing this resource: %v\n", name)
+	for typeUrl, resType := range resourceTypes {
+		resources := []types.Resource{}
+		for name, res := range state.GetResources(typeUrl) {
+			if name == request.ResourceName && typeUrl == request.TypeUrl {
+				fmt.Printf("Removing resource %v from %v\n", request.ResourceName, request.TypeUrl)
+				continue
+			} else {
+				resources = append(resources, res)
+			}
 		}
+		snapshot.Resources[resType] = cache.NewResources(request.Version, resources)
 	}
-
-	switch request.TypeUrl {
-	case TypeUrlCDS:
-		snapshot.Resources[types.Cluster] = cache.NewResources(request.Version, resources)
-	case TypeUrlLDS:
-		snapshot.Resources[types.Listener] = cache.NewResources(request.Version, resources)
-	case TypeUrlRDS:
-		snapshot.Resources[types.Route] = cache.NewResources(request.Version, resources)
-	case TypeUrlEDS:
-		snapshot.Resources[types.Endpoint] = cache.NewResources(request.Version, resources)
-	}
-
 	if err := xdsCache.SetSnapshot(context.Background(), request.Node, snapshot); err != nil {
 		return nil, err
 	}
-	response := &pb.RemoveResourceResponse{Success: true}
+	newSnapshot, _ := xdsCache.GetSnapshot(request.Node)
+	prettySnap, _ := json.Marshal(newSnapshot)
+	fmt.Printf("new snapshot after removal: \n%v\n\n", string(prettySnap))
+	response := &pb.RemoveResourceResponse{
+		Success: true,
+	}
 	return response, nil
 }
 
