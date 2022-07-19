@@ -3,7 +3,7 @@ Feature: Delta
 
 
   @incremental @non-aggregated @aggregated
-  Scenario Outline: Subscribe to resources one after the other
+  Scenario Outline: [<service>] Subscribe to resources one after the other
     Given a target setup with service <service>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <r1> for <service>
     Then the Client receives the resources <r1> and version <v1> for <service>
@@ -20,7 +20,7 @@ Feature: Delta
 
 
  @incremental @non-aggregated @aggregated
-  Scenario Outline: When a resource is updated, receive response for only that resource
+ Scenario Outline: [<service>] When a resource is updated, receive response for only that resource
     Given a target setup with service <service>, resources <resources>, and starting version <v1>
      When the Client subscribes to resources <resources> for <service>
      Then the Client receives the resources <resources> and version <v1> for <service>
@@ -37,7 +37,7 @@ Feature: Delta
       | "EDS"   | "A,B,C"   | "A" | "1" | "2" |
 
  @incremental @non-aggregated @aggregated
- Scenario: Client is told if resource does not exist, and is notified if it is created
+ Scenario Outline: [<service>] Client is told if resource does not exist, and is notified if it is created
    Given a target setup with service <service>, resources <r1>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <r1> and version <v1> for <service>
@@ -57,7 +57,7 @@ Feature: Delta
 
 
  @incremental @non-aggregated @aggregated
- Scenario: Client is told when a resource is removed via removed_resources field
+ Scenario Outline: [<service>] Client is told when a resource is removed via removed_resources field
    Given a target setup with service <service>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <resources> and version <v1> for <service>
@@ -77,7 +77,7 @@ Feature: Delta
 
 
  @incremental @non-aggregated @aggregated
- Scenario: Client can incrementally unsubscribe from resources
+ Scenario Outline: [<service>] Client can incrementally unsubscribe from resources
    Given a target setup with service <service>, resources <resources>, and starting version <v1>
     When the Client subscribes to resources <resources> for <service>
     Then the Client receives the resources <resources> and version <v1> for <service>
@@ -97,7 +97,7 @@ Feature: Delta
      | "EDS"   | "D,E"     | "E" | "D" | "1" | "2" |
 
   @incremental @aggregated
-  Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
+  Scenario Outline: [<services>] Client can subscribe to multiple services via ADS
     Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
      When the Client subscribes to resources <r1> for <xDS>
       And the Client subscribes to resources <r1> for <xDS2>
