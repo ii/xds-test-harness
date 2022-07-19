@@ -1,0 +1,87 @@
+#+title: xDS Relay
+#+date:  <2022-07-18 Mon>
+
+* Purpose
+This diary explores adding an xds-relay server as a second example
+implementation. I build an understanding of xds-relay through known examples,
+then iterate through running it through our test suite.
+* What is xds relay?
+xDS relay, a project maintained by Envoy Proxy, is described in the README as
+"Caching, aggregation, and relaying for xDS compliant clients and origin servers
+". Practically, it is used to help setups where you have multiple envoy proxies
+running and want a nice way for them to all receive updates from the same
+source.
+
+It also helps extend the capabilities of your home-made control plane.
+From an [[https://www.youtube.com/watch?v=9058lR0evbo][envoy AMA]], Matt Klein said:
+
+#+begin_quote
+the idea behind xds-relay is to push a bunch of functionality that people have
+to build if they're really going to build a reliable and resilient control
+plane, into a middle tier. You can think of it as a cdn, or caching layer, or
+varnish-like thing, but built for xDS.
+#+end_quote
+* Resources
+- Repo :: https://github.com/envoyproxy/xds-relay
+- Matt Klein AMA :: https://www.youtube.com/watch?v=9058lR0evbo
+- Kubecon Presentation with Jessica Yuen, Jyoti Mahapatra ::  https://www.youtube.com/watch?v=sdKklehKW78
+
+* xDS relay and us
+For our purposes, it is important that this is not a management server, it is a
+relay that listens to updates from a management server. We would still need to build
+a server that is integrated with our adapter so it can handle state updates. This
+server doesnt' /need/ to be conformant though, as long as it's sending any sort of
+updates to the xds-relay.  The relay than takes these updates, transforms them as needed,
+and sends updates to the subscribed client.  An example that Matt uses in the above AMA is
+a server that is only set up with State of the World, but then xds relay takes the SotW updates
+and turns them into incremental updates.  So from the client's perspective, they now have
+incremental subscriptions, even though they did not build a server that could handle them.
+
+In short, the xds relay has a management server as a dependency. The management
+server must send updates to the relay, but I don't think it needs to be
+conformant fro the xds relay to be conformant.
+
+This is my understanding of it, though it would be good to check my understanding.
+* Status of project
+The xds-relay readme offers an example setup, with a simple GCP management
+server providing a new snapshot every 10s and xds-relay attached to that. I
+think I can port this example over here, then modify their GCP to use our
+adapter as well.
+
+One thing to note is there's been no meaningful updates to this codebase in the
+last 17 months. The latest change was an update to the OWNERS file. Before that,
+the last real update was Jan/Feb 2021. No issue has been commented on
+since 2020.
+
+In the [[https://www.youtube.com/watch?v=sdKklehKW78][xds relay talk]] of 2020, one of the features listed for the
+relay is a SoTW->Delta conversion, however this is an open issue that doesn't
+seem ot have any progress since.  I am wondering if this is the most useful example of
+an implementation for our test harness.
+
+Is the incremental variant implemented in the service? If so, how should we test it?
+
+The xds relay service is meant to be run via rules. You create an
+aggregation-rules.yaml that is passed to the relay on startup. This, I believe,
+sets up which services to talk to and any sort of transformations (the example
+shows creating a custom key for each service from a cluster, e.g. "cluster1_LDS"
+as a key for all LDS responses).
+
+In KubeCon presentation, someone asked how to determine which logic should be
+handled by xds-relay and which should be configured in your mangement server.
+Jessica answered that, essentially, if you can't declare your intent as a rule
+in this yaml, and instead must write custom logic, then it is best to write that
+logic in your management server.
+
+I, personally, am having a hard time figuring out the structure and limits of
+the current rules.yaml. The example is simple, but what of things like
+incremental updates or serving a non-envoy client.
+
+Lastly, in the #xds-relay channel in the envoy slack, it is stated that the project is
+no longer being developed by the original maintainers and the last meaningful conversations
+happened in early 2021.
+
+I do not think this is a good fit for our example implementation.
+
+* Questions
+** Does the xds relay require a tested,conformant management server before it can run our test suite?
+** Should we build an implementation, considering this does not seem to be in active development?
