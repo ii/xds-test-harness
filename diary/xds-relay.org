@@ -30,7 +30,7 @@ varnish-like thing, but built for xDS.
 For our purposes, it is important that this is not a management server, it is a
 relay that listens to updates from a management server. We would still need to build
 a server that is integrated with our adapter so it can handle state updates. This
-server doesnt' /need/ to be conformant though, as long as it's sending any sort of
+server doesn't /need/ to be conformant though, as long as it's sending any sort of
 updates to the xds-relay.  The relay than takes these updates, transforms them as needed,
 and sends updates to the subscribed client.  An example that Matt uses in the above AMA is
 a server that is only set up with State of the World, but then xds relay takes the SotW updates
@@ -39,7 +39,7 @@ incremental subscriptions, even though they did not build a server that could ha
 
 In short, the xds relay has a management server as a dependency. The management
 server must send updates to the relay, but I don't think it needs to be
-conformant fro the xds relay to be conformant.
+conformant for the xds relay to be conformant.
 
 This is my understanding of it, though it would be good to check my understanding.
 * Status of project
@@ -55,7 +55,7 @@ since 2020.
 
 In the [[https://www.youtube.com/watch?v=sdKklehKW78][xds relay talk]] of 2020, one of the features listed for the
 relay is a SoTW->Delta conversion, however this is an open issue that doesn't
-seem ot have any progress since.  I am wondering if this is the most useful example of
+seem to have any progress since.  I am wondering if this is the most useful example of
 an implementation for our test harness.
 
 Is the incremental variant implemented in the service? If so, how should we test it?
@@ -66,8 +66,8 @@ sets up which services to talk to and any sort of transformations (the example
 shows creating a custom key for each service from a cluster, e.g. "cluster1_LDS"
 as a key for all LDS responses).
 
-In KubeCon presentation, someone asked how to determine which logic should be
-handled by xds-relay and which should be configured in your mangement server.
+In the KubeCon presentation, someone asked how to determine which logic should be
+handled by xds-relay and which should be configured in your management server.
 Jessica answered that, essentially, if you can't declare your intent as a rule
 in this yaml, and instead must write custom logic, then it is best to write that
 logic in your management server.
