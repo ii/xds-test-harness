@@ -129,7 +129,7 @@ Feature: Subscribing to Resources
 
 
   @sotw @aggregated
-  Scenario Outline: [<xDS>] Client can subscribe to multiple services via ADS
+  Scenario Outline: [<services>] Client can subscribe to multiple services via ADS
     Given a target setup with multiple services <services>, each with resources <resources>, and starting version <v1>
     When the Client subscribes to resources <r1> for <xDS>
     Then the Client receives the resources <r1> and version <v1> for <xDS>
