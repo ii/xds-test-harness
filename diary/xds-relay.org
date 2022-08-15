@@ -82,6 +82,7 @@ happened in early 2021.
 
 I do not think this is a good fit for our example implementation.
 
-* Questions
-** Does the xds relay require a tested,conformant management server before it can run our test suite?
-** Should we build an implementation, considering this does not seem to be in active development?
+* Conclusion
+Based on the stalled status of the project, and its incomplete feature set
+compared to our test suite, we decided to not use xDS-relay as an example target
+server for our test suite.
