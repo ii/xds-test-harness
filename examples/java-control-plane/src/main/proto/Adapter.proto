@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+option go_package = "github.com/zachmandeville/tester-prototype/adapter/adapter";
+option java_multiple_files = false;
+option java_package = 'nz.ii.xdstestharness.adapter';
+option java_outer_classname = 'AdapterProto';
+option objc_class_prefix = 'ADP';
+
+package adapter;
+
+import "google/protobuf/any.proto";
+
+message SetStateRequest {
+  string node = 1;
+  string version = 2;
+  repeated google.protobuf.Any resources = 3;
+}
+
+message SetStateResponse {
+  bool success = 1;
+}
+
+message clearStateRequest {
+  string node = 1;
+}
+
+message clearStateResponse {
+  string response = 1;
+}
+
+message ResourceRequest {
+  string node = 1;
+  string typeUrl = 2;
+  string resourceName = 3;
+  string version = 4;
+}
+
+message UpdateResourceResponse {
+  bool success = 1;
+}
+
+message AddResourceResponse {
+  bool success = 1;
+}
+
+message RemoveResourceResponse {
+  bool success = 1;
+}
+
+service Adapter {
+  rpc SetState(SetStateRequest) returns (SetStateResponse){}
+  rpc ClearState(clearStateRequest) returns (clearStateResponse) {}
+  rpc UpdateResource(ResourceRequest) returns (UpdateResourceResponse) {}
+  rpc AddResource(ResourceRequest) returns (AddResourceResponse) {}
+  rpc RemoveResource(ResourceRequest) returns (RemoveResourceResponse) {}
+}
