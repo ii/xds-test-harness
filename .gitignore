@@ -10,3 +10,5 @@ results.json
 sotw-*.json
 incremental-*.json
 .ignore
+examples/java-control-plane/build
+examples/java-control-plane/.gradle
