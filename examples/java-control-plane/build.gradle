@@ -55,4 +55,16 @@ sourceSets {
         }
     }
 }
-// startScripts.enabled = false
+startScripts.enabled = false
+
+task controlPlaneWithAdapter(type: CreateStartScripts) {
+    mainClass = 'ii.nz.xdstestharness.Main'
+    applicationName = 'control-plane-with-adapter'
+    outputDir = new File(project.buildDir, 'tmp/scripts/' + name)
+    classpath = startScripts.classpath
+}
+
+applicationDistribution.into('bin') {
+    from(controlPlaneWithAdapter)
+    fileMode = 0755
+}
